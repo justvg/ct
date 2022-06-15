@@ -1,0 +1,56 @@
+{
+   "indexed" : 0,
+
+   "meshes": [
+      {
+         "primitives": [
+            {
+               "attributes": {
+                  "POSITION": 0,
+                  "NORMAL": 1,
+               },
+            }
+         ],
+      }
+   ],
+   "accessors": [
+      {
+         "bufferView": 0,
+         "byteOffset": 0,
+         "componentType": 5126,
+         "count": 336,
+         "type": "VEC3"
+      },
+      {
+         "bufferView": 1,
+         "byteOffset": 0,
+         "componentType": 5126,
+         "count":336,
+         "type": "VEC3"
+      },
+   ],
+   "bufferViews": [
+      {
+         "buffer": 0,
+         "byteLength": 4032,
+         "byteOffset": 0,
+         "byteStride": 12,
+         "target": 34962,
+      },
+      {
+         "buffer": 0,
+         "byteLength": 4032,
+         "byteOffset": 4032,
+         "byteStride": 12,
+         "target": 34962,
+      },
+   ],
+   "buffers":[
+      {
+         "byteLength": 10752,
+         "uri": "editor_arrow.bin"
+      }
+   ],
+   
+   "offset" : [ 0.0, 0.0, 0.0 ],
+}
