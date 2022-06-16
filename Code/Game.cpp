@@ -26,7 +26,12 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 	{
 		Camera->Pitch = Clamp(Camera->Pitch, -60.0f, 89.0f);
 	}
+	
 	Camera->Head -= 0.1f*GameInput->MouseDeltaX;
+	if (Absolute(Camera->Head) >= 360.0f)
+	{
+		Camera->Head += -Sign(Camera->Head) * 360.0f;
+	}
 	
 	Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
 	Camera->Dir.y = Sin(Radians(Camera->Pitch));
@@ -433,24 +438,33 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 		for (uint32_t EntityIndex = 0; EntityIndex < Level->EntityCount; EntityIndex++)
 		{
 			SEntity* Entity = Level->Entities + EntityIndex;
-			
+				
 			if ((Entity->Type == Entity_Gates) && Entity->bCollisionWithHeroStarted)
 			{
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
+					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+
+					float Orientation = Camera->Head;
+
 					char LevelName[264] = {};
 					ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 					LoadLevel(GameState, &GameState->LevelBaseState, LevelName, Level->Entities[0].Velocity);
-					
-					if (CompareStrings(Entity->TargetLevelName, "level_base"))
-					{
-						GameState->LevelBaseState.Entities[0].Pos = GameState->LastBaseLevelPos;
-					}
-					
-					float GatesAngleDifference = Entity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+
+					SEntity* HeroEntity = &GameState->LevelBaseState.Entities[0];
+
+					if (!bTargetMainHub)
+						Orientation = HeroEntity->Orientation.y;
+
+					float GatesAngleDifference = Orientation - GameState->LastBaseLevelGatesAngle;
 					quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
-					GameState->LevelBaseState.Entities[0].Velocity = RotateByQuaternion(GameState->LevelBaseState.Entities[0].Velocity, Rotation);
+					HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
 					Camera->Head += GatesAngleDifference;
+
+					if (bTargetMainHub)
+					{
+						HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
+					}
 					
 					Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
 					Camera->Dir.y = Sin(Radians(Camera->Pitch));

@@ -142,6 +142,7 @@ struct SText
 
 	bool bAppearance;
 	float TimeToAppear;
+	float TimeToStartAppear;
 };
 
 struct SHeroControl
@@ -229,7 +230,7 @@ struct SGameState
 #endif
 };
 
-inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float Scale, float Time, bool bAppearance = false, float TimeToAppear = 0.0f)
+inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float Scale, float Time, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
 {
 	Assert(GameState->TextsToRenderCount < ArrayCount(GameState->TextsToRender));
 	SText* Text = &GameState->TextsToRender[GameState->TextsToRenderCount++];
@@ -248,6 +249,7 @@ inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float S
 	
 	Text->bAppearance = bAppearance;
 	Text->TimeToAppear = TimeToAppear;
+	Text->TimeToStartAppear = TimeToStartAppear;
 }
 
 inline bool IsVoxelActive(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)

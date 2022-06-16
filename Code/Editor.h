@@ -56,7 +56,7 @@ struct SEditorState
 	vec3 SelectedVoxelColorFloat;
 
 	uint32_t BuildingVoxelsToAddCount;
-	uint32_t BuildingVoxelsToAdd[256];
+	uint32_t BuildingVoxelsToAdd[LevelDimZ*LevelDimY*LevelDimX];
 
 	EWallSetMode WallSetMode;
 	vec3 WallSetLastWorldPos;

@@ -180,6 +180,12 @@ SEntity* AddMessageToggler(SLevel& Level, vec3 Pos)
 	Entity->Dim = Vec3(1.0f, 1.0f, 1.0f);
 	Entity->Scale = 1.0f;
 
+	Entity->MessagePos = Vec2(0.0f, 0.5f);
+	Entity->MessageScale = 0.5f;
+	Entity->MessageLifeTime = 5.0f;
+	Entity->MessageTimeToAppear = 3.0f;
+	Entity->MessageTimeToStartAppear = 0.0f;
+
 	Entity->Alpha = 1.0f;
 
 	Entity->MeshIndex = 1;
@@ -313,7 +319,7 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 			B->bCollisionWithHeroStarted = true;
 			B->CollisionWithHeroTimePassed = 0.0f;
 
-			if (CompareStrings(GameState->LevelName, "Levels\\level_base.ctl"))
+			if (CompareStrings(GameState->LevelName, "Levels\\MainHub.ctl"))
 			{
 				GameState->LastBaseLevelPos = A->PrevPos;
 				GameState->LastBaseLevelGatesAngle = B->Orientation.y;
@@ -331,7 +337,7 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 	{
 		B->bRemoved = true;
 
-		AddText(GameState, B->MessageText, Vec2(0.0f, 0.5f), 0.6f, 5.0f, true, 3.0f);
+		AddText(GameState, B->MessageText, B->MessagePos, B->MessageScale, B->MessageLifeTime, true, B->MessageTimeToAppear, B->MessageTimeToStartAppear);
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Checkpoint))
 	{

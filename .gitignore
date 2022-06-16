@@ -5,5 +5,5 @@ workspace.code-workspace
 Log.txt
 TODO
 cloc.exe
-WinMain.sln
 Content/Shaders/*
+WinMain.sln

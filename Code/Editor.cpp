@@ -35,6 +35,14 @@ bool EditorDragFloat(SEditorState* EditorState, const char* Name, float* Ptr, fl
 	return bValueChanged;
 }
 
+bool EditorDragFloat2(SEditorState* EditorState, const char* Name, float* Ptr, float Speed)
+{
+	bool bValueChanged = ImGui::DragFloat2(Name, Ptr, Speed);
+	EditorState->bIsImguiWindowHovered |= ImGui::IsItemActive();
+
+	return bValueChanged;
+}
+
 bool EditorDragFloat3(SEditorState* EditorState, const char* Name, float* Ptr, float Speed)
 {
 	bool bValueChanged = ImGui::DragFloat3(Name, Ptr, Speed);
@@ -66,6 +74,20 @@ bool EditorColorEdit3(SEditorState* EditorState, const char* Name, vec3* Ptr)
 	EditorState->bIsImguiWindowHovered |= ImGui::IsItemActive();
 
 	return bValueChanged;
+}
+
+bool EditorInputText(SEditorState* EditorState, const char* Name, char* Buffer, size_t BufferSize)
+{
+	bool bEnter = ImGui::InputText(Name, Buffer, BufferSize, ImGuiInputTextFlags_EnterReturnsTrue);
+	if (bEnter)
+	{
+		// NOTE(georgii): Disable focus of this window, so the camera can move.
+		// NOTE(georgii): This function was added by me, I'm not sure if it is good for DearImGui, but it seems to work.
+		ImGui::DisableFocus();
+	}
+	EditorState->bIsImguiWindowFocused |= ImGui::IsItemFocused();
+
+	return bEnter;
 }
 
 void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFramebuffer Framebuffer)
@@ -125,7 +147,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
                 
 				bool bNewLevelCreated = false;
             	static char NewLevelName[MaxFilenameLength] = ""; 
-				if (ImGui::InputText("New level", NewLevelName, ArrayCount(NewLevelName), ImGuiInputTextFlags_EnterReturnsTrue))
+				if (EditorInputText(EditorState, "New level", NewLevelName, ArrayCount(NewLevelName)))
 				{
 					if (StringLength(NewLevelName) > 0)
 					{
@@ -173,10 +195,6 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 							NewLevelName[0] = 0;
 
 							bNewLevelCreated = true;
-
-							// NOTE(georgii): Disable focus of this window, so the camera can move.
-							// NOTE(georgii): This function was added by me, I'm not sure if it is good for DearImGui, but it seems to work.
-							ImGui::DisableFocus();
 						}
 					}
 				}
@@ -361,14 +379,18 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
                         
 						case Entity_Gates:
 						{
-							ImGui::InputText("TeleportLevel", Entity->TargetLevelName, ArrayCount(Entity->TargetLevelName), ImGuiInputTextFlags_EnterReturnsTrue);
-							EditorState->bIsImguiWindowFocused |= ImGui::IsItemFocused();
+							EditorInputText(EditorState, "TeleportLevel", Entity->TargetLevelName, ArrayCount(Entity->TargetLevelName));
 						} break;
 
 						case Entity_MessageToggler:
 						{
-							if (ImGui::InputText("Message", Entity->MessageText, ArrayCount(Entity->MessageText), ImGuiInputTextFlags_EnterReturnsTrue))
-							EditorState->bIsImguiWindowFocused |= ImGui::IsItemFocused();
+							EditorInputText(EditorState, "Message", Entity->MessageText, ArrayCount(Entity->MessageText));
+
+							bValueChanged |= EditorDragFloat2(EditorState, "ScreenPos", &Entity->MessagePos.x, 0.025f);
+							bValueChanged |= EditorDragFloat(EditorState, "Scale", &Entity->MessageScale, 0.025f);
+							bValueChanged |= EditorDragFloat(EditorState, "LifeTime", &Entity->MessageLifeTime, 0.025f);
+							bValueChanged |= EditorDragFloat(EditorState, "TimeToAppear", &Entity->MessageTimeToAppear, 0.025f);
+							bValueChanged |= EditorDragFloat(EditorState, "TimeToStartAppear", &Entity->MessageTimeToStartAppear, 0.025f);
 						} break;
 
 						case Entity_Checkpoint:
@@ -571,7 +593,11 @@ void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanCon
 		Camera->Pitch -= 0.1f*GameInput->MouseDeltaY;
 		Camera->Pitch = Clamp(Camera->Pitch, -89.0f, 89.0f);
 		Camera->Head -= 0.1f*GameInput->MouseDeltaX;
-		
+		if (Absolute(Camera->Head) >= 360.0f)
+		{
+			Camera->Head += -Sign(Camera->Head) * 360.0f;
+		}
+
 		Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
 		Camera->Dir.y = Sin(Radians(Camera->Pitch));
 		Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));

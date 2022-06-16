@@ -62,7 +62,20 @@ struct SEntity
 	vec3 PrevPos;
 	vec4 PrevOrientation; // NOTE(georgii): Euler angles. W is unused for now.
 
-	SPointLight PointLight;
+	union
+	{
+		SPointLight PointLight;
+
+		// NOTE(georgii): Stuff for message toggler
+		struct
+		{
+			vec2 MessagePos;
+			float MessageScale;
+			float MessageLifeTime;
+			float MessageTimeToAppear;
+			float MessageTimeToStartAppear;
+		};
+	};
 
 	// Gameplay colors
 	vec3 CurrentColor;

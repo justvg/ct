@@ -351,20 +351,23 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 	{
 		const SEntity* Entity = Level->Entities + I;
         
-		if ((LengthSq(Entity->PointLight.Color.rgb) > 0.0f) && (Entity->PointLight.Radius > 0.0f))
+		if (Entity->Type != Entity_MessageToggler)
 		{
-			Assert(PointLightCount < ArrayCount(Level->PointLights));
-			
-			PointLightsGPU[PointLightCount].Pos = Entity->Pos + Entity->PointLight.Pos;
-			PointLightsGPU[PointLightCount].Radius = Entity->PointLight.Radius;
-			PointLightsGPU[PointLightCount].Color = Entity->PointLight.Color;
-            
-			if ((Entity->Type == Entity_Torch) || (Entity->Type == Entity_Container))
+			if ((LengthSq(Entity->PointLight.Color.rgb) > 0.0f) && (Entity->PointLight.Radius > 0.0f))
 			{
-				PointLightsGPU[PointLightCount].Color.rgb = 8.0f * Entity->Color;
+				Assert(PointLightCount < ArrayCount(Level->PointLights));
+				
+				PointLightsGPU[PointLightCount].Pos = Entity->Pos + Entity->PointLight.Pos;
+				PointLightsGPU[PointLightCount].Radius = Entity->PointLight.Radius;
+				PointLightsGPU[PointLightCount].Color = Entity->PointLight.Color;
+				
+				if ((Entity->Type == Entity_Torch) || (Entity->Type == Entity_Container))
+				{
+					PointLightsGPU[PointLightCount].Color.rgb = 8.0f * Entity->Color;
+				}
+				
+				PointLightCount++;
 			}
-            
-			PointLightCount++;
 		}
 	}
     
@@ -378,9 +381,21 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
     
 	// NOTE(georgii): Delete all voxels that were marked for deletion. Add all voxels that were added. Chnage all voxels that were updated. Update appropriate GPU buffers.
 	UpdateVoxels(GameState, Vulkan, Level);
-    
-	uint32_t TotalParticleCount = UpdateParticles(GameState, Vulkan, Level, GameInput.dt);
 
+	// Update particles
+	uint32_t TotalParticleCount = UpdateParticles(GameState, Vulkan, Level, GameInput.dt);
+    
+	// Sound mixing
+	STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
+	OutputPlayingSounds(&GameState->AudioState, SoundBuffer, GameState->LoadedSounds, &SoundTempMemory);
+	EndTempMemoryArena(&SoundTempMemory);
+    
+	// Render
+	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
+	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory);
+	EndTempMemoryArena(&RenderTempMemory);
+
+	// Update text stuff
 	for (uint32_t I = 0; I < GameState->TextsToRenderCount;)
 	{
 		SText* Text = GameState->TextsToRender + I;
@@ -395,16 +410,6 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 			I++;
 		}
 	}
-    
-	// Sound mixing
-	STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
-	OutputPlayingSounds(&GameState->AudioState, SoundBuffer, GameState->LoadedSounds, &SoundTempMemory);
-	EndTempMemoryArena(&SoundTempMemory);
-    
-	// Render
-	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
-	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory);
-	EndTempMemoryArena(&RenderTempMemory);
 
 	// Delete all entities marked for deletion and fix all indexes.
 	for (uint32_t EntityIndex = 0; EntityIndex < Level->EntityCount;)

@@ -279,7 +279,10 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 		vec2 ScreenPosition = Hadamard(Text.Pos, 0.5f * Vec2i(Vulkan.Width, Vulkan.Height)) - 0.5f * TextSize;
 		if (Text.bAppearance)
 		{
-			Renderer->HudRenderPass.RenderStringWithAppearance(Vulkan, Renderer->Font, ScreenPosition, Text.Scale, Text.String, Clamp(Text.CurrentTime /  Text.TimeToAppear, 0.0f, 1.0f));
+			if (Text.CurrentTime >= Text.TimeToStartAppear)
+			{
+				Renderer->HudRenderPass.RenderStringWithAppearance(Vulkan, Renderer->Font, ScreenPosition, Text.Scale, Text.String, Clamp((Text.CurrentTime - Text.TimeToStartAppear) / Text.TimeToAppear, 0.0f, 1.0f));
+			}
 		}
 		else
 		{
