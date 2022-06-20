@@ -296,12 +296,12 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 		{
 			PushConstants.Offset.xyz = Vec3(-0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
 			PushConstants.Scale = Hadamard(PushConstants.Scale, Vec4(0.15f, 0.15f, 1.03f, 0.0f));
-			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.TargetColor : Entity.TargetColor;
+			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.TargetColor : 10.0f * Entity.TargetColor;
 			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderPushConstants), &PushConstants);
 			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
 
 			PushConstants.Offset.xyz = Vec3(0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
-			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.CurrentColor : Entity.CurrentColor;
+			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.CurrentColor : 10.0f * Entity.CurrentColor;
 			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderPushConstants), &PushConstants);
 			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
 		}

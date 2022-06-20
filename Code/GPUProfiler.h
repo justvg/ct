@@ -20,7 +20,7 @@ struct SGpuProfilerBlock
 struct SGpuProfiler
 {
 public:
-    void Initialize(VkDevice Device, float TimePeriod);
+    void Initialize(VkInstance Instance, VkDevice Device, float TimePeriod);
 
     void BeginProfilerBlock(const char* Name, VkCommandBuffer CommandBuffer, uint32_t FrameInFlight);
     void EndProfilerBlock(const char* Name, VkCommandBuffer CommandBuffer, uint32_t FrameInFlight);
@@ -41,11 +41,15 @@ private:
     // NOTE(georgii): Must be a power of two!
     SGpuProfilerBlock BlocksHashTable[512];
 
+	PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
+	PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
+	
+
 private:
     SGpuProfilerBlock* GetBlockFromName(const char* Name);
 };
 
-void SGpuProfiler::Initialize(VkDevice Device, float TimePeriod)
+void SGpuProfiler::Initialize(VkInstance Instance, VkDevice Device, float TimePeriod)
 {
     if (!bInitialized)
     {
@@ -56,6 +60,9 @@ void SGpuProfiler::Initialize(VkDevice Device, float TimePeriod)
         }
 
         TimestampPeriod = TimePeriod;
+
+		vkCmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT) vkGetInstanceProcAddr(Instance, "vkCmdBeginDebugUtilsLabelEXT");
+		vkCmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT) vkGetInstanceProcAddr(Instance, "vkCmdEndDebugUtilsLabelEXT");
 
         bInitialized = true;
     }
@@ -73,6 +80,13 @@ void SGpuProfiler::BeginProfilerBlock(const char* Name, VkCommandBuffer CommandB
 
     Block->HitCount[FrameInFlight]++;
     CurrentOpenedBlocks++;
+
+	// RenderDoc marker
+	VkDebugUtilsLabelEXT MarkerBegin = { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, 0, Name };
+	if (vkCmdBeginDebugUtilsLabelEXT)
+	{
+		vkCmdBeginDebugUtilsLabelEXT(CommandBuffer, &MarkerBegin);
+	}
 }
 
 void SGpuProfiler::EndProfilerBlock(const char* Name, VkCommandBuffer CommandBuffer, uint32_t FrameInFlight)
@@ -86,6 +100,12 @@ void SGpuProfiler::EndProfilerBlock(const char* Name, VkCommandBuffer CommandBuf
     vkCmdWriteTimestamp(CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, QueryPools[FrameInFlight], QueriesCounts++);
 
     CurrentOpenedBlocks--;
+
+	// RenderDoc marker
+	if (vkCmdEndDebugUtilsLabelEXT)
+	{
+		vkCmdEndDebugUtilsLabelEXT(CommandBuffer);
+	}
 }
 
 void SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
@@ -214,7 +234,7 @@ SGpuProfilerBlock* SGpuProfiler::GetBlockFromName(const char* Name)
 
 static SGpuProfiler GpuProfiler = {};
 
-#define INIT_GPU_PROFILER(Device, TimePeriod) GpuProfiler.Initialize(Device, TimePeriod)
+#define INIT_GPU_PROFILER(Instance, Device, TimePeriod) GpuProfiler.Initialize(Instance, Device, TimePeriod)
 #define BEGIN_GPU_PROFILER_BLOCK(BlockName, CommandBuffer, FrameInFlight) GpuProfiler.BeginProfilerBlock(BlockName, CommandBuffer, FrameInFlight)
 #define END_GPU_PROFILER_BLOCK(BlockName, CommandBuffer, FrameInFlight) GpuProfiler.EndProfilerBlock(BlockName, CommandBuffer, FrameInFlight)
 #define OUTPUT_GPU_PROFILER_INFO(Device, FrameInFlight) GpuProfiler.OutputInfo(Device, FrameInFlight)
@@ -222,7 +242,7 @@ static SGpuProfiler GpuProfiler = {};
 
 #else
 
-#define INIT_GPU_PROFILER(Device, TimePeriod)
+#define INIT_GPU_PROFILER(Instance, Device, TimePeriod)
 #define BEGIN_GPU_PROFILER_BLOCK(BlockName, CommandBuffer, FrameInFlight)
 #define END_GPU_PROFILER_BLOCK(BlockName, CommandBuffer, FrameInFlight)
 #define OUTPUT_GPU_PROFILER_INFO(Device, FrameInFlight)

@@ -182,7 +182,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 								}	
 							}
 
-							EditorState->NewLevel.AmbientColor = Vec3(125.0f / 255.0f, 125.0f / 255.0f, 125.0f / 255.0f);
+							EditorState->NewLevel.AmbientColor = Vec3(15.0f / 255.0f, 30.0f / 255.0f, 60.0f / 255.0f);
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
                             
 							AddHero(EditorState->NewLevel, Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim));
@@ -193,6 +193,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 							SaveLevelEditor(EditorState->NewLevel, NewLevelPath);
 							LoadLevel(GameState, &GameState->LevelBaseState, NewLevelName);
 							NewLevelName[0] = 0;
+							EditorState->NewLevel = {};
 
 							bNewLevelCreated = true;
 						}
@@ -249,7 +250,9 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 
                 GameState->bDeathAnimation = false;
                 GameState->DeathAnimationLengthMoved = 0.0f;
-                GameState->DeathPosition = Vec3(0.0f);
+                GameState->DeathPos = Vec3(0.0f);
+				GameState->DeathAnimationTargetPos = GameState->Level.Entities[0].Pos;
+				GameState->LastCheckpointPos = GameState->Level.Entities[0].Pos;
 
                 GameState->CurrentCheckpointIndex = 0;
                 
@@ -476,6 +479,11 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 					EditorState->SelectedEntity = AddGates(GameState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.5f), Quat(0, 0, 0, 1));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
+
+					if (!CompareStrings(GameState->LevelName, "Levels\\MainHub.ctl"))
+					{
+						memcpy(EditorState->SelectedEntity->TargetLevelName, "MainHub", StringLength("MainHub") + 1);
+					}
 				}
 				if (ImGui::Button("MessageToggler"))
 				{

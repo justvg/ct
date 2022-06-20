@@ -443,20 +443,23 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 			{
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
-					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
-
-					float Orientation = Camera->Head;
-
 					char LevelName[264] = {};
 					ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 					LoadLevel(GameState, &GameState->LevelBaseState, LevelName, Level->Entities[0].Velocity);
 
 					SEntity* HeroEntity = &GameState->LevelBaseState.Entities[0];
 
-					if (!bTargetMainHub)
-						Orientation = HeroEntity->Orientation.y;
+					float GatesAngleDifference = 0.0f;
+					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+					if (bTargetMainHub)
+					{
+						GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
+					}
+					else
+					{
+						GatesAngleDifference = HeroEntity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+					}
 
-					float GatesAngleDifference = Orientation - GameState->LastBaseLevelGatesAngle;
 					quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
 					HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
 					Camera->Head += GatesAngleDifference;
@@ -498,19 +501,19 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 	
 	END_PROFILER_BLOCK("ENTITIES_SIMULATION");
 	
-	if (Length(Level->Entities[0].Pos - Level->Entities[0].PrevPos) > 0.00001f)
+	if (!GameState->bDeathAnimation && Length(Level->Entities[0].Pos - Level->Entities[0].PrevPos) > 0.00001f)
 	{
 		Camera->Pos = Level->Entities[0].Pos + Camera->OffsetFromPlayer;
 	}
 
 	if (GameState->bDeathAnimation && !GameState->bReloadLevel && !GameState->bReloadLevelEditor)
 	{
-		vec3 MoveDelta = GameState->DeathAnimationSpeed * GameInput->dt * NormalizeSafe0(Level->Entities[0].Pos - GameState->DeathPosition);
+		vec3 MoveDelta = GameState->DeathAnimationSpeed * GameInput->dt * NormalizeSafe0(GameState->DeathAnimationTargetPos - GameState->DeathPos);
 		GameState->DeathAnimationLengthMoved += Length(MoveDelta);
 		Camera->Pos += MoveDelta;
 		
-		if ((Length((Camera->Pos - Camera->OffsetFromPlayer) - Level->Entities[0].Pos) < 0.07f) ||
-			(GameState->DeathAnimationLengthMoved >= Length(Level->Entities[0].Pos - GameState->DeathPosition)))
+		if ((Length((Camera->Pos - Camera->OffsetFromPlayer) - GameState->DeathAnimationTargetPos) < 0.07f) ||
+			(GameState->DeathAnimationLengthMoved >= Length(GameState->DeathAnimationTargetPos - GameState->DeathPos)))
 		{
 			GameState->bDeathAnimation = false;
 			GameState->DeathAnimationLengthMoved = 0.0f;

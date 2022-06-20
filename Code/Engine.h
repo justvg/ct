@@ -202,10 +202,13 @@ struct SGameState
 	uint32_t TextsToRenderCount;
 	SText TextsToRender[8];
 
+	vec3 LastCheckpointPos;
+
     bool bDeathAnimation;
     float DeathAnimationSpeed;
     float DeathAnimationLengthMoved;
-    vec3 DeathPosition;
+    vec3 DeathPos;
+	vec3 DeathAnimationTargetPos;
 
 	// NOTE(georgii): Don't wanna resave every level when I change this params for hero, so I just store them in SGameState.
 	float HeroSpeed;
@@ -643,8 +646,6 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 		Assert(Level->Entities[0].Type == Entity_Hero);
 		Level->Entities[0].Velocity = HeroVelocity;
 
-		GameState->TextsToRenderCount = 0;
-
 		GameState->bReloadLevel = true;
 	}
 }
@@ -657,23 +658,23 @@ void ReloadGameLevel(SGameState* GameState, bool bDeath = false)
 	GameState->bReloadLevel = true;
 #endif
 
-    if (!bDeath)
-    {
-        SEntity* HeroEntity = GameState->bReloadLevelEditor ? &GameState->LevelGameStartState.Entities[0] : &GameState->LevelBaseState.Entities[0];
-        Assert(HeroEntity->Type == Entity_Hero);
-
-	    GameState->Camera.Pitch = 0.0f;
-	    GameState->Camera.Head = HeroEntity->Orientation.y;
-    }
-
     if (bDeath)
     {
         SEntity* HeroEntity = &GameState->Level.Entities[0];
         Assert(HeroEntity->Type == Entity_Hero);
 
         GameState->bDeathAnimation = true;
-        GameState->DeathPosition = HeroEntity->Pos;
+        GameState->DeathPos = HeroEntity->Pos;
+		GameState->DeathAnimationTargetPos = GameState->LastCheckpointPos;
     }
+	else
+	{
+		SEntity* HeroEntity = GameState->bReloadLevelEditor ? &GameState->LevelGameStartState.Entities[0] : &GameState->LevelBaseState.Entities[0];
+        Assert(HeroEntity->Type == Entity_Hero);
+
+	    GameState->Camera.Pitch = 0.0f;
+	    GameState->Camera.Head = HeroEntity->Orientation.y;
+	}
 }
 
 void FixDoorIndex(SLevel* Level, uint32_t OldDoorIndex, uint32_t NewDoorIndex)

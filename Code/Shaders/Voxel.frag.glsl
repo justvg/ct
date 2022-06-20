@@ -80,6 +80,7 @@ void main()
     vec3 VoxelColor = max(LineFactor0 * LineFactor1, 0.5) * vec3(VoxelColorR, VoxelColorG, VoxelColorB);
 	vec3 ColorFinal = (Ambient + Diffuse) * VoxelColor;
 
+	// TODO(georgii): I think I can do this in vertex shader. I remember that in Crysis we did it in VS
 	vec4 CurrentTexCoords = ProjUnjittered * View * vec4(FragPosWS, 1.0);
 	CurrentTexCoords.xy /= CurrentTexCoords.w;
 	CurrentTexCoords.xy = CurrentTexCoords.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5);

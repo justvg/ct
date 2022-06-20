@@ -795,7 +795,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					FrameFences[I] = CreateFence(Device);
 				}
 
-				INIT_GPU_PROFILER(Device, PhysicalDeviceProps.limits.timestampPeriod);
+				INIT_GPU_PROFILER(Instance, Device, PhysicalDeviceProps.limits.timestampPeriod);
 
 				SVulkanContext Vulkan = {};
 				Vulkan.Device = Device;
@@ -1027,7 +1027,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					if (FrameID > (FramesInFlight - 2))
 					{
-						// OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
+						OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
 					}
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();

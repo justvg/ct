@@ -346,6 +346,8 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 		A->TimeToChangeColor = 1.0f;
 		A->TimeToChangeColorCurrent = 0.0f;
 
+		GameState->LastCheckpointPos = B->Pos;
+
 		B->bRemoved = true;
 
 		if ((B->DoorIndex > 0) && (B->DoorIndex < Level->EntityCount))

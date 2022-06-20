@@ -258,7 +258,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 
         GameState->DeathAnimationSpeed = 10.0f;
         
-		LoadLevel(GameState, &GameState->LevelBaseState, "TestLevel.ctl");
+		LoadLevel(GameState, &GameState->LevelBaseState, "MainHub.ctl");
         
         GameState->bInitialized = true;
     }
@@ -279,8 +279,16 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 			GameState->Level = GameState->LevelGameStartState;
 		}
 
-		GameState->TextsToRenderCount = 0;
-		
+		Assert(GameState->Level.Entities[0].Type == Entity_Hero);
+		if (GameState->bDeathAnimation)
+		{
+			GameState->Level.Entities[0].Pos = GameState->LastCheckpointPos;
+		}
+		else
+		{
+			GameState->LastCheckpointPos = GameState->Level.Entities[0].Pos; 
+		}
+
 		memset(GameState->VoxelDraws, 0, sizeof(GameState->VoxelDraws));
 		for (uint32_t Z = 0; Z < LevelDimZ; Z++)
 		{
