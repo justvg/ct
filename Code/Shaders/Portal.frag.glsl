@@ -2,14 +2,14 @@
 
 #extension GL_GOOGLE_include_directive: require
 #include "VoxelDimension.h"
+#include "Noise.incl.glsl"
 
 layout (location = 0) out vec4 FragColor;
-layout (location = 1) out float FragLinearDepth;
-layout (location = 2) out vec2 FragVelocity;
 
 layout (location = 0) in vec3 NormalWS;
 layout (location = 1) in vec3 FragPosWS;
 layout (location = 2) in vec3 FragPrevPosWS;
+layout (location = 3) in vec3 LocalPos;
 
 layout (push_constant) uniform PushConstants
 {
@@ -63,41 +63,37 @@ layout (set = 0, binding = 4) readonly buffer PointsLights
 	SPointLight PointLight[];
 };
 
+const float Pi = 3.14159265358979323846;
+vec2 PolarCoordinates(vec2 UV, vec2 Center, float RadialScale, float LengthScale)
+{
+    vec2 Delta = UV - Center;
+    float Radius = length(Delta) * 2 * RadialScale;
+    float Angle = abs(atan(Delta.y, Delta.x)) * LengthScale * (1.0 / (2 * Pi));
+
+    return vec2(Radius, Angle);
+}
+
 void main()
 {
-	vec3 Normal = normalize(NormalWS);
-	vec3 Color = MeshColor.rgb;
+	vec2 UV = vec2(LocalPos.x, -LocalPos.y) + vec2(0.5);
 
-    vec3 Ambient = vec3(0.0, 0.0, 0.0);
-	if ((Color.r <= 1.0) && (Color.g <= 1.0) && (Color.b <= 1.0))
-	{
-		Ambient = CalculateAmbient(FragPosWS, Normal);
-	}
-	else
-	{
-		Ambient = AmbientColor.rgb;
-	}
-	
-	vec3 Diffuse = vec3(0.0, 0.0, 0.0);
-	uint PointLightCount = uint(Offset.w);
-	for (uint I = 0; I < PointLightCount; I++)
-	{
-		Diffuse += CalculatePointLight(PointLight[I], FragPosWS, Normal);
-	}
+	float NoiseBasedOnUV = 0.1 * (2.0 * GradientNoiseFloat(UV + vec2(Time), 3.0) - 1.0);
 
-	vec3 ColorFinal = (Ambient + Diffuse) * Color;
+	vec2 PolarCoords = PolarCoordinates(UV, vec2(0.5), 1.0, 1.0);
+	float Radius = PolarCoords.x;
+	float Angle = PolarCoords.y;
 
-	vec4 CurrentTexCoords = ProjUnjittered * View * vec4(FragPosWS, 1.0);
-	CurrentTexCoords.xy /= CurrentTexCoords.w;
-	CurrentTexCoords.xy = CurrentTexCoords.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5);
+	vec2 SampleUV = vec2(Radius + Time, Angle + Radius) + vec2(NoiseBasedOnUV);
+	float ColorNoise = pow(SimpleNoise(SampleUV, 2), 3.0);
 
-	vec4 PrevTexCoords = PrevProj * PrevView * vec4(FragPrevPosWS, 1.0);
-	PrevTexCoords.xy /= PrevTexCoords.w;
-	PrevTexCoords.xy = PrevTexCoords.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5);
-	
-	vec2 Velocity = CurrentTexCoords.xy - PrevTexCoords.xy;
+	float RadiusNoise = 0.2 * SimpleNoise(UV + 0.5 * vec2(Time), 10.0);
+	float NewRadius = Radius + RadiusNoise;
+	float Alpha = step(NewRadius, 1.0) * (1.0 - pow(smoothstep(0.2, max(0.2, NewRadius), Radius), 64));
 
-	FragColor = vec4(ColorFinal, MeshColor.w);
-    FragLinearDepth = length(FragPosWS - CameraPosition.xyz) / Viewport.w;
-	FragVelocity = Velocity;
+	vec3 BrightPointUV = 10 * normalize(FragPosWS) + vec3(0.05 * Time);
+	float BrightPoint = 2 * smoothstep(0.7, 0.9, SimpleNoise(BrightPointUV.xy, 1000));
+
+	vec3 Color = MeshColor.rgb * (ColorNoise + pow(NewRadius, 8.0)) + BrightPoint;
+
+	FragColor = vec4(Color, Alpha);
 }

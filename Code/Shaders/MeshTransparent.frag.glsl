@@ -8,7 +8,6 @@ layout (location = 0) out vec4 FragColor;
 layout (location = 0) in vec3 NormalWS;
 layout (location = 1) in vec3 FragPosWS;
 layout (location = 2) in vec3 FragPrevPosWS;
-layout (location = 3) in vec3 Color;
 
 layout (push_constant) uniform PushConstants
 {
@@ -23,6 +22,9 @@ layout (push_constant) uniform PushConstants
 
     uint FrameNumber;
 	uint FPWeaponDepthTest;
+
+	float Time;
+	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
 };
 
 layout (set = 0, binding = 0) uniform CameraBuffer
@@ -72,7 +74,7 @@ void main()
 		Diffuse += CalculatePointLight(PointLight[I], FragPosWS, Normal);
 	}
 
-	vec3 ColorFinal = (Ambient + Diffuse) * Color;
+	vec3 ColorFinal = (Ambient + Diffuse) * MeshColor.rgb;
 
 	FragColor = vec4(ColorFinal, MeshColor.w);
 }

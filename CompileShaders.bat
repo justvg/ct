@@ -4,7 +4,7 @@ REM Add -g to DebugFlags to compile debug information for shaders
 REM Add -Od to DebugFlags to disable optimizations for shaders
 
 set VulkanSDKPath=C:\VulkanSDK\1.3.211.0\
-set DebugFlags=
+set DebugFlags=-g
 
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\BloomBrightness.frag.glsl" -o Content\Shaders\BloomBrightness.frag.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\BloomDownscale.comp.glsl" -o Content\Shaders\BloomDownscale.comp.spv
@@ -28,3 +28,5 @@ set DebugFlags=
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Voxel.vert.glsl" -o Content\Shaders\Voxel.vert.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Voxel.frag.glsl" -o Content\Shaders\Voxel.frag.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\VoxelCulling.comp.glsl" -o Content\Shaders\VoxelCulling.comp.spv
+%VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Portal.frag.glsl" -o Content\Shaders\Portal.frag.spv
+%VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Door.frag.glsl" -o Content\Shaders\Door.frag.spv

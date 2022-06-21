@@ -154,7 +154,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->CubeIB, Renderer->StagingBuffers[0], CubeIndices, sizeof(CubeIndices));
 }
 
-VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena)
+VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float dt)
 {
 	// Rendering
 	BEGIN_PROFILER_BLOCK("RENDERING");
@@ -207,7 +207,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	// Forward render entities
 	if (!GameState->bHideEntities)
 	{
-		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, GameState->Camera, GameState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, GameState->GameMode == GameMode_Game, MemoryArena);
+		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, GameState->Camera, GameState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, GameState->GameMode == GameMode_Game, MemoryArena, dt);
 	}
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_MSAA_TARGETS", Vulkan.CommandBuffer, Vulkan.FrameInFlight);

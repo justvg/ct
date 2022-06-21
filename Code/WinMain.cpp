@@ -1027,7 +1027,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					if (FrameID > (FramesInFlight - 2))
 					{
-						OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
+						// OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
 					}
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();

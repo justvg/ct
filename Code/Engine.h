@@ -535,6 +535,11 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 				memcpy(&Level->Entities[I].Color, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
 
+				if (Level->Entities[I].Type == Entity_Door)
+				{
+					Level->Entities[I].Color = Vec3(0.0f);
+				}
+
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 				memcpy(&Level->Entities[I].PrevPos, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
@@ -579,6 +584,11 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 				AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
 				memcpy(&Level->Entities[I].MeshIndex, LevelMemory, sizeof(uint32_t));
 				LevelMemory += sizeof(uint32_t);
+
+				if (Level->Entities[I].Type == Entity_Door)
+				{
+					Level->Entities[I].MeshIndex = 2;
+				}
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(char));
 				memcpy(&Level->Entities[I].TargetLevelName, LevelMemory, sizeof(SEntity::MessageText));

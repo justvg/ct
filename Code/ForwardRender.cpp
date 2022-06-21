@@ -2,7 +2,7 @@ struct SForwardRenderPass
 {
 public:
     static SForwardRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena);
+    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float dt);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
 private:
@@ -22,6 +22,12 @@ private:
     VkRenderPass RenderPassTransp;
     VkFramebuffer FramebufferTransp;
     VkShaderModule FShaderTransp;
+
+	VkPipeline PipelinePortal;
+	VkShaderModule FShaderPortal;
+
+	VkPipeline PipelineDoor;
+	VkShaderModule FShaderDoor;
 
 private:
     static VkRenderPass CreateRenderPass(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount);
@@ -44,6 +50,18 @@ struct SForwardRenderPushConstants
 
     uint32_t FrameNumber;
 	uint32_t FPWeaponDepthTest;
+
+	float Time;
+	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
+};
+
+enum EMeshMaterial
+{
+	MeshMaterial_Default,
+	MeshMaterial_TranspDefault,
+
+	MeshMaterial_Portal,
+	MeshMaterial_Door
 };
 
 SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, 
@@ -89,6 +107,12 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
 	VkShaderModule FShaderTransp = LoadShader(Vulkan.Device, "Shaders\\MeshTransparent.frag.spv");
 	VkPipeline PipelineTransp = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderTransp, Vulkan.SampleCountMSAA);
 
+	VkShaderModule FShaderPortal = LoadShader(Vulkan.Device, "Shaders\\Portal.frag.spv");
+	VkPipeline PipelinePortal = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderPortal, Vulkan.SampleCountMSAA);
+
+	VkShaderModule FShaderDoor = LoadShader(Vulkan.Device, "Shaders\\Door.frag.spv");
+	VkPipeline PipelineDoor = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderDoor, Vulkan.SampleCountMSAA);
+
     SForwardRenderPass ForwardRenderPass = {};
     ForwardRenderPass.Pipeline = Pipeline;
     ForwardRenderPass.PipelineLayout = PipelineLayout;
@@ -101,12 +125,16 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
 	ForwardRenderPass.PipelineTransp = PipelineTransp;
     ForwardRenderPass.RenderPassTransp = RenderPassTransp;
     ForwardRenderPass.FramebufferTransp = FramebufferTransp;
+	ForwardRenderPass.FShaderPortal = FShaderPortal;
+	ForwardRenderPass.PipelinePortal = PipelinePortal;
+	ForwardRenderPass.FShaderDoor = FShaderDoor;
+	ForwardRenderPass.PipelineDoor = PipelineDoor;
     memcpy(ForwardRenderPass.DescrSets, DescrSets, sizeof(ForwardRenderPass.DescrSets));
 
     return ForwardRenderPass;
 }
 
-void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena)
+void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float dt)
 {
 	BEGIN_GPU_PROFILER_BLOCK("RENDER_ENTITIES", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
@@ -176,9 +204,19 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	bool bFirstTranspEncountered = false;
+	static float Time = 0.0f;
 	SForwardRenderPushConstants PushConstants = {};
 	PushConstants.FrameNumber = FrameID % 8;
+	PushConstants.Time = Time;
+
+	Time += dt;
+	// if (Time >= Pi)
+	// {
+	// 	Time -= Pi;
+	// }
+
+	bool bFirstTranspEncountered = false;
+	EMeshMaterial LastMeshMaterial = MeshMaterial_Default;
 	for (uint32_t I = 0; I < EntityCount; I++)
 	{
 		const SEntity& Entity = RenderEntities[I];
@@ -195,9 +233,45 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 			RenderPassTranspBeginInfo.renderArea.extent.width = Vulkan.Width;
 			RenderPassTranspBeginInfo.renderArea.extent.height = Vulkan.Height;
 			vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassTranspBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		}
 
-			vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineTransp);
-			vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
+		if (bFirstTranspEncountered)
+		{
+			switch (Entity.Type)
+			{
+				case Entity_Gates:
+				{
+					if (LastMeshMaterial != MeshMaterial_Portal)
+					{
+						vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelinePortal);
+						vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
+
+						LastMeshMaterial = MeshMaterial_Portal;
+					}
+				} break;
+
+				case Entity_Door:
+				{
+					if (LastMeshMaterial != MeshMaterial_Door)
+					{
+						vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineDoor);
+						vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
+
+						LastMeshMaterial = MeshMaterial_Door;
+					}
+				} break;
+
+				default:
+				{
+					if (LastMeshMaterial != MeshMaterial_TranspDefault)
+					{
+						vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineTransp);
+						vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
+
+						LastMeshMaterial = MeshMaterial_TranspDefault;
+					}
+				}
+			}
 		}
 
 		PushConstants.Position = Vec4(Entity.Pos, 0.0f);
@@ -286,6 +360,11 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 					PushConstants.Color = Vec4(0.5f, 0.5f, 0.5f, 1.0f);
 				}
 			} break;
+
+			case Entity_Door:
+			{
+				PushConstants.ShaderValue0 = 0.1f;
+			} break;
 		}
 
 		const SMesh& Mesh = Geometry.Meshes[Entity.MeshIndex];
@@ -297,11 +376,15 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 			PushConstants.Offset.xyz = Vec3(-0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
 			PushConstants.Scale = Hadamard(PushConstants.Scale, Vec4(0.15f, 0.15f, 1.03f, 0.0f));
 			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.TargetColor : 10.0f * Entity.TargetColor;
+			PushConstants.ShaderValue0 = 0.5f;
+		
 			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderPushConstants), &PushConstants);
 			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
 
 			PushConstants.Offset.xyz = Vec3(0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
 			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.CurrentColor : 10.0f * Entity.CurrentColor;
+			PushConstants.ShaderValue0 = 0.5f;
+
 			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderPushConstants), &PushConstants);
 			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
 		}
@@ -566,7 +649,7 @@ VkPipeline SForwardRenderPass::CreateGraphicsPipelineTransp(VkDevice Device, VkR
 
 	VkPipelineRasterizationStateCreateInfo RasterizationStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 	RasterizationStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-	RasterizationStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	RasterizationStateInfo.cullMode = VK_CULL_MODE_NONE;
 	RasterizationStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	RasterizationStateInfo.lineWidth = 1.0f;
 

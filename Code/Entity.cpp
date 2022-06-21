@@ -83,7 +83,7 @@ SEntity* AddDoor(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation, vec3 Color
 	Entity->Dim = Dim;
 	Entity->Scale = 1.0f;
 
-	Entity->Alpha = 1.0f;
+	Entity->Alpha = 0.8f;
 
 	Entity->TimeToMove = TimeToMove;
 	Entity->BasePos = Entity->Pos;
@@ -107,10 +107,10 @@ SEntity* AddGates(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation)
 	Entity->Dim = Dim;
 	Entity->Scale = 1.0f;
 
-	Entity->Alpha = 1.0f;
+	Entity->Alpha = 0.8f;
 
-	Entity->Color = Vec3(0.25f, 0.45f, 0.9f);
-	Entity->MeshIndex = 1;
+	Entity->Color = Vec3(0.25f, 0.45f, 1.0f);
+	Entity->MeshIndex = 2;
 
 	return Entity;
 }

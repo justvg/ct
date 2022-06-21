@@ -476,7 +476,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 				if (ImGui::Button("Gates"))
 				{
 					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddGates(GameState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.5f), Quat(0, 0, 0, 1));
+					EditorState->SelectedEntity = AddGates(GameState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.1f), Quat(0, 0, 0, 1));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 

@@ -3,7 +3,7 @@
 layout (location = 0) out vec3 NormalWS;
 layout (location = 1) out vec3 FragPosWS;
 layout (location = 2) out vec3 FragPrevPosWS;
-layout (location = 3) out vec3 Color;
+layout (location = 3) out vec3 LocalPos; // NOTE(georgii): Currently used for portals to get "texture coordinates". TODO(georgii): Use different vertex shader for some materials?
 
 layout (location = 0) in vec3 LocalPosition;
 layout (location = 1) in vec3 LocalNormal;
@@ -21,6 +21,9 @@ layout (push_constant) uniform PushConstants
 
     uint FrameNumber;
 	uint FPWeaponDepthTest;
+
+	float Time;
+	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
 };
 
 layout (set = 0, binding = 0) uniform CameraBuffer
@@ -47,7 +50,6 @@ void main()
 	vec3 P = Position.xyz;
 	vec3 S = Scale.xyz;
 	vec4 O = Orientation;
-	vec3 C = MeshColor.rgb;
 	
 	vec3 PrevP = PrevPosition.xyz;
 	vec4 PrevO = PrevOrientation;
@@ -55,7 +57,7 @@ void main()
 	NormalWS = normalize(RotateQuaternion(LocalNormal * (1.0 / S), O));
 	FragPosWS = RotateQuaternion((LocalPosition * S) + Offset.xyz, O) + P;
 	FragPrevPosWS = RotateQuaternion((LocalPosition * S) + Offset.xyz, PrevO) + PrevP;
-	Color = C;
+	LocalPos = LocalPosition;
 
 	gl_Position = Proj * View * vec4(FragPosWS, 1.0);
 	

@@ -160,6 +160,24 @@ void CreateVoxelMesh(SGeometry& Geometry)
 	AddVerticesToGeometry(Geometry, ArrayCount(Vertices), Vertices, ArrayCount(Indices), Indices);
 }
 
+void CreateQuadMesh(SGeometry& Geometry)
+{
+	SVertex Vertices[] = 
+	{
+		{ Vec3(-0.5f, 0.5f, 0.0f), Vec3(0.0f, 0.0f, 1.0f) },
+		{ Vec3(-0.5f, -0.5f, 0.0f), Vec3(0.0f, 0.0f, 1.0f) },
+		{ Vec3(0.5f, 0.5f, 0.0f), Vec3(0.0f, 0.0f, 1.0f) },
+		{ Vec3(0.5f, -0.5f, 0.0f), Vec3(0.0f, 0.0f, 1.0f) }
+	};
+
+	uint32_t Indices[] = 
+	{
+		0, 1, 2, 2, 1, 3
+	};
+
+	AddVerticesToGeometry(Geometry, ArrayCount(Vertices), Vertices, ArrayCount(Indices), Indices);
+}
+
 SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool CommandPool, VkCommandBuffer CommandBuffer, VkQueue Queue, const SBuffer& StagingBuffer, VmaAllocator MemoryAllocator, VkDescriptorSetLayout DescrSetLayout)
 {
 	SFont Font = {};

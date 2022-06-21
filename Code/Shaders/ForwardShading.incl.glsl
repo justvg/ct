@@ -126,7 +126,7 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
     const int Samples = 4;
     for(int I = 0; I < Samples; I++)
     {
-        const float MaxDistance = 6.0;
+        const float MaxDistance = 2.5;
         vec3 StartPos = FragPosWS;
         vec3 DirTS = SampleHemisphere(BlueNoiseVec2());
         vec3 Dir = Tangent*DirTS.x + Bitangent*DirTS.y + Normal*DirTS.z;

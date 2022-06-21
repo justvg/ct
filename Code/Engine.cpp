@@ -165,6 +165,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 
 		CreateVoxelMesh(GameState->Geometry);
 		AddGLTFMesh(GameState->Geometry, "Models\\cube.gltf");
+		CreateQuadMesh(GameState->Geometry);
         
 		InitializeRenderer(&GameState->Renderer, Vulkan, &GameState->Geometry);
             
@@ -400,7 +401,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
     
 	// Render
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
-	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory);
+	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, GameInput.dt);
 	EndTempMemoryArena(&RenderTempMemory);
 
 	// Update text stuff
