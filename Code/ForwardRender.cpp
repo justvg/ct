@@ -4,6 +4,7 @@ public:
     static SForwardRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
     void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float dt);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
+	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
 private:
     VkPipeline Pipeline;
@@ -209,11 +210,8 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 	PushConstants.FrameNumber = FrameID % 8;
 	PushConstants.Time = Time;
 
+	// TODO(georgii): Can this become too big? Fix (Jonathan Blow wrote smth about this I think)
 	Time += dt;
-	// if (Time >= Pi)
-	// {
-	// 	Time -= Pi;
-	// }
 
 	bool bFirstTranspEncountered = false;
 	EMeshMaterial LastMeshMaterial = MeshMaterial_Default;
@@ -299,21 +297,15 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 					CameraDir.z = Cos(Radians(CameraPitch)) * Cos(Radians(CameraHead));
 					CameraDir = Normalize(CameraDir);
 					
-					vec3 CameraRight = Normalize(Cross(CameraDir, Vec3(0.0f, 1.0f, 0.0f)));
-					vec3 CameraUp = Cross(CameraRight, CameraDir);
-
+					vec3 CameraRight = Camera.Right;
+					vec3 CameraUp = Camera.Up;
 
 					float CameraPrevPitch = Clamp(Camera.PrevPitch, -89.0f, 50.0f);
 					float CameraPrevHead = Camera.PrevHead;
 					
-					vec3 CameraPrevDir;
-					CameraPrevDir.x = Cos(Radians(CameraPrevPitch)) * Sin(Radians(CameraPrevHead));
-					CameraPrevDir.y = Sin(Radians(CameraPrevPitch));
-					CameraPrevDir.z = Cos(Radians(CameraPrevPitch)) * Cos(Radians(CameraPrevHead));
-					CameraPrevDir = Normalize(CameraPrevDir);
-					
-					vec3 CameraPrevRight = Normalize(Cross(CameraPrevDir, Vec3(0.0f, 1.0f, 0.0f)));
-					vec3 CameraPrevUp = Cross(CameraPrevRight, CameraPrevDir);
+					vec3 CameraPrevDir = Camera.PrevDir;
+					vec3 CameraPrevRight = Camera.PrevRight;
+					vec3 CameraPrevUp = Camera.PrevUp;
 
 					PushConstants.Position.xyz += (Entity.LampOffset.x * Entity.Dim.x * CameraRight) + (Entity.LampOffset.z * CameraDir) + (Entity.LampOffset.y * CameraUp);
 					PushConstants.Orientation = Quat(Vec3(0.0f, 1.0f, 0.0f), Camera.Head + Entity.LampRotationOffset.y) * Quat(Vec3(1.0f, 0.0f, 0.0f), -Camera.Pitch - Entity.LampRotationOffset.x);
@@ -405,6 +397,34 @@ void SForwardRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, const S
 
 	VkImageView FramebufferAttachmentsTransp[] = { HDRTargetImage.View, DepthImage.View };
     FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), Vulkan.Width, Vulkan.Height);
+}
+
+void SForwardRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
+{
+	vkDestroyPipeline(Vulkan.Device, Pipeline, 0);
+	vkDestroyPipeline(Vulkan.Device, PipelineTransp, 0);
+	vkDestroyPipeline(Vulkan.Device, PipelinePortal, 0);
+	vkDestroyPipeline(Vulkan.Device, PipelineDoor, 0);
+
+	vkDestroyFramebuffer(Vulkan.Device, Framebuffer, 0);
+	vkDestroyFramebuffer(Vulkan.Device, FramebufferTransp, 0);
+
+	vkDestroyRenderPass(Vulkan.Device, RenderPass, 0);
+	vkDestroyRenderPass(Vulkan.Device, RenderPassTransp, 0);
+
+	RenderPass = CreateRenderPass(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+    RenderPassTransp = CreateRenderPassTransp(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+
+	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
+    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+
+	VkImageView FramebufferAttachmentsTransp[] = { HDRTargetImage.View, DepthImage.View };
+    FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), Vulkan.Width, Vulkan.Height);
+
+    Pipeline = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
+	PipelineTransp = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderTransp, Vulkan.SampleCountMSAA);
+	PipelinePortal = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderPortal, Vulkan.SampleCountMSAA);
+	PipelineDoor = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderDoor, Vulkan.SampleCountMSAA);
 }
 
 VkRenderPass SForwardRenderPass::CreateRenderPass(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount)

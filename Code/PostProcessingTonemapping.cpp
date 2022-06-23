@@ -2,7 +2,7 @@ struct SToneMappingRenderPass
 {
 public:
     static SToneMappingRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage);
-    void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID);
+    void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, bool bVignette);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage* HistoryImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage);
 
 private:
@@ -21,6 +21,12 @@ private:
 private:
     static VkRenderPass CreateRenderPass(VkDevice Device, VkFormat ColorFormat);
     static VkPipeline CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS);
+};
+
+struct STonemappingRenderPassPushConstants
+{
+	uint32_t MenuOpened;
+    uint32_t VignetteEnabled;
 };
 
 SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage)
@@ -48,7 +54,7 @@ SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulk
     VkShaderModule VShader = LoadShader(Vulkan.Device, "Shaders\\Fullscreen.vert.spv");
     VkShaderModule FShader = LoadShader(Vulkan.Device, "Shaders\\Tonemapping.frag.spv");
 
-    VkPipelineLayout PipelineLayout = CreatePipelineLayout(Vulkan.Device, 1, &DescrSetLayout);
+    VkPipelineLayout PipelineLayout = CreatePipelineLayout(Vulkan.Device, 1, &DescrSetLayout, sizeof(STonemappingRenderPassPushConstants), VK_SHADER_STAGE_FRAGMENT_BIT);
     VkPipeline Pipeline = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader);
 
     SToneMappingRenderPass ToneMappingPass = {};
@@ -64,7 +70,7 @@ SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulk
     return ToneMappingPass;
 }
 
-void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID)
+void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, bool bVignette)
 {
 	BEGIN_GPU_PROFILER_BLOCK("TONEMAPPING", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
@@ -78,6 +84,9 @@ void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer&
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[FrameID % 2], 0, 0);
+
+	STonemappingRenderPassPushConstants PushConstants = { bMenuOpened ? 1u : 0u, bVignette ? 1u : 0u };
+	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(STonemappingRenderPassPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &QuadVertexBuffer.Buffer, &Offset);

@@ -113,6 +113,11 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 				GameState->bFlyMode = false;
 				
 				GameState->GameMode = GameMode_Editor;
+
+				GameState->TextsToRenderCount = 0;
+
+				GameState->bMenuOpened = false;
+				GameState->SelectedMenuElement = MenuElement_DefaultNone;
 			}
             
 			ImGui::SetWindowPos(ImVec2(0, 0), true);

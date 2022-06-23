@@ -178,16 +178,24 @@ void CreateQuadMesh(SGeometry& Geometry)
 	AddVerticesToGeometry(Geometry, ArrayCount(Vertices), Vertices, ArrayCount(Indices), Indices);
 }
 
-SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool CommandPool, VkCommandBuffer CommandBuffer, VkQueue Queue, const SBuffer& StagingBuffer, VmaAllocator MemoryAllocator, VkDescriptorSetLayout DescrSetLayout)
+SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool CommandPool, VkCommandBuffer CommandBuffer, VkQueue Queue, const SBuffer& StagingBuffer, VmaAllocator MemoryAllocator, VkDescriptorSetLayout DescrSetLayout, const char* FontName)
 {
 	SFont Font = {};
 
-	Font.BitmapFont = LoadTexture(Device, CommandPool, CommandBuffer, Queue, StagingBuffer, MemoryAllocator, "Fonts\\normaleste.bmp", true);
-	Font.BitmapSampler = CreateSampler(Device, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, (float) GetMipsCount(Font.BitmapFont.Width, Font.BitmapFont.Height));
+	char FontBmpPath[256] = {};
+	ConcStrings(FontBmpPath, ArrayCount(FontBmpPath), "Fonts\\", FontName);
+	ConcStrings(FontBmpPath, ArrayCount(FontBmpPath), FontBmpPath, ".bmp");
+
+	char FontInfoPath[256] = {};
+	ConcStrings(FontInfoPath, ArrayCount(FontInfoPath), "Fonts\\", FontName);
+	ConcStrings(FontInfoPath, ArrayCount(FontInfoPath), FontInfoPath, ".fnt");
+
+	Font.BitmapFont = LoadTexture(Device, CommandPool, CommandBuffer, Queue, StagingBuffer, MemoryAllocator, FontBmpPath, true);
+	Font.BitmapSampler = CreateSampler(Device, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, (float) GetMipsCount(Font.BitmapFont.Width, Font.BitmapFont.Height), VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 	Font.BitmapFontDescrSet = CreateDescriptorSet(Device, DescriptorPool, DescrSetLayout);
 	UpdateDescriptorSetImage(Device, Font.BitmapFontDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, Font.BitmapSampler, Font.BitmapFont.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	ReadEntireFileResult FontInfoFile = ReadEntireTextFile("Fonts\\normaleste.fntinfo");
+	ReadEntireFileResult FontInfoFile = ReadEntireTextFile(FontInfoPath);
 	Assert(FontInfoFile.Memory);
 
 	const char *CurrentLine = (const char*) FontInfoFile.Memory;
@@ -206,7 +214,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* XPtr = Iter;
-		uint32_t XLength = 0;
+		int32_t XLength = 0;
 		while (*Iter != ' ')
 		{
 			XLength++;
@@ -215,7 +223,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* YPtr = Iter;
-		uint32_t YLength = 0;
+		int32_t YLength = 0;
 		while (*Iter != ' ')
 		{
 			YLength++;
@@ -224,7 +232,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* WidthPtr = Iter;
-		uint32_t WidthLength = 0;
+		int32_t WidthLength = 0;
 		while (*Iter != ' ')
 		{
 			WidthLength++;
@@ -233,7 +241,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* HeightPtr = Iter;
-		uint32_t HeightLength = 0;
+		int32_t HeightLength = 0;
 		while (*Iter != '\"')
 		{
 			HeightLength++;
@@ -249,7 +257,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* AdvancePtr = Iter;
-		uint32_t AdvanceLength = 0;
+		int32_t AdvanceLength = 0;
 		while (*Iter != '\"')
 		{
 			AdvanceLength++;
@@ -265,7 +273,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* OffsetXPtr = Iter;
-		uint32_t OffsetXLength = 0;
+		int32_t OffsetXLength = 0;
 		while (*Iter != ' ')
 		{
 			OffsetXLength++;
@@ -274,7 +282,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 		Iter++;
 
 		const char* OffsetYPtr = Iter;
-		uint32_t OffsetYLength = 0;
+		int32_t OffsetYLength = 0;
 		while (*Iter != '\"')
 		{
 			OffsetYLength++;
@@ -296,40 +304,50 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 			CurrentLine = Iter;
 		}
 
-		uint32_t GlyphX = StrToInt32(XPtr, XLength);
-		uint32_t GlyphY = StrToInt32(YPtr, YLength);
-		uint32_t GlyphWidth = StrToInt32(WidthPtr, WidthLength);
-		uint32_t GlyphHeight = StrToInt32(HeightPtr, HeightLength);
+		int32_t GlyphX = StrToInt32(XPtr, XLength);
+		int32_t GlyphY = StrToInt32(YPtr, YLength);
+		int32_t GlyphWidth = StrToInt32(WidthPtr, WidthLength);
+		int32_t GlyphHeight = StrToInt32(HeightPtr, HeightLength);
 
-		uint32_t GlyphAdvance = StrToInt32(AdvancePtr, AdvanceLength);
+		int32_t GlyphAdvance = StrToInt32(AdvancePtr, AdvanceLength);
 		
-		uint32_t GlyphOffsetX = StrToInt32(OffsetXPtr, OffsetXLength);
-		uint32_t GlyphOffsetY = StrToInt32(OffsetYPtr, OffsetYLength);
+		int32_t GlyphOffsetX = StrToInt32(OffsetXPtr, OffsetXLength);
+		int32_t GlyphOffsetY = StrToInt32(OffsetYPtr, OffsetYLength);
 
 		Font.Glyphs[Character].Width = GlyphWidth;
 		Font.Glyphs[Character].Height = GlyphHeight;
 		Font.Glyphs[Character].Advance = GlyphAdvance;
 		Font.Glyphs[Character].OffsetX = GlyphOffsetX;
-		Font.Glyphs[Character].OffsetY = 81 - GlyphOffsetY;
+		Font.Glyphs[Character].OffsetY = GlyphOffsetY;
 		Font.Glyphs[Character].UVs.x = GlyphX / float(Font.BitmapFont.Width);
 		Font.Glyphs[Character].UVs.y = GlyphY / float(Font.BitmapFont.Height);
 		Font.Glyphs[Character].UVs.z = (GlyphX + GlyphWidth) / float(Font.BitmapFont.Width);
 		Font.Glyphs[Character].UVs.w = (GlyphY + GlyphHeight) / float(Font.BitmapFont.Height);
+
+		if (GlyphHeight > Font.MaxHeight)
+		{
+			Font.MaxHeight = GlyphHeight;
+		}
 	}
+
+	for (uint32_t I = 0; I < ArrayCount(Font.Glyphs); I++)
+	{
+		Font.Glyphs[I].OffsetY = Font.MaxHeight - Font.Glyphs[I].OffsetY;
+	}	
 
 	return Font;
 }
 
-vec2 GetTextSize(const SFont& Font, float FontScale, const char* String)
+vec2 GetTextSize(const SFont* Font, vec2 FontScale, const char* String)
 {
-	vec2 Size = Vec2(0.0f, FontScale * 81);
+	vec2 Size = Vec2(0.0f, FontScale.y * Font->MaxHeight);
 
 	for (const char *C = String; *C; C++)
 	{
-		Assert(*C < ArrayCount(Font.Glyphs));
-		const SGlyph& Glyph = Font.Glyphs[*C];
+		Assert(*C < ArrayCount(Font->Glyphs));
+		const SGlyph& Glyph = Font->Glyphs[*C];
         
-		Size.x += FontScale * Glyph.Advance * 0.9f;
+		Size.x += FontScale.x * Glyph.Advance;
 	}
 
 	return Size;

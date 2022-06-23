@@ -179,6 +179,8 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
         GameState->Camera.Far = 300.0f;
         GameState->Camera.FoV = 70.0f;
 
+		GameState->bVignetteEnabled = true;
+
 		ReadEntireFileResult ConfigFile = ReadEntireTextFile("Game.cfg");
 		if (ConfigFile.Memory && ConfigFile.Size)
 		{
@@ -264,9 +266,18 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
         GameState->bInitialized = true;
     }
     
-	if (Vulkan.bSwapchainResized)
+	bool bSwapchainChanged = false;
+	if (Vulkan.bSwapchainChanged || GameState->bSampleCountMSAAChanged)
 	{
-		RendererSwapchainResized(&GameState->Renderer, Vulkan);
+		if (GameState->bSampleCountMSAAChanged)
+		{
+			((SVulkanContext&) Vulkan).SampleCountMSAA = VkSampleCountFlagBits(GameState->NewSampleCountMSAA);
+		}
+
+		RendererHandleChanges(&GameState->Renderer, Vulkan, GameState->bSampleCountMSAAChanged);
+		GameState->bSampleCountMSAAChanged = false;
+
+		bSwapchainChanged = true;
 	}
 	
 	if (GameState->bReloadLevel || GameState->bReloadLevelEditor || GameState->bForceUpdateVoxels)
@@ -324,7 +335,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 	{
 		case GameMode_Game:
 		{
-			UpdateGame(GameState, &GameInput);
+			UpdateGame(GameState, &GameInput, &Vulkan);
 		} break;
         
 #ifndef ENGINE_RELEASE
@@ -401,7 +412,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
     
 	// Render
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&GameState->MemoryArena);
-	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, GameInput.dt);
+	VkImage FinalImage = RenderScene(GameState, &GameState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, GameInput.dt, bSwapchainChanged);
 	EndTempMemoryArena(&RenderTempMemory);
 
 	// Update text stuff
@@ -409,10 +420,17 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 	{
 		SText* Text = GameState->TextsToRender + I;
 
-		Text->CurrentTime += GameInput.dt;
-		if (Text->CurrentTime > Text->Time)
+		if ((GameState->bMenuOpened && Text->bMenuText) || (!GameState->bMenuOpened && !Text->bMenuText))
 		{
-			*Text = GameState->TextsToRender[--GameState->TextsToRenderCount];
+			Text->CurrentTime += GameInput.dt;
+			if (Text->CurrentTime > Text->Time)
+			{
+				*Text = GameState->TextsToRender[--GameState->TextsToRenderCount];
+			}
+			else
+			{
+				I++;
+			}
 		}
 		else
 		{

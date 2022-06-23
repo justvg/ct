@@ -34,7 +34,7 @@ struct SRenderer
 	SImage HDRTargetImage;
 	SImage DepthImage;
 	SImage LinearDepthImage;
-	SImage VelocityImage;
+	SImage VelocityImages[2];
 
 	SImage DepthPyramidImage;
 	uint32_t DepthPyramidMipCount;
@@ -68,7 +68,8 @@ struct SRenderer
 	SHUDRenderPass HudRenderPass;
 	SDebugRenderPass DebugRenderPass;
 
-	SFont Font;
+	SFont KarminaRegular;
+	SFont KarminaBold;
 
 	SImage BlueNoiseTexture;
 

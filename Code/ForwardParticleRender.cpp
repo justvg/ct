@@ -4,6 +4,7 @@ public:
     static SForwardParticleRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
     void Render(const SVulkanContext& Vulkan, uint32_t TotalParticleCount, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
+	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
 private:
     VkPipeline Pipeline;
@@ -108,6 +109,20 @@ void SForwardParticleRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan,
 
     VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
     Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);    
+}
+
+void SForwardParticleRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
+{
+	vkDestroyPipeline(Vulkan.Device, Pipeline, 0);
+	vkDestroyFramebuffer(Vulkan.Device, Framebuffer, 0);
+	vkDestroyRenderPass(Vulkan.Device, RenderPass, 0);
+
+	RenderPass = CreateRenderPass(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+
+    VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
+    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+
+    Pipeline = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
 }
 
 VkRenderPass SForwardParticleRenderPass::CreateRenderPass(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount)

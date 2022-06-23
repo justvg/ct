@@ -130,12 +130,19 @@ struct SLightBuffer
 	vec4 AmbientConstant; // w - unused
 };
 
+enum ETextAlignment
+{
+	TextAlignment_Center,
+	TextAlignment_Left,
+	TextAlignment_Right
+};
+
 struct SText
 {
 	char String[64];
 
 	vec2 Pos; // NOTE(georgii): Pos is in NDC coordinates. Text center position.
-	float Scale;
+	vec2 Scale;
 
 	float CurrentTime;
 	float Time;
@@ -143,6 +150,12 @@ struct SText
 	bool bAppearance;
 	float TimeToAppear;
 	float TimeToStartAppear;
+
+	vec4 Color;
+	const SFont* Font;
+
+	bool bMenuText;
+	ETextAlignment Alignment;
 };
 
 struct SHeroControl
@@ -159,6 +172,34 @@ enum EGameMode
 	GameMode_Editor,
 };
 
+enum EMenuElement
+{
+	MenuElement_DefaultNone,
+
+	MenuElement_Settings,
+	MenuElement_StartNewGame,
+	MenuElement_Quit,
+
+	MenuElement_DefaultCount,
+
+
+	MenuElement_SettingsNone,
+
+	MenuElement_Fullscreen,
+	MenuElement_VSync,
+	MenuElement_Resolution,
+	MenuElement_Vignetting,
+	MenuElement_Multisampling,
+
+	MenuElement_SettingsCount,
+};
+
+enum EMenuMode
+{
+	MenuMode_Default,
+	MenuMode_Settings
+};
+
 struct SGameState
 {
     bool bInitialized;
@@ -166,6 +207,9 @@ struct SGameState
 	SGeometry Geometry;
 
 	SRenderer Renderer;
+
+	bool bSampleCountMSAAChanged;
+	uint32_t NewSampleCountMSAA;
 
 	SVoxelDraw VoxelDraws[LevelDimZ*LevelDimY*LevelDimX];
 	uint32_t VoxelVisibilities[LevelDimZ*LevelDimY*LevelDimX];
@@ -200,7 +244,7 @@ struct SGameState
 	SMemoryArena MemoryArena;
 
 	uint32_t TextsToRenderCount;
-	SText TextsToRender[8];
+	SText TextsToRender[64];
 
 	vec3 LastCheckpointPos;
 
@@ -210,13 +254,19 @@ struct SGameState
     vec3 DeathPos;
 	vec3 DeathAnimationTargetPos;
 
-	// NOTE(georgii): Don't wanna resave every level when I change this params for hero, so I just store them in SGameState.
+	// NOTE(georgii): Don't wanna resave every level when I change these params for hero, so I just store them in SGameState.
 	float HeroSpeed;
 	float HeroDrag;
 	float HeroJumpPower;
 	float HeroLampDistance;
 
 	EGameMode GameMode;
+
+	bool bMenuOpened;
+	EMenuMode MenuMode;
+	EMenuElement SelectedMenuElement;
+
+	bool bVignetteEnabled;
 
 	// Debug and editor stuff
 	bool bFlyMode;
@@ -233,7 +283,7 @@ struct SGameState
 #endif
 };
 
-inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float Scale, float Time, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
+inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float Scale, vec4 Color = Vec4(1.0f), float Time = FloatMax, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
 {
 	Assert(GameState->TextsToRenderCount < ArrayCount(GameState->TextsToRender));
 	SText* Text = &GameState->TextsToRender[GameState->TextsToRenderCount++];
@@ -245,7 +295,7 @@ inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float S
 	Text->String[Length] = 0;
 
 	Text->Pos = Pos;
-	Text->Scale = Scale;
+	Text->Scale = Vec2(Scale, Scale);
 
 	Text->CurrentTime = 0.0f;
 	Text->Time = Time;
@@ -253,6 +303,40 @@ inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float S
 	Text->bAppearance = bAppearance;
 	Text->TimeToAppear = TimeToAppear;
 	Text->TimeToStartAppear = TimeToStartAppear;
+
+	Text->Color = Color;
+	Text->bMenuText = false;
+	Text->Alignment = TextAlignment_Center;
+
+	Text->Font = &GameState->Renderer.KarminaRegular;
+}
+
+inline void AddTextMenu(SGameState* GameState, const char* String, vec2 Pos, float Scale, const SFont* Font, vec4 Color = Vec4(1.0f), ETextAlignment Alignment = TextAlignment_Center)
+{
+	Assert(GameState->TextsToRenderCount < ArrayCount(GameState->TextsToRender));
+	SText* Text = &GameState->TextsToRender[GameState->TextsToRenderCount++];
+
+	uint32_t Length = StringLength(String);
+	Assert(ArrayCount(Text->String) >= Length + 1);
+
+	memcpy(Text->String, String, Length);
+	Text->String[Length] = 0;
+
+	Text->Pos = Pos;
+	Text->Scale = Vec2(Scale, Scale);
+
+	Text->CurrentTime = 0.0f;
+	Text->Time = 0.0f;
+	
+	Text->bAppearance = false;
+	Text->TimeToAppear = 0.0f;
+	Text->TimeToStartAppear = 0.0f;
+
+	Text->Color = Color;
+	Text->bMenuText = true;
+	Text->Alignment = Alignment;
+
+	Text->Font = Font;
 }
 
 inline bool IsVoxelActive(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)

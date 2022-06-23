@@ -1,4 +1,4 @@
-void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
+void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 {
 	SCamera* Camera = &GameState->Camera;
 	SLevel* Level = &GameState->Level;
@@ -378,6 +378,10 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 					
 					SMoveEntityInfo MoveInfo = { !GameState->bFlyMode, GameState->bFlyMode, true, true, HeroControl.Acceleration };
 					MoveEntity(GameState, Entity, Level, MoveInfo, GameInput->dt);
+
+					Entity->PointLight.Color.rgb = Entity->Color;
+					Entity->PointLight.Radius = 2.0f;
+					Entity->PointLight.Pos = Vec3(0.0f);//(Entity->LampOffset.x * Entity->Dim.x * Camera->Right) + (0.3f * Entity->Dim.z * Camera->Dir) + (Entity->LampOffset.y * Camera->Up);
 				} break;
 				
 				case Entity_Door:
@@ -518,5 +522,238 @@ void UpdateGame(SGameState* GameState, const SGameInput* GameInput)
 			GameState->bDeathAnimation = false;
 			GameState->DeathAnimationLengthMoved = 0.0f;
 		}
+	}
+}
+
+void UpdateMenuDefault(SGameState* GameState, const SGameInput* GameInput)
+{
+	AddTextMenu(GameState, "COLOR THIEF", Vec2(0.0f, 0.7f), 0.4f, &GameState->Renderer.KarminaBold, Vec4(1.0f));
+	for (int32_t MenuElement = MenuElement_DefaultNone; MenuElement < MenuElement_DefaultCount; MenuElement++)
+	{
+		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
+		bool bEnterDown = WasDown(GameInput->Buttons[Button_Enter]);
+
+		const SFont* Font = &GameState->Renderer.KarminaRegular;
+		float Scale = 0.2f;
+		vec4 Color = bSelected ? Vec4(0.8f, 0.8f, 0.8f, 1.0f) : Vec4(0.5f, 0.5f, 0.5f, 1.0f);
+		switch (MenuElement)
+		{
+			case MenuElement_Settings:
+			{
+				AddTextMenu(GameState, "Settings", Vec2(0.0f, 0.12f), Scale, Font, Color);
+			} break;
+
+			case MenuElement_StartNewGame:
+			{
+				AddTextMenu(GameState, "Start A New Game", Vec2(0.0f, 0.0f), Scale, Font, Color);
+			} break;
+
+			case MenuElement_Quit:
+			{
+				AddTextMenu(GameState, "Quit", Vec2(0.0f, -0.12f), Scale, Font, Color);
+			} break;
+		}
+
+		if (bSelected && bEnterDown)
+		{
+			switch (MenuElement)
+			{
+				case MenuElement_Settings:
+				{
+					GameState->MenuMode = MenuMode_Settings;
+				} break;
+
+				case MenuElement_StartNewGame:
+				{
+					LoadLevel(GameState, &GameState->LevelBaseState, "MainHub.ctl");
+					GameState->bMenuOpened = false;
+				} break;
+
+				case MenuElement_Quit:
+				{
+					PlatformQuitGame();
+				} break;
+			}
+		}
+	}
+}
+
+void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVulkanContext* Vulkan)
+{
+	AddTextMenu(GameState, "SETTINGS", Vec2(0.0f, 0.7f), 0.4f, &GameState->Renderer.KarminaBold, Vec4(1.0f));
+	for (int32_t MenuElement = MenuElement_SettingsNone; MenuElement < MenuElement_SettingsCount; MenuElement++)
+	{
+		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
+
+		bool bArrowLeft = WasDown(GameInput->Buttons[Button_A]) || WasDown(GameInput->Buttons[Button_ArrowLeft]);
+		bool bArrowRight = WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
+		bool bArrowUsed = bArrowLeft || bArrowRight;
+
+		const SFont* Font = &GameState->Renderer.KarminaRegular;
+		const float LeftPos = -0.5f;
+		const float RightPos = 0.5f;
+		const float Scale = 0.15f;
+		const vec4 Color = bSelected ? Vec4(0.8f, 0.8f, 0.8f, 1.0f) : Vec4(0.5f, 0.5f, 0.5f, 1.0f);
+		switch (MenuElement)
+		{
+			case MenuElement_Fullscreen:
+			{
+				const float YPos = 0.24f;
+				AddTextMenu(GameState, "Fullscreen:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(GameState, PlatformGetFullscreen() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+			} break;
+
+			case MenuElement_VSync:
+			{
+				const float YPos = 0.12f;
+				AddTextMenu(GameState, "V-Sync:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(GameState, PlatformGetVSync() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+			} break;
+
+			case MenuElement_Resolution:
+			{
+				const float YPos = 0.0f;
+				AddTextMenu(GameState, "Resolution:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(GameState, "1920x1080", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+			} break;
+
+			case MenuElement_Vignetting:
+			{
+				const float YPos = -0.12f;
+				AddTextMenu(GameState, "Vignetting:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(GameState, GameState->bVignetteEnabled ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+			} break;
+
+			case MenuElement_Multisampling:
+			{
+				const float YPos = -0.24f;
+				AddTextMenu(GameState, "Multisampling:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+
+				char MultisamplingText[32] = {};
+				const char ValueMSAA[2] = { char(Vulkan->SampleCountMSAA + '0'), '\0' };
+				ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), ValueMSAA, "x MSAA");
+
+				AddTextMenu(GameState, MultisamplingText, Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+			} break;
+		}
+
+		if (bSelected && bArrowUsed)
+		{
+			switch (MenuElement)
+			{
+				case MenuElement_Fullscreen:
+				{
+					PlatformChangeFullscreen(!PlatformGetFullscreen());
+				} break;
+
+				case MenuElement_VSync:
+				{
+					PlatformChangeVSync(!PlatformGetVSync());
+				} break;
+
+				case MenuElement_Resolution:
+				{
+				} break;
+
+				case MenuElement_Vignetting:
+				{
+					GameState->bVignetteEnabled = !GameState->bVignetteEnabled;
+				} break;
+
+				case MenuElement_Multisampling:
+				{
+					uint32_t MaxSampleCountMSAA = uint32_t(Vulkan->MaxSampleCountMSAA);
+					uint32_t SampleCountMSAA = uint32_t(Vulkan->SampleCountMSAA);
+
+					if (bArrowRight)
+					{
+						SampleCountMSAA *= 2;
+						if (SampleCountMSAA > MaxSampleCountMSAA)
+						{
+							SampleCountMSAA = 1;
+						}
+					}
+					else
+					{
+						SampleCountMSAA /= 2;
+						if (SampleCountMSAA == 0)
+						{
+							SampleCountMSAA = MaxSampleCountMSAA;
+						}
+					}
+
+					GameState->bSampleCountMSAAChanged = true;
+					GameState->NewSampleCountMSAA = SampleCountMSAA;
+				} break;
+			}
+		}
+	}
+
+	if (WasDown(GameInput->Buttons[Button_Escape]))
+	{
+		GameState->MenuMode = MenuMode_Default;
+		GameState->SelectedMenuElement = MenuElement_Settings;
+	}
+}
+
+void UpdateMenu(SGameState* GameState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+{
+	EMenuElement MinMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultNone : MenuElement_SettingsNone;
+	EMenuElement MaxMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultCount : MenuElement_SettingsCount;
+
+	if (WasDown(GameInput->Buttons[Button_W]) || WasDown(GameInput->Buttons[Button_ArrowUp]) ||
+		WasDown(GameInput->Buttons[Button_S]) || WasDown(GameInput->Buttons[Button_ArrowDown]))
+	{
+		if (WasDown(GameInput->Buttons[Button_W]) || WasDown(GameInput->Buttons[Button_ArrowUp]))
+		{
+			GameState->SelectedMenuElement = EMenuElement(GameState->SelectedMenuElement - 1);
+
+			if (GameState->SelectedMenuElement == MinMenuElement)
+			{
+				GameState->SelectedMenuElement = EMenuElement(MaxMenuElement - 1);
+			}
+		}
+		else
+		{
+			GameState->SelectedMenuElement = EMenuElement((GameState->SelectedMenuElement + 1) % MaxMenuElement);
+		}
+
+		GameState->SelectedMenuElement = EMenuElement(Clamp(GameState->SelectedMenuElement, MinMenuElement + 1, MaxMenuElement - 1));
+	}
+
+	switch (GameState->MenuMode)
+	{
+		case MenuMode_Default:
+		{
+			UpdateMenuDefault(GameState, GameInput);
+		} break;
+
+		case MenuMode_Settings:
+		{
+			UpdateMenuSettings(GameState, GameInput, (SVulkanContext*) Vulkan);
+		} break;
+	}
+	
+}
+
+void UpdateGame(SGameState* GameState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+{
+	if (WasDown(GameInput->Buttons[Button_Escape]))
+	{
+		if (!GameState->bMenuOpened || (GameState->MenuMode != MenuMode_Settings))
+		{
+			GameState->bMenuOpened = !GameState->bMenuOpened;
+			GameState->MenuMode = MenuMode_Default;
+			GameState->SelectedMenuElement = MenuElement_DefaultNone;
+		}
+	}
+
+	if (!GameState->bMenuOpened)
+	{
+		UpdateGameMode(GameState, GameInput);	
+	}
+	else
+	{
+		UpdateMenu(GameState, GameInput, Vulkan);
 	}
 }

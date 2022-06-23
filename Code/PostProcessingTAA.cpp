@@ -1,9 +1,9 @@
 struct STaaRenderPass
 {
 public:
-    static STaaRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage& VelocityImage);
-    void Render(const SVulkanContext& Vulkan, const SImage* HistoryImages, const SBuffer& QuadVertexBuffer, uint32_t FrameID);
-	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage& VelocityImage);
+    static STaaRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage* VelocityImages);
+    void Render(const SVulkanContext& Vulkan, const SImage* HistoryImages, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bSwapchainChanged);
+	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage* VelocityImages);
 
 	static vec2 GetJitter(uint32_t FrameID);
 
@@ -25,13 +25,14 @@ private:
     static VkPipeline CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS);
 };
 
-STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage& VelocityImage)
+STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage* VelocityImages)
 {
     VkDescriptorSetLayoutBinding CurrBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding HistoryBinding = CreateDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding VelocityBinding = CreateDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayoutBinding HistoryVelocityBinding = CreateDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     
-    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CurrBinding, HistoryBinding, VelocityBinding };
+    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CurrBinding, HistoryBinding, VelocityBinding, HistoryVelocityBinding };
     VkDescriptorSetLayout DescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(DescrSetLayoutBindings), DescrSetLayoutBindings);
 
     VkDescriptorSet DescrSets[2] = {};
@@ -40,7 +41,8 @@ STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptor
         DescrSets[I] = CreateDescriptorSet(Vulkan.Device, DescrPool, DescrSetLayout);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HDRTargetImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HistoryImages[(I + 1) % ArrayCount(DescrSets)].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImages[(I + 1) % ArrayCount(DescrSets)].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
         
     VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -70,14 +72,14 @@ STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptor
     return TaaPass;
 }
 
-void STaaRenderPass::Render(const SVulkanContext& Vulkan, const SImage* HistoryImages, const SBuffer& QuadVertexBuffer, uint32_t FrameID)
+void STaaRenderPass::Render(const SVulkanContext& Vulkan, const SImage* HistoryImages, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bSwapchainChanged)
 {
 	BEGIN_GPU_PROFILER_BLOCK("TAA", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	const uint32_t TargetIndex = FrameID % 2;
     const uint32_t PrevIndex = (TargetIndex + 1) % 2;
 
-	if ((FrameID == 0) || Vulkan.bSwapchainResized)
+	if ((FrameID == 0) || bSwapchainChanged)
 	{
 		VkImageMemoryBarrier TAABeginBarrier = CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, HistoryImages[PrevIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT);
 		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &TAABeginBarrier);
@@ -107,13 +109,14 @@ void STaaRenderPass::Render(const SVulkanContext& Vulkan, const SImage* HistoryI
 	END_GPU_PROFILER_BLOCK("TAA", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }
 
-void STaaRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage& VelocityImage)
+void STaaRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, const SImage* HistoryImages, VkSampler PointEdgeSampler, const SImage* VelocityImages)
 {
     for (uint32_t I = 0; I < ArrayCount(DescrSets); I++)
     {
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HDRTargetImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HistoryImages[(I + 1) % ArrayCount(DescrSets)].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImages[(I + 1) % ArrayCount(DescrSets)].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
         
     for (uint32_t I = 0; I < ArrayCount(Framebuffers); I++)

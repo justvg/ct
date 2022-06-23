@@ -144,6 +144,34 @@ static bool bGlobalCursorWasJustDisabled = false;
 
 static int64_t GlobalPerfCounterFrequency;
 
+static bool bGlobalFullscreen = true;
+static VkPresentModeKHR GlobalPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+
+void PlatformQuitGame()
+{
+	bGlobalRunning = false;
+}
+
+bool PlatformGetFullscreen()
+{
+	return bGlobalFullscreen;
+}
+
+void PlatformChangeFullscreen(bool bFullscreen)
+{
+	bGlobalFullscreen = bFullscreen;
+}
+
+bool PlatformGetVSync()
+{
+	return (GlobalPresentMode == VK_PRESENT_MODE_FIFO_KHR) ? true : false;
+}
+
+void PlatformChangeVSync(bool bEnabled)
+{
+	GlobalPresentMode = bEnabled ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
+}
+
 struct SWindowUserPtr
 {
 	SPlatformData* PlatformData;
@@ -336,30 +364,38 @@ void WinToggleFullscreen(HWND Window)
     // NOTE(georgii): This follows Raymond Chen's prescription for fullscreen toggling, see:
     // https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
 	static WINDOWPLACEMENT GlobalWindowPosition = { sizeof(GlobalWindowPosition) };
+	static bool bFullscreen = false;
 
-    DWORD Style = GetWindowLong(Window, GWL_STYLE);
-    if (Style & WS_OVERLAPPEDWINDOW) 
-    {
-        MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
-        if (GetWindowPlacement(Window, &GlobalWindowPosition) &&
-            GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) 
-        {
-            SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
-            SetWindowPos(Window, HWND_TOP,
-                        MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
-                        MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
-                        MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
-                        SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-        }
-    }
-    else 
-    {
-        SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
-        SetWindowPlacement(Window, &GlobalWindowPosition);
-        SetWindowPos(Window, NULL, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-    }
+	if (bFullscreen != bGlobalFullscreen)
+	{
+		DWORD Style = GetWindowLong(Window, GWL_STYLE);
+		if (Style & WS_OVERLAPPEDWINDOW) 
+		{
+			MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
+			if (GetWindowPlacement(Window, &GlobalWindowPosition) &&
+				GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) 
+			{
+				SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+				SetWindowPos(Window, HWND_TOP,
+							MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+							MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+							MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+							SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+
+				bFullscreen = true;
+			}
+		}
+		else 
+		{
+			SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+			SetWindowPlacement(Window, &GlobalWindowPosition);
+			SetWindowPos(Window, NULL, 0, 0, 0, 0,
+						SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+						SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+
+			bFullscreen = false;
+		}
+	}
 }
 
 LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
@@ -533,6 +569,7 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 
 				bool WasDown = ((LParam & (1 << 30)) != 0);
 				bool IsDown = ((LParam & (1 << 31)) == 0);
+				bool bAltDown = ((LParam & (1 << 29)) != 0);
                 
 				if (WasDown != IsDown)
 				{ 
@@ -580,6 +617,14 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					{
 						WinProcessKeyboardMessage(GameInput->Buttons[Button_Delete], IsDown);
 					}
+					else if (VKCode == VK_RETURN)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_Enter], IsDown && !bAltDown);
+					}
+					else if (VKCode == VK_ESCAPE)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_Escape], IsDown);
+					}
 					else if (VKCode == 'Z')
 					{
 						WinProcessKeyboardMessage(GameInput->Buttons[Button_Z], IsDown);
@@ -612,19 +657,30 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					{
 						WinProcessKeyboardMessage(GameInput->Buttons[Button_F], IsDown);
 					}
+					else if (VKCode == VK_UP)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_ArrowUp], IsDown);
+					}
+					else if (VKCode == VK_DOWN)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_ArrowDown], IsDown);
+					}
+					else if (VKCode == VK_LEFT)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_ArrowLeft], IsDown);
+					}
+					else if (VKCode == VK_RIGHT)
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_ArrowRight], IsDown);
+					}
 
 					if (IsDown)
 					{
-						bool AltDown = ((LParam & (1 << 29)) != 0);
-						if(AltDown)
+						if (bAltDown)
 						{
 							if (VKCode == VK_F4)
 							{
 								bGlobalRunning = false;
-							}
-							else if (VKCode == VK_RETURN)
-							{
-								WinToggleFullscreen(Window);
 							}
 						}
 					}
@@ -728,6 +784,8 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 			{
 				SLogger::Log("Game memory allocated.\n\n", LoggerVerbosity_Release);
 
+				WinToggleFullscreen(Window);
+
 				memset(GameMemory.Storage, 0, GameMemory.StorageSize);
 
 				SVulkanVersion VulkanVersion = GetVulkanVersion();
@@ -750,15 +808,11 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				uint32_t GraphicsFamilyIndex = GetGraphicsFamilyIndex(PhysicalDevice);
 				Assert(GraphicsFamilyIndex != VK_QUEUE_FAMILY_IGNORED);
 
-				VkSampleCountFlagBits SampleCountMSAA = GetMaxUsableSamplerCount(PhysicalDeviceProps);
-				Assert(SampleCountMSAA > VK_SAMPLE_COUNT_1_BIT);
+				VkSampleCountFlagBits MaxSampleCountMSAA = VkSampleCountFlagBits(Max(GetMaxUsableSamplerCount(PhysicalDeviceProps), uint32_t(VK_SAMPLE_COUNT_8_BIT)));
+				VkSampleCountFlagBits SampleCountMSAA = MaxSampleCountMSAA;
 				if (SampleCountMSAA >= VK_SAMPLE_COUNT_4_BIT)
 				{
 					SampleCountMSAA = VK_SAMPLE_COUNT_4_BIT;
-				}
-				else
-				{
-					SampleCountMSAA = VK_SAMPLE_COUNT_2_BIT;
 				}
 
 				bool bIndirectCountKHR = false;
@@ -776,7 +830,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				VkFormat DepthFormat = FindDepthFormat(PhysicalDevice);
 
 				VmaAllocator MemoryAllocator = CreateVulkanMemoryAllocator(Instance, PhysicalDevice, Device);
-				SSwapchain Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, SwapchainFormat);
+				SSwapchain Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, SwapchainFormat, GlobalPresentMode);
 				SLogger::Log("Swapchain created.\n", LoggerVerbosity_Release);
 
 				VkCommandPool CommandPool = CreateCommandPool(Device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, GraphicsFamilyIndex);
@@ -805,6 +859,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				Vulkan.GraphicsQueue = GraphicsQueue;
 				Vulkan.SwapchainFormat = SwapchainFormat;
 				Vulkan.DepthFormat = DepthFormat;
+				Vulkan.MaxSampleCountMSAA = MaxSampleCountMSAA;
 				Vulkan.SampleCountMSAA = SampleCountMSAA;
 
 #ifndef ENGINE_RELEASE
@@ -862,6 +917,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 							} break;
 						}
 					}
+					WinToggleFullscreen(Window);
 
 					if (FrameID == 0)
 					{
@@ -891,11 +947,12 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					VkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCaps));
 					if ((SurfaceCaps.currentExtent.width != 0) && (SurfaceCaps.currentExtent.height != 0))
 					{
-						bool bSwapchainWasResized = ResizeSwapchainIfChanged(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, SurfaceCaps);
-						if (bSwapchainWasResized)
+						bool bSwapchainChanged = ResizeSwapchainIfChanged(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, SurfaceCaps);
+						if (bSwapchainChanged)
 						{
 							GameInput.MouseDeltaX = GameInput.MouseDeltaY = 0.0f;
 						}
+						bSwapchainChanged = bSwapchainChanged || ChangeVSyncIfNeeded(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, GlobalPresentMode);
 
 						uint32_t FrameInFlight = FrameID % FramesInFlight;
 
@@ -907,7 +964,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						SLogger::Log("Next swapchain image acquired.\n", LoggerVerbosity_SuperDebug);
 
 						Vulkan.CommandBuffer = CommandBuffers[FrameInFlight];
-						Vulkan.bSwapchainResized = bSwapchainWasResized;
+						Vulkan.bSwapchainChanged = bSwapchainChanged;
 						Vulkan.Width = Swapchain.Width; 
 						Vulkan.Height = Swapchain.Height;
 						Vulkan.FrameInFlight = FrameInFlight;

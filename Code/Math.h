@@ -202,6 +202,22 @@ inline float Clamp(float Value, float Min, float Max)
     return(Value);
 }
 
+inline int32_t Clamp(int32_t Value, int32_t Min, int32_t Max)
+{
+    Assert(Min <= Max);
+
+    if (Value < Min) 
+    {
+        Value = Min;
+    }
+    else if (Value > Max)
+    {
+        Value = Max;
+    } 
+
+    return(Value);
+}
+
 // 
 // NOTE(georgii): vec2
 // 

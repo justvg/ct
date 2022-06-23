@@ -131,6 +131,9 @@ enum EButtonType
 	Button_Alt,
 	Button_Shift,
 	Button_Delete,
+	Button_Escape,
+	Button_Enter,
+
 	Button_Z,
 	Button_R,
 	Button_C,
@@ -139,6 +142,11 @@ enum EButtonType
 	Button_Q,
 	Button_E,
 	Button_F,
+
+	Button_ArrowUp,
+	Button_ArrowDown,
+	Button_ArrowLeft,
+	Button_ArrowRight,
 
 	Button_Count
 };
@@ -217,9 +225,10 @@ struct SVulkanContext
 
 	VkFormat SwapchainFormat;
 	VkFormat DepthFormat;
+	VkSampleCountFlagBits MaxSampleCountMSAA;
 	VkSampleCountFlagBits SampleCountMSAA;
 
-	bool bSwapchainResized;
+	bool bSwapchainChanged;
 	uint32_t Width, Height;
 
 	uint32_t FrameInFlight;
@@ -239,3 +248,11 @@ void PlatformToggleCursorOnOff(SGameInput* GameInput);
 bool PlatformIsCursorEnabled();
 
 void PlatformGetAllFilenamesFromDir(const char* WildcardPath, char* Filenames, uint32_t Stride, uint32_t& FileCount);
+
+bool PlatformGetFullscreen();
+void PlatformChangeFullscreen(bool bFullscreen);
+
+bool PlatformGetVSync();
+void PlatformChangeVSync(bool bEnabled);
+
+void PlatformQuitGame();

@@ -5,6 +5,7 @@ public:
     void RenderEarly(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, vec3 AmbientColor, uint32_t FrameID);
     void RenderLate(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, uint32_t FrameID);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
+	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
 private:
     VkPipeline PipelineEarly, PipelineLate;
@@ -161,6 +162,28 @@ void SForwardVoxelRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, co
 	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
     FramebufferEarly = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
     FramebufferLate = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+}
+
+void SForwardVoxelRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
+{
+	vkDestroyPipeline(Vulkan.Device, PipelineEarly, 0);
+	vkDestroyPipeline(Vulkan.Device, PipelineLate, 0);
+
+	vkDestroyFramebuffer(Vulkan.Device, FramebufferEarly, 0);
+	vkDestroyFramebuffer(Vulkan.Device, FramebufferLate, 0);
+
+	vkDestroyRenderPass(Vulkan.Device, RenderPassEarly, 0);
+	vkDestroyRenderPass(Vulkan.Device, RenderPassLate, 0);
+
+	RenderPassEarly = CreateRenderPassEarly(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+    RenderPassLate = CreateRenderPassLate(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+
+	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
+    FramebufferEarly = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+    FramebufferLate = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+
+	PipelineEarly = CreateGraphicsPipelineEarly(Vulkan.Device, RenderPassEarly, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
+    PipelineLate = CreateGraphicsPipelineLate(Vulkan.Device, RenderPassLate, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
 }
 
 VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount)

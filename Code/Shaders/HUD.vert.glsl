@@ -11,6 +11,7 @@ layout (push_constant) uniform PushConstants
 	
     uint FontRendering;
 	float BlendFactor;
+	vec4 FontColor;
 };
 
 layout (set = 0, binding = 0) uniform Projection

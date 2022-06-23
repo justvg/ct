@@ -37,7 +37,11 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
 	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-	Renderer->VelocityImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	
+	for (uint32_t I = 0; I < ArrayCount(Renderer->VelocityImages); I++)
+	{
+		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	}
 	
 	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.Width, Vulkan.Height);
 	Renderer->DepthPyramidImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, DepthPyramidInfo.Width, DepthPyramidInfo.Height, 0, DepthPyramidInfo.MipCount, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -86,7 +90,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->DownscaleComputePass = SDownscaleComputePass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearDepthImage, Renderer->DepthPyramidMipCount, Renderer->DepthPyramidMipViews, Renderer->PointEdgeSampler, Renderer->MaxReductionSampler);
 	Renderer->ExposureRenderPass = SExposureRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->LinearEdgeSamplerMips, Renderer->BrightnessImage, Renderer->BrightnessMipViews, Renderer->PointEdgeSampler, Renderer->ExposureImages);
 	Renderer->BloomRenderPass = SBloomRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
-	Renderer->TaaRenderPass = STaaRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImage);
+	Renderer->TaaRenderPass = STaaRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImages);
 	Renderer->ToneMappingRenderPass = SToneMappingRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->PointEdgeSampler, Renderer->HistoryImages, Renderer->ExposureImages, Renderer->LinearEdgeSampler, Renderer->BloomImage, Renderer->FinalImage);
 	Renderer->HudRenderPass = SHUDRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->HUDProjectionBuffers, Renderer->FinalImage);
 	Renderer->DebugRenderPass = SDebugRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->FinalImage);
@@ -95,8 +99,8 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->AimTextureDescrSet = CreateDescriptorSet(Vulkan.Device, Renderer->DescriptorPool, Renderer->HudRenderPass.GetTextureDescrSetLayout());
 	UpdateDescriptorSetImage(Vulkan.Device, Renderer->AimTextureDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, Renderer->LinearEdgeSampler, Renderer->AimTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	Renderer->Font = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout());
-
+	Renderer->KarminaRegular = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaRegular");
+	Renderer->KarminaBold = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaBold");
 
 	vec2 QuadVertices[] =
 	{
@@ -154,7 +158,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->CubeIB, Renderer->StagingBuffers[0], CubeIndices, sizeof(CubeIndices));
 }
 
-VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float dt)
+VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float dt, bool bSwapchainChanged)
 {
 	// Rendering
 	BEGIN_PROFILER_BLOCK("RENDERING");
@@ -168,7 +172,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	BEGIN_GPU_PROFILER_BLOCK("RENDER", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
 	// Frustum cull voxels visible last frame
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, false);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, false, bSwapchainChanged);
     
 	// Forward render voxels visibile last frame and frustum culled in this frame
 	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(GameState->VoxelDraws), PointLightCount, Level->AmbientColor, FrameID);
@@ -182,13 +186,26 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	};
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(LinearDepthResolveBarriers), LinearDepthResolveBarriers);
 	
-	VkImageResolve LinearDepthResolve = {};
-	LinearDepthResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	LinearDepthResolve.srcSubresource.layerCount = 1; 
-    LinearDepthResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    LinearDepthResolve.dstSubresource.layerCount = 1;
-    LinearDepthResolve.extent = { Renderer->LinearDepthImage.Width, Renderer->LinearDepthImage.Height, 1 };
-	vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthResolve);
+	if (Vulkan.SampleCountMSAA > 1)
+	{
+		VkImageResolve LinearDepthResolve = {};
+		LinearDepthResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthResolve.srcSubresource.layerCount = 1; 
+		LinearDepthResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthResolve.dstSubresource.layerCount = 1;
+		LinearDepthResolve.extent = { Renderer->LinearDepthImage.Width, Renderer->LinearDepthImage.Height, 1 };
+		vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthResolve);
+	}
+	else
+	{
+		VkImageCopy LinearDepthCopy = {};
+		LinearDepthCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthCopy.srcSubresource.layerCount = 1; 
+		LinearDepthCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthCopy.dstSubresource.layerCount = 1;
+		LinearDepthCopy.extent = { Renderer->LinearDepthImage.Width, Renderer->LinearDepthImage.Height, 1 };
+		vkCmdCopyImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthCopy);
+	}
 	
 	END_GPU_PROFILER_BLOCK("RESOLVE_LINEAR_DEPTH", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
@@ -196,7 +213,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	Renderer->DownscaleComputePass.Dispatch(Vulkan, Renderer->LinearDepthImage, Renderer->DepthPyramidImage, Renderer->DepthPyramidMipCount);
     
 	// Frustum and occlusion cull all voxels
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, true);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, true, bSwapchainChanged);
     
 	// Render voxels visible this frame that are not already rendered
 	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(GameState->VoxelDraws), PointLightCount, FrameID);
@@ -207,7 +224,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	// Forward render entities
 	if (!GameState->bHideEntities)
 	{
-		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, GameState->Camera, GameState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, GameState->GameMode == GameMode_Game, MemoryArena, dt);
+		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, GameState->Camera, GameState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, GameState->GameMode == GameMode_Game, MemoryArena, GameState->bMenuOpened ? 0.0f : dt);
 	}
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_MSAA_TARGETS", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
@@ -218,28 +235,63 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_ASPECT_COLOR_BIT),
 		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->VelocityImageMSAA.Image, VK_IMAGE_ASPECT_COLOR_BIT),
 		CreateImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, Renderer->HDRTargetImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
-		CreateImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, Renderer->VelocityImage.Image, VK_IMAGE_ASPECT_COLOR_BIT)
+		CreateImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, Renderer->VelocityImages[Vulkan.FrameInFlight].Image, VK_IMAGE_ASPECT_COLOR_BIT)
 	};
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(MSAAResolveBarriers), MSAAResolveBarriers);
     
-	VkImageResolve HDRTargetResolve = {};
-	HDRTargetResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	HDRTargetResolve.srcSubresource.layerCount = 1; 
-    HDRTargetResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    HDRTargetResolve.dstSubresource.layerCount = 1;
-    HDRTargetResolve.extent = { Renderer->HDRTargetImage.Width, Renderer->HDRTargetImage.Height, 1 };
-	vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->HDRTargetImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->HDRTargetImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &HDRTargetResolve);
-    
-	vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthResolve);
-    
-	VkImageResolve VelocityResolve = {};
-	VelocityResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	VelocityResolve.srcSubresource.layerCount = 1; 
-    VelocityResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    VelocityResolve.dstSubresource.layerCount = 1;
-    VelocityResolve.extent = { Renderer->VelocityImage.Width, Renderer->VelocityImage.Height, 1 };
-	vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->VelocityImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->VelocityImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &VelocityResolve);
-    
+	if (Vulkan.SampleCountMSAA > 1)
+	{
+		VkImageResolve HDRTargetResolve = {};
+		HDRTargetResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		HDRTargetResolve.srcSubresource.layerCount = 1; 
+		HDRTargetResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		HDRTargetResolve.dstSubresource.layerCount = 1;
+		HDRTargetResolve.extent = { Renderer->HDRTargetImage.Width, Renderer->HDRTargetImage.Height, 1 };
+		vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->HDRTargetImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->HDRTargetImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &HDRTargetResolve);
+		
+		VkImageResolve LinearDepthResolve = {};
+		LinearDepthResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthResolve.srcSubresource.layerCount = 1; 
+		LinearDepthResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthResolve.dstSubresource.layerCount = 1;
+		LinearDepthResolve.extent = { Renderer->LinearDepthImage.Width, Renderer->LinearDepthImage.Height, 1 };
+		vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthResolve);
+		
+		VkImageResolve VelocityResolve = {};
+		VelocityResolve.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VelocityResolve.srcSubresource.layerCount = 1; 
+		VelocityResolve.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VelocityResolve.dstSubresource.layerCount = 1;
+		VelocityResolve.extent = { Renderer->VelocityImages[Vulkan.FrameInFlight].Width, Renderer->VelocityImages[Vulkan.FrameInFlight].Height, 1 };
+		vkCmdResolveImage(Vulkan.CommandBuffer, Renderer->VelocityImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->VelocityImages[Vulkan.FrameInFlight].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &VelocityResolve);
+	}
+	else
+	{
+		VkImageCopy HDRTargetCopy = {};
+		HDRTargetCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		HDRTargetCopy.srcSubresource.layerCount = 1; 
+		HDRTargetCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		HDRTargetCopy.dstSubresource.layerCount = 1;
+		HDRTargetCopy.extent = { Renderer->HDRTargetImage.Width, Renderer->HDRTargetImage.Height, 1 };
+		vkCmdCopyImage(Vulkan.CommandBuffer, Renderer->HDRTargetImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->HDRTargetImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &HDRTargetCopy);
+
+		VkImageCopy LinearDepthCopy = {};
+		LinearDepthCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthCopy.srcSubresource.layerCount = 1; 
+		LinearDepthCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		LinearDepthCopy.dstSubresource.layerCount = 1;
+		LinearDepthCopy.extent = { Renderer->LinearDepthImage.Width, Renderer->LinearDepthImage.Height, 1 };
+		vkCmdCopyImage(Vulkan.CommandBuffer, Renderer->LinearDepthImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->LinearDepthImage.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &LinearDepthCopy);
+
+		VkImageCopy VelocityCopy = {};
+		VelocityCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VelocityCopy.srcSubresource.layerCount = 1; 
+		VelocityCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VelocityCopy.dstSubresource.layerCount = 1;
+		VelocityCopy.extent = { Renderer->VelocityImages[Vulkan.FrameInFlight].Width, Renderer->VelocityImages[Vulkan.FrameInFlight].Height, 1 };
+		vkCmdCopyImage(Vulkan.CommandBuffer, Renderer->VelocityImageMSAA.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->VelocityImages[Vulkan.FrameInFlight].Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &VelocityCopy);
+	}
+
 	VkImageMemoryBarrier HDRTargetReadBarrier = CreateImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->HDRTargetImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &HDRTargetReadBarrier);
     
@@ -249,16 +301,20 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	Renderer->ExposureRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BrightnessImage, Renderer->ExposureImages, FrameID);
     
 	// TAA
-	VkImageMemoryBarrier VelocityReadBarrier = CreateImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->VelocityImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
-	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &VelocityReadBarrier);
+	VkImageMemoryBarrier VelocityReadBarriers[] = 
+	{
+		CreateImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->VelocityImages[Vulkan.FrameInFlight].Image, VK_IMAGE_ASPECT_COLOR_BIT),
+		CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->VelocityImages[(Vulkan.FrameInFlight + 1) % FramesInFlight].Image, VK_IMAGE_ASPECT_COLOR_BIT),
+	};
+	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(VelocityReadBarriers), VelocityReadBarriers);
     
-	Renderer->TaaRenderPass.Render(Vulkan, Renderer->HistoryImages, Renderer->QuadVB, FrameID);
+	Renderer->TaaRenderPass.Render(Vulkan, Renderer->HistoryImages, Renderer->QuadVB, FrameID, bSwapchainChanged);
     
 	// Calculate bloom
 	Renderer->BloomRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BloomImage, FrameID);
     
 	// Tone mapping
-	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID);
+	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID, GameState->bMenuOpened, GameState->bVignetteEnabled);
     
 	// HUD
 	SHUDProjectionBuffer HUDProjectionData = { Orthographic(-0.5f*Vulkan.Width, 0.5f*Vulkan.Width, -0.5f*Vulkan.Height, 0.5f*Vulkan.Height, -1.0f, 1.0f)  };
@@ -275,18 +331,47 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	{
 		const SText& Text = GameState->TextsToRender[I];
 
-		vec2 TextSize = GetTextSize(Renderer->Font, Text.Scale, Text.String);
-		vec2 ScreenPosition = Hadamard(Text.Pos, 0.5f * Vec2i(Vulkan.Width, Vulkan.Height)) - 0.5f * TextSize;
-		if (Text.bAppearance)
+		if ((GameState->bMenuOpened && Text.bMenuText) || (!GameState->bMenuOpened && !Text.bMenuText))
 		{
-			if (Text.CurrentTime >= Text.TimeToStartAppear)
+			const SFont* Font = Text.Font;
+
+			vec2 ScreenSizeScale = Vec2(Vulkan.Width / 1920.0f, Vulkan.Height / 1080.0f);
+			vec2 TextScale = Hadamard(Text.Scale, ScreenSizeScale);
+			vec2 ScreenPosition = Hadamard(Text.Pos, 0.5f * Vec2i(Vulkan.Width, Vulkan.Height));
+
+			vec2 TextSize = GetTextSize(Font, TextScale, Text.String);
+			if (Text.Alignment == TextAlignment_Center)
 			{
-				Renderer->HudRenderPass.RenderStringWithAppearance(Vulkan, Renderer->Font, ScreenPosition, Text.Scale, Text.String, Clamp((Text.CurrentTime - Text.TimeToStartAppear) / Text.TimeToAppear, 0.0f, 1.0f));
+				ScreenPosition -= 0.5f * TextSize;
 			}
-		}
-		else
-		{
-			Renderer->HudRenderPass.RenderString(Vulkan, Renderer->Font, ScreenPosition, Text.Scale, Text.String);
+			else if (Text.Alignment == TextAlignment_Left)
+			{
+				ScreenPosition.y -= 0.5f * TextSize.y;
+			}
+			else
+			{
+				Assert(Text.Alignment == TextAlignment_Right);
+
+				ScreenPosition -= Vec2(TextSize.x, 0.5f * TextSize.y);
+			}
+
+			if (Text.bAppearance)
+			{
+				if (Text.Time - Text.CurrentTime < 1.0f)
+				{
+					float BlendFactor = Text.Time - Text.CurrentTime;
+					Renderer->HudRenderPass.RenderString(Vulkan, Font, ScreenPosition, TextScale, Text.String, Text.Color, BlendFactor);
+				}
+				else if (Text.CurrentTime >= Text.TimeToStartAppear)
+				{
+					float AppearanceFactor = Clamp((Text.CurrentTime - Text.TimeToStartAppear) / Text.TimeToAppear, 0.0f, 1.0f);
+					Renderer->HudRenderPass.RenderStringWithAppearance(Vulkan, Font, ScreenPosition, TextScale, Text.String, AppearanceFactor);
+				}
+			}
+			else
+			{
+				Renderer->HudRenderPass.RenderString(Vulkan, Font, ScreenPosition, TextScale, Text.String, Text.Color);
+			}
 		}
 	}
 	
@@ -309,8 +394,10 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	return Renderer->FinalImage.Image;
 }
 
-void RendererSwapchainResized(SRenderer* Renderer, const SVulkanContext& Vulkan)
+void RendererHandleChanges(SRenderer* Renderer, const SVulkanContext& Vulkan, bool bSampleCountMSAAChanged)
 {
+	VkCheck(vkDeviceWaitIdle(Vulkan.Device));
+
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->HDRTargetImageMSAA);
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->DepthImageMSAA);
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->LinearDepthImageMSAA);		
@@ -319,7 +406,11 @@ void RendererSwapchainResized(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->HDRTargetImage);
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->DepthImage);
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->LinearDepthImage);
-	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->VelocityImage);
+
+	for (uint32_t I = 0; I < ArrayCount(Renderer->VelocityImages); I++)
+	{
+		DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->VelocityImages[I]);
+	}
 	
 	for (uint32_t I = 0; I < Renderer->DepthPyramidMipCount; I++)
 	{
@@ -349,7 +440,11 @@ void RendererSwapchainResized(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
 	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-	Renderer->VelocityImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	
+	for (uint32_t I = 0; I < ArrayCount(Renderer->VelocityImages); I++)
+	{
+		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	}
 	
 	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.Width, Vulkan.Height);
 	Renderer->DepthPyramidImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, DepthPyramidInfo.Width, DepthPyramidInfo.Height, 0, DepthPyramidInfo.MipCount, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -372,6 +467,13 @@ void RendererSwapchainResized(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	
 	Renderer->FinalImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.SwapchainFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	
+	if (bSampleCountMSAAChanged)
+	{
+		Renderer->ForwardVoxRenderPass.HandleSampleMSAAChange(Vulkan, Renderer->HDRTargetImageMSAA, Renderer->LinearDepthImageMSAA, Renderer->VelocityImageMSAA, Renderer->DepthImageMSAA);
+		Renderer->ForwardRenderPass.HandleSampleMSAAChange(Vulkan, Renderer->HDRTargetImageMSAA, Renderer->LinearDepthImageMSAA, Renderer->VelocityImageMSAA, Renderer->DepthImageMSAA);
+		Renderer->ForwardPartRenderPass.HandleSampleMSAAChange(Vulkan, Renderer->HDRTargetImageMSAA, Renderer->LinearDepthImageMSAA, Renderer->VelocityImageMSAA, Renderer->DepthImageMSAA);		
+	}
+
 	Renderer->CullingVoxComputePass.UpdateAfterResize(Vulkan, Renderer->MaxReductionSampler, Renderer->DepthPyramidImage);
 	Renderer->ForwardVoxRenderPass.UpdateAfterResize(Vulkan, Renderer->HDRTargetImageMSAA, Renderer->LinearDepthImageMSAA, Renderer->VelocityImageMSAA, Renderer->DepthImageMSAA);
 	Renderer->ForwardRenderPass.UpdateAfterResize(Vulkan, Renderer->HDRTargetImageMSAA, Renderer->LinearDepthImageMSAA, Renderer->VelocityImageMSAA, Renderer->DepthImageMSAA);
@@ -379,7 +481,7 @@ void RendererSwapchainResized(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	Renderer->DownscaleComputePass.UpdateAfterResize(Vulkan, Renderer->DescriptorPool, Renderer->LinearDepthImage, Renderer->DepthPyramidMipCount, Renderer->DepthPyramidMipViews, Renderer->PointEdgeSampler, Renderer->MaxReductionSampler);
 	Renderer->ExposureRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage);
 	Renderer->BloomRenderPass.UpdateAfterResize(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
-	Renderer->TaaRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImage);
+	Renderer->TaaRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImages);
 	Renderer->ToneMappingRenderPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->HistoryImages, Renderer->LinearEdgeSampler, Renderer->BloomImage, Renderer->FinalImage);
 	Renderer->HudRenderPass.UpdateAfterResize(Vulkan, Renderer->FinalImage);
 	Renderer->DebugRenderPass.UpdateAfterResize(Vulkan, Renderer->FinalImage);
@@ -399,9 +501,7 @@ void UpdateCameraRenderData(SRenderer* Renderer, const SCamera& Camera, uint32_t
 	CameraBufferData.Pos = Vec4(Camera.Pos, -Camera.Near);
 
 	CameraBufferData.PrevView = CameraBufferData.View;
-	CameraBufferData.PrevProj = CameraBufferData.Proj;
-	CameraBufferData.PrevProj.E[2 * 4 + 0] = 0.0f;
-	CameraBufferData.PrevProj.E[2 * 4 + 1] = 0.0f;
+	CameraBufferData.PrevProj = CameraBufferData.ProjUnjittered;
 
 	CameraBufferData.View = LookAt(Camera.Pos, Camera.Pos + Camera.Dir, Camera.Up);
 

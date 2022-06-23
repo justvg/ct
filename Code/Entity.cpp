@@ -337,7 +337,7 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 	{
 		B->bRemoved = true;
 
-		AddText(GameState, B->MessageText, B->MessagePos, B->MessageScale, B->MessageLifeTime, true, B->MessageTimeToAppear, B->MessageTimeToStartAppear);
+		AddText(GameState, B->MessageText, B->MessagePos, B->MessageScale, Vec4(1.0f), B->MessageLifeTime, true, B->MessageTimeToAppear, B->MessageTimeToStartAppear);
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Checkpoint))
 	{
@@ -588,11 +588,11 @@ void MoveEntity(SGameState* GameState, SEntity* Entity, SLevel* Level, const SMo
 
 				if (Entity->Type == Entity_Fireball)
 				{
-					if ((t < 1.0f))
+					if (t < 1.0f)
 					{
 						Entity->bRemoved = true;
 					}
-					else if (HitEntity && (HitEntity->Type != Entity_Turret))
+					else if (HitEntity && (HitEntity->Type != Entity_Turret) && (HitEntity->Type != Entity_Fireball))
 					{
 						Entity->bRemoved = true;
 					}

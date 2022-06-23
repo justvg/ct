@@ -136,8 +136,8 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 
 		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
 		{
-			SoundBuffer.Samples[2 * I] = int16_t(Clamp(SamplesFloat[2 * I], INT16_MIN, INT16_MAX));
-			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(SamplesFloat[2 * I + 1], INT16_MIN, INT16_MAX));
+			SoundBuffer.Samples[2 * I] = int16_t(Clamp(SamplesFloat[2 * I], float(INT16_MIN), float(INT16_MAX)));
+			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(SamplesFloat[2 * I + 1], float(INT16_MIN), float(INT16_MAX)));
 		}
 	}
 

@@ -2,7 +2,7 @@ struct SVoxelCullingComputePass
 {
 public:
     static SVoxelCullingComputePass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, const SBuffer& VisibilityBuffer, VkSampler DepthSampler, const SImage& DepthPyramidImage);
-    void Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate);
+    void Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged);
     void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler DepthSampler, const SImage& DepthPyramidImage);
 
 private:
@@ -63,7 +63,7 @@ SVoxelCullingComputePass SVoxelCullingComputePass::Create(const SVulkanContext& 
     return CullingPass;
 }
 
-void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate)
+void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged)
 {
     if (!bLate)
     {
@@ -82,7 +82,7 @@ void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuf
     VkBufferMemoryBarrier FillBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, CountBuffer, sizeof(uint32_t));
     vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &FillBufferBarrier, 0, 0);
 
-    if (!bLate && ((FrameID == 0) || Vulkan.bSwapchainResized))
+    if (!bLate && ((FrameID == 0) || bSwapchainChanged))
     {
 		VkImageMemoryBarrier DepthPyramidBarrier = CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DepthPyramidImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
         vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 0, 0, 1, &DepthPyramidBarrier);

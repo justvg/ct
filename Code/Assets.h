@@ -32,10 +32,10 @@ struct SGlyph
 	uint32_t Width;
 	uint32_t Height;
 
-	uint32_t Advance;
+	int32_t Advance;
 
-	uint32_t OffsetX;
-	uint32_t OffsetY;
+	int32_t OffsetX;
+	int32_t OffsetY;
 
 	vec4 UVs;
 };
@@ -47,4 +47,5 @@ struct SFont
 	VkDescriptorSet BitmapFontDescrSet;
 
 	SGlyph Glyphs[128];
+	int32_t MaxHeight;
 };

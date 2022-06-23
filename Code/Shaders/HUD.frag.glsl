@@ -13,13 +13,14 @@ layout (push_constant) uniform PushConstants
 
     uint FontRendering;
     float BlendFactor;
+	vec4 FontColor;
 };
 
 void main()
 {
     if (FontRendering > 0)
     {
-        FragColor = vec4(1.0, 1.0, 1.0, BlendFactor * texture(Texture, TexCoords).a);
+        FragColor = vec4(FontColor.rgb, FontColor.a * BlendFactor * texture(Texture, TexCoords).a);
     }
     else
     {

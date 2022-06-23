@@ -4,8 +4,8 @@ struct SHUDRenderPass
     static SHUDRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* ProjectionBuffers, const SImage& FinalImage);
     void BeginRender(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer);
     void Render(const SVulkanContext& Vulkan, VkDescriptorSet TextureDescrSet, vec2 ScreenPosition, vec2 Scale);
-	void RenderString(const SVulkanContext& Vulkan, const SFont& Font, vec2 ScreenPosition, float FontScale, const char* String);
-	void RenderStringWithAppearance(const SVulkanContext& Vulkan, const SFont& Font, vec2 BaseLinePos, float FontScale, const char* String, float AppearanceFactor);
+	void RenderString(const SVulkanContext& Vulkan, const SFont* Font, vec2 ScreenPosition, vec2 FontScale, const char* String, vec4 Color, float BlendFactor = 1.0f);
+	void RenderStringWithAppearance(const SVulkanContext& Vulkan, const SFont* Font, vec2 BaseLinePos, vec2 FontScale, const char* String, float AppearanceFactor);
 	void EndRender(const SVulkanContext& Vulkan);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& FinalImage);
     
@@ -39,6 +39,10 @@ struct SHUDRenderPassPushConstants
     
     uint32_t FontRendering;
 	float BlendFactor;
+	float Padding0;
+	float Padding1;
+
+	vec4 FontColor;
 };
 
 SHUDRenderPass SHUDRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* ProjectionBuffers, const SImage& FinalImage)
@@ -105,48 +109,55 @@ void SHUDRenderPass::Render(const SVulkanContext& Vulkan, VkDescriptorSet Textur
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &TextureDescrSet, 0, 0);
     
 	SHUDRenderPassPushConstants PushConstants = { Vec4(ScreenPosition, Scale), Vec4(1.0f, 1.0f, 0.0f, 0.0f), 0 };
+
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SHUDRenderPassPushConstants), &PushConstants);
     
 	vkCmdDraw(Vulkan.CommandBuffer, 6, 1, 0, 0);
 }
 
-void SHUDRenderPass::RenderString(const SVulkanContext& Vulkan, const SFont& Font, vec2 BaseLinePos, float FontScale, const char* String)
+void SHUDRenderPass::RenderString(const SVulkanContext& Vulkan, const SFont* Font, vec2 BaseLinePos, vec2 FontScale, const char* String, vec4 Color, float BlendFactor)
 {
-	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &Font.BitmapFontDescrSet, 0, 0);
+	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &Font->BitmapFontDescrSet, 0, 0);
     
     const uint32_t Length = StringLength(String);
     
 	for (const char *C = String; *C; C++)
 	{
-		Assert(*C < ArrayCount(Font.Glyphs));
-		const SGlyph& Glyph = Font.Glyphs[*C];
+		Assert(*C < ArrayCount(Font->Glyphs));
+		const SGlyph& Glyph = Font->Glyphs[*C];
         
 		if (*C != ' ')
 		{
 			vec2 ScreenPosition = BaseLinePos;
-			ScreenPosition.x += FontScale * (Glyph.OffsetX + 0.5f * Glyph.Width);
-			ScreenPosition.y += FontScale * (Glyph.OffsetY - 0.5f * Glyph.Height);
+			ScreenPosition.x += FontScale.x * (Glyph.OffsetX + 0.5f * Glyph.Width);
+			ScreenPosition.y += FontScale.y * (Glyph.OffsetY - 0.5f * Glyph.Height);
             
-			SHUDRenderPassPushConstants PushConstants = { Vec4(ScreenPosition, FontScale * Glyph.Width, FontScale * Glyph.Height), Vec4(Glyph.UVs.z, 1.0f - Glyph.UVs.y, Glyph.UVs.x, 1.0f - Glyph.UVs.w), 1, 1.0f };
+			SHUDRenderPassPushConstants PushConstants = {};
+			PushConstants.PositionScale = Vec4(ScreenPosition, FontScale.x * Glyph.Width, FontScale.y * Glyph.Height);
+			PushConstants.MaxMinTC = Vec4(Glyph.UVs.z, 1.0f - Glyph.UVs.y, Glyph.UVs.x, 1.0f - Glyph.UVs.w);
+			PushConstants.FontRendering = 1;
+			PushConstants.BlendFactor = BlendFactor;
+			PushConstants.FontColor = Color;
+
 			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SHUDRenderPassPushConstants), &PushConstants);
             
 			vkCmdDraw(Vulkan.CommandBuffer, 6, 1, 0, 0);
 		}
         
-		BaseLinePos.x += FontScale * Glyph.Advance * 0.9f;
+		BaseLinePos.x += FontScale.x * Glyph.Advance;
 	}
 }
 
-void SHUDRenderPass::RenderStringWithAppearance(const SVulkanContext& Vulkan, const SFont& Font, vec2 BaseLinePos, float FontScale, const char* String, float AppearanceFactor)
+void SHUDRenderPass::RenderStringWithAppearance(const SVulkanContext& Vulkan, const SFont* Font, vec2 BaseLinePos, vec2 FontScale, const char* String, float AppearanceFactor)
 {
-    vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &Font.BitmapFontDescrSet, 0, 0);
+    vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &Font->BitmapFontDescrSet, 0, 0);
     
     const uint32_t Length = StringLength(String);
 	for (uint32_t I = 0; I < Length; I++)
     {
 		const char C = String[I];
-        Assert(C < ArrayCount(Font.Glyphs));
-        const SGlyph& Glyph = Font.Glyphs[C];
+        Assert(C < ArrayCount(Font->Glyphs));
+        const SGlyph& Glyph = Font->Glyphs[C];
 
 		float BlendFactor = Clamp(Length * AppearanceFactor - I, 0.0f, 1.0f);
 	
@@ -155,17 +166,23 @@ void SHUDRenderPass::RenderStringWithAppearance(const SVulkanContext& Vulkan, co
 			if (C != ' ')
 			{
 				vec2 ScreenPosition = BaseLinePos;
-				ScreenPosition.x += FontScale * (Glyph.OffsetX + 0.5f * Glyph.Width);
-				ScreenPosition.y += FontScale * (Glyph.OffsetY - 0.5f * Glyph.Height);
+				ScreenPosition.x += FontScale.x * (Glyph.OffsetX + 0.5f * Glyph.Width);
+				ScreenPosition.y += FontScale.y * (Glyph.OffsetY - 0.5f * Glyph.Height);
 				
-				SHUDRenderPassPushConstants PushConstants = { Vec4(ScreenPosition, FontScale * Glyph.Width, FontScale * Glyph.Height), Vec4(Glyph.UVs.z, 1.0f - Glyph.UVs.y, Glyph.UVs.x, 1.0f - Glyph.UVs.w), 1, BlendFactor };
+				SHUDRenderPassPushConstants PushConstants = {};
+				PushConstants.PositionScale = Vec4(ScreenPosition, FontScale.x * Glyph.Width, FontScale.y * Glyph.Height);
+				PushConstants.MaxMinTC = Vec4(Glyph.UVs.z, 1.0f - Glyph.UVs.y, Glyph.UVs.x, 1.0f - Glyph.UVs.w);
+				PushConstants.FontRendering = 1;
+				PushConstants.BlendFactor = BlendFactor;
+				PushConstants.FontColor = Vec4(1.0f);
+
 				vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SHUDRenderPassPushConstants), &PushConstants);
 				
 				vkCmdDraw(Vulkan.CommandBuffer, 6, 1, 0, 0);
 			}
 		}
         
-        BaseLinePos.x += FontScale * Glyph.Advance * 0.9f;
+        BaseLinePos.x += FontScale.x * Glyph.Advance;
     }
 }
 

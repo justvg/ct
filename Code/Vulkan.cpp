@@ -40,6 +40,8 @@ struct SSwapchain
 	VkImage Images[8];
 
 	uint32_t Width, Height;
+
+	VkPresentModeKHR PresentMode;
 };
 
 VkInstance CreateInstance()
@@ -556,12 +558,12 @@ void DestroyImage(VkDevice Device, VmaAllocator MemoryAllocator, SImage& Image)
 	Image.Allocation = 0;
 }
 
-VkSampler CreateSampler(VkDevice Device, VkFilter Filter, VkSamplerAddressMode AddressMode, float MaxLod = 0.0f, VkSamplerReductionMode ReductionMode = VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE)
+VkSampler CreateSampler(VkDevice Device, VkFilter Filter, VkSamplerAddressMode AddressMode, float MaxLod = 0.0f, VkSamplerReductionMode ReductionMode = VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE, VkSamplerMipmapMode MipmapFilter = VK_SAMPLER_MIPMAP_MODE_NEAREST)
 {
 	VkSamplerCreateInfo CreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 	CreateInfo.magFilter = Filter;
 	CreateInfo.minFilter = Filter;
-	CreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	CreateInfo.mipmapMode = MipmapFilter;
 	CreateInfo.addressModeU = AddressMode;
 	CreateInfo.addressModeV = AddressMode;
 	CreateInfo.addressModeW = AddressMode;
@@ -673,7 +675,7 @@ VkFramebuffer CreateFramebuffer(VkDevice Device, VkRenderPass RenderPass, const 
 	return Framebuffer;
 }
 
-VkSwapchainKHR CreateSwapchain(VkDevice Device, VkSurfaceKHR Surface, VkFormat Format, const VkSurfaceCapabilitiesKHR& SurfaceCaps, VkSwapchainKHR OldSwapchain = 0)
+VkSwapchainKHR CreateSwapchain(VkDevice Device, VkSurfaceKHR Surface, VkFormat Format, const VkSurfaceCapabilitiesKHR& SurfaceCaps, VkPresentModeKHR PresentMode, VkSwapchainKHR OldSwapchain = 0)
 {
 	VkCompositeAlphaFlagBitsKHR CompositeAlpha = (SurfaceCaps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) ? VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR :
 												 (SurfaceCaps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR) ? VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR :
@@ -690,7 +692,7 @@ VkSwapchainKHR CreateSwapchain(VkDevice Device, VkSurfaceKHR Surface, VkFormat F
 	CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	CreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	CreateInfo.compositeAlpha = CompositeAlpha;
-	CreateInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;//VK_PRESENT_MODE_IMMEDIATE_KHR;
+	CreateInfo.presentMode = PresentMode;
 	CreateInfo.oldSwapchain = OldSwapchain;
 
 	VkSwapchainKHR Swapchain = 0;
@@ -699,14 +701,14 @@ VkSwapchainKHR CreateSwapchain(VkDevice Device, VkSurfaceKHR Surface, VkFormat F
 	return Swapchain;
 }
 
-SSwapchain CreateSwapchain(VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, VkSwapchainKHR OldSwapchain = 0)
+SSwapchain CreateSwapchain(VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, VkPresentModeKHR PresentMode, VkSwapchainKHR OldSwapchain = 0)
 {
 	SSwapchain Swapchain = {};
 
 	VkSurfaceCapabilitiesKHR SurfaceCaps;
 	VkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCaps));
 
-	Swapchain.VkSwapchain = CreateSwapchain(Device, Surface, ColorFormat, SurfaceCaps, OldSwapchain);
+	Swapchain.VkSwapchain = CreateSwapchain(Device, Surface, ColorFormat, SurfaceCaps, PresentMode, OldSwapchain);
 	Assert(Swapchain.VkSwapchain);
 
 	uint32_t ImageCount = 0;
@@ -718,6 +720,7 @@ SSwapchain CreateSwapchain(VkDevice Device, VkPhysicalDevice PhysicalDevice, VkS
 	Swapchain.ImageCount = ImageCount;
 	Swapchain.Width = SurfaceCaps.currentExtent.width;
 	Swapchain.Height = SurfaceCaps.currentExtent.height;
+	Swapchain.PresentMode = PresentMode;
 
 	return Swapchain;
 }
@@ -733,16 +736,36 @@ bool ResizeSwapchainIfChanged(SSwapchain& Swapchain, VkDevice Device, VkPhysical
 
 	if ((Swapchain.Width != SurfaceCaps.currentExtent.width) || (Swapchain.Height != SurfaceCaps.currentExtent.height))
 	{
-		SSwapchain OldSwapchain = Swapchain;
-		Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, ColorFormat, Swapchain.VkSwapchain);
-
 		VkCheck(vkDeviceWaitIdle(Device));
+
+		SSwapchain OldSwapchain = Swapchain;
+		Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, ColorFormat, Swapchain.PresentMode, Swapchain.VkSwapchain);
+
 		DestroySwapchain(OldSwapchain, Device);
 
 		bResized = true;
 	}
 
 	return bResized;
+}
+
+bool ChangeVSyncIfNeeded(SSwapchain& Swapchain, VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, VkPresentModeKHR PresentMode)
+{
+	bool bChanged = false;
+
+	if (Swapchain.PresentMode != PresentMode)
+	{
+		VkCheck(vkDeviceWaitIdle(Device));
+
+		SSwapchain OldSwapchain = Swapchain;
+		Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, ColorFormat, PresentMode, Swapchain.VkSwapchain);
+
+		DestroySwapchain(OldSwapchain, Device);
+
+		bChanged = true;
+	}
+
+	return bChanged;
 }
 
 VkCommandPool CreateCommandPool(VkDevice Device, VkCommandPoolCreateFlags Flags, uint32_t FamilyIndex)
