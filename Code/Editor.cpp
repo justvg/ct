@@ -15,7 +15,7 @@ void SaveLevelHistory(SEditorState* EditorState, const SLevel* Level)
 
 void SaveLevelEditor(const SLevel& Level, const char* Path)
 {
-	const uint32_t FileVersion = 1;
+	const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
 
 	FILE* File = fopen(Path, "wb");
 	Assert(File);
@@ -90,9 +90,9 @@ bool EditorInputText(SEditorState* EditorState, const char* Name, char* Buffer, 
 	return bEnter;
 }
 
-void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFramebuffer Framebuffer)
+void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, VkFramebuffer Framebuffer)
 {
-	SEditorState* EditorState = &GameState->EditorState;
+	SEditorState* EditorState = &EngineState->EditorState;
 	EditorState->bIsImguiWindowHovered = false;
 	EditorState->bIsImguiWindowFocused = false;
     
@@ -103,21 +103,20 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
     BeginInfo.renderArea.extent.height = Vulkan->Height;
 	vkCmdBeginRenderPass(Vulkan->CommandBuffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     
-	if (GameState->GameMode == GameMode_Game)
+	if (EngineState->EngineMode == EngineMode_Game)
 	{
 		if (ImGui::Begin("Mode", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 		{
 			if (ImGui::Button("Editor"))
 			{
-				GameState->bReloadLevelEditor = true;
-				GameState->bFlyMode = false;
+				EngineState->bReloadLevelEditor = true;
+				EngineState->bFlyMode = false;
 				
-				GameState->GameMode = GameMode_Editor;
+				EngineState->EngineMode = EngineMode_Editor;
 
-				GameState->TextsToRenderCount = 0;
+				EngineState->TextsToRenderCount = 0;
 
-				GameState->bMenuOpened = false;
-				GameState->SelectedMenuElement = MenuElement_DefaultNone;
+				EngineState->bMenuOpened = false;
 			}
             
 			ImGui::SetWindowPos(ImVec2(0, 0), true);
@@ -127,7 +126,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
         
 		if (ImGui::Begin("DebugVars", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 		{
-			ImGui::Checkbox("Fly mode", &GameState->bFlyMode);
+			ImGui::Checkbox("Fly mode", &EngineState->bFlyMode);
             
 			ImVec2 ImguiWindowSize = ImGui::GetWindowSize();
 			ImGui::SetWindowPos(ImVec2(Vulkan->Width - ImguiWindowSize.x, 0), true);
@@ -135,7 +134,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 		}
 		ImGui::End();
 	}
-	else if (GameState->GameMode == GameMode_Editor)
+	else if (EngineState->EngineMode == EngineMode_Editor)
 	{
 		ImVec2 LevelsWindowSize = {};
 		if (ImGui::Begin("Levels", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
@@ -191,12 +190,12 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
                             
 							AddHero(EditorState->NewLevel, Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim));
-							GameState->Camera.Pos = Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim) + Vec3(5.0f, 6.0f, -5.0f);
-							GameState->Camera.Pitch = -45.0f;
-							GameState->Camera.Head = -45.0f;
+							EngineState->Camera.Pos = Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim) + Vec3(5.0f, 6.0f, -5.0f);
+							EngineState->Camera.Pitch = -45.0f;
+							EngineState->Camera.Head = -45.0f;
 
 							SaveLevelEditor(EditorState->NewLevel, NewLevelPath);
-							LoadLevel(GameState, &GameState->LevelBaseState, NewLevelName);
+							LoadLevel(EngineState, &EngineState->LevelBaseState, NewLevelName);
 							NewLevelName[0] = 0;
 							EditorState->NewLevel = {};
 
@@ -215,10 +214,10 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 							EditorState->SelectedEntity = 0;
 							EditorState->SelectedVoxelsCount = 0;
                             
-							LoadLevel(GameState, &GameState->LevelBaseState, LevelNames[I]);
+							LoadLevel(EngineState, &EngineState->LevelBaseState, LevelNames[I]);
 
-							Assert(GameState->LevelBaseState.Entities[0].Type == Entity_Hero);
-							GameState->Camera.Pos = GameState->LevelBaseState.Entities[0].Pos;
+							Assert(EngineState->LevelBaseState.Entities[0].Type == Entity_Hero);
+							EngineState->Camera.Pos = EngineState->LevelBaseState.Entities[0].Pos;
 						}
 					}
 					ImGui::EndListBox();
@@ -237,8 +236,8 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 			ImGui::SameLine();
 			if (ImGui::Button("SaveLevel"))
 			{
-				SaveLevelEditor(GameState->Level, GameState->LevelName);
-				GameState->LevelBaseState = GameState->Level;
+				SaveLevelEditor(EngineState->Level, EngineState->LevelName);
+				EngineState->LevelBaseState = EngineState->Level;
 			}
             
 			ImGui::SameLine();
@@ -247,21 +246,9 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 				EditorState->SelectedVoxelsCount = 0;
 				EditorState->SelectedVoxelColorFloat = Vec3(0.0f);
                 
-				GameState->LevelGameStartState = GameState->Level;
+				ReloadGameLevel(EngineState);
                 
-				Assert(GameState->Level.Entities[0].Type == Entity_Hero);
-				GameState->Camera.Pitch = 0.0f;
-				GameState->Camera.Head = GameState->Level.Entities[0].Orientation.y;
-
-                GameState->bDeathAnimation = false;
-                GameState->DeathAnimationLengthMoved = 0.0f;
-                GameState->DeathPos = Vec3(0.0f);
-				GameState->DeathAnimationTargetPos = GameState->Level.Entities[0].Pos;
-				GameState->LastCheckpointPos = GameState->Level.Entities[0].Pos;
-
-                GameState->CurrentCheckpointIndex = 0;
-                
-				GameState->GameMode = GameMode_Game;
+				EngineState->EngineMode = EngineMode_Game;
 			}
             
 			ModeWindowSize = ImGui::GetWindowSize();
@@ -302,12 +289,12 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 						uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
 						uint32_t Z = ID / (LevelDimX*LevelDimY);
                         
-						MarkVoxelForChangingColor(GameState, X, Y, Z, Red, Green, Blue);
+						MarkVoxelForChangingColor(EngineState, X, Y, Z, Red, Green, Blue);
 					}
                     
 					if ((EditorState->SelectedVoxelsCount > 0) && !EditorState->bImGuiChangeStarted)
 					{
-						SaveLevelHistory(EditorState, &GameState->Level);
+						SaveLevelHistory(EditorState, &EngineState->Level);
                         
 						EditorState->bImGuiChangeStarted = true;
 						EditorState->ImGuiChangeTimePassed = 0.0f;
@@ -428,7 +415,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
                 
 				if (bValueChanged && !EditorState->bImGuiChangeStarted)
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
+					SaveLevelHistory(EditorState, &EngineState->Level);
                     
 					EditorState->bImGuiChangeStarted = true;
 					EditorState->ImGuiChangeTimePassed = 0.0f;
@@ -444,70 +431,70 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 		if (ImGui::Begin("ObjectsAndLevelStuff", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 		{
 			bool bValueChanged = false;
-			bValueChanged |= EditorColorEdit3(EditorState, "AmbientColor", &GameState->Level.AmbientColor);
-			bValueChanged |= EditorColorEdit3(EditorState, "AmbientConstant", &GameState->Level.AmbientConstant);
+			bValueChanged |= EditorColorEdit3(EditorState, "AmbientColor", &EngineState->Level.AmbientColor);
+			bValueChanged |= EditorColorEdit3(EditorState, "AmbientConstant", &EngineState->Level.AmbientConstant);
 			
-			vec3 SpawnPos = GameState->Camera.Pos + 3.0f * GameState->Camera.Dir;
+			vec3 SpawnPos = EngineState->Camera.Pos + 3.0f * EngineState->Camera.Dir;
 			if (ImGui::CollapsingHeader("Entities"))
 			{
 				if (ImGui::Button("Torch"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddTorch(GameState->Level, SpawnPos, Vec3(0.5f), Vec3(0.0f, 1.0f, 0.0f));
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddTorch(EngineState->Level, SpawnPos, Vec3(0.5f), Vec3(0.0f, 1.0f, 0.0f));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Container"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddContainer(GameState->Level, SpawnPos);
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddContainer(EngineState->Level, SpawnPos);
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Door"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddDoor(GameState->Level, SpawnPos, Vec3(1.5f, 2.0f, 0.2f), Quat(0, 0, 0, 1), Vec3(0.58f, 0.29f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(0.0f, 2.0f, 0.0f));
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddDoor(EngineState->Level, SpawnPos, Vec3(1.5f, 2.0f, 0.2f), Quat(0, 0, 0, 1), Vec3(0.58f, 0.29f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(0.0f, 2.0f, 0.0f));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Turret"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddTurret(GameState->Level, SpawnPos, Vec3(1.0f), Quat(0, 0, 0, 1), Vec3(0.8f, 0.8f, 0.8f), Vec3(0.0f, 0.0f, 1.0f), 1.0f);
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddTurret(EngineState->Level, SpawnPos, Vec3(1.0f), Quat(0, 0, 0, 1), Vec3(0.8f, 0.8f, 0.8f), Vec3(0.0f, 0.0f, 1.0f), 1.0f);
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Gates"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddGates(GameState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.1f), Quat(0, 0, 0, 1));
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddGates(EngineState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.1f), Quat(0, 0, 0, 1));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 
-					if (!CompareStrings(GameState->LevelName, "Levels\\MainHub.ctl"))
+					if (!CompareStrings(EngineState->LevelName, "Levels\\MainHub.ctl"))
 					{
 						memcpy(EditorState->SelectedEntity->TargetLevelName, "MainHub", StringLength("MainHub") + 1);
 					}
 				}
 				if (ImGui::Button("MessageToggler"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddMessageToggler(GameState->Level, SpawnPos);
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddMessageToggler(EngineState->Level, SpawnPos);
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Checkpoint"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddCheckpoint(GameState->Level, SpawnPos);
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddCheckpoint(EngineState->Level, SpawnPos);
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("ColorField"))
 				{
-					SaveLevelHistory(EditorState, &GameState->Level);
-					EditorState->SelectedEntity = AddColorField(GameState->Level, SpawnPos);
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddColorField(EngineState->Level, SpawnPos);
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
@@ -515,8 +502,8 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
             
 			if (ImGui::Button("PointLight"))
 			{
-				SaveLevelHistory(EditorState, &GameState->Level);
-				EditorState->SelectedPointLight = AddPointLight(GameState->Level, SpawnPos, 1.0f, Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+				SaveLevelHistory(EditorState, &EngineState->Level);
+				EditorState->SelectedPointLight = AddPointLight(EngineState->Level, SpawnPos, 1.0f, Vec4(1.0f, 1.0f, 1.0f, 1.0f));
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedVoxelsCount = 0;
 			}
@@ -537,7 +524,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 					{
 						for (uint32_t X = 0; X < LevelDimX; X++)
 						{
-							if (IsVoxelActive(GameState->Level.Voxels, X, Y, Z))
+							if (IsVoxelActive(EngineState->Level.Voxels, X, Y, Z))
 							{
 								uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
 								EditorState->SelectedVoxels[EditorState->SelectedVoxelsCount++] = ID;			
@@ -547,7 +534,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 				}
 			}
             
-			if (ImGui::Checkbox("HideEntities", &GameState->bHideEntities))
+			if (ImGui::Checkbox("HideEntities", &EngineState->bHideEntities))
 			{
 				EditorState->SelectedEntity = 0;
 			}
@@ -556,7 +543,7 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
             
 			if (bValueChanged && !EditorState->bImGuiChangeStarted)
 			{
-				SaveLevelHistory(EditorState, &GameState->Level);
+				SaveLevelHistory(EditorState, &EngineState->Level);
                 
 				EditorState->bImGuiChangeStarted = true;
 				EditorState->ImGuiChangeTimePassed = 0.0f;
@@ -579,11 +566,11 @@ void RenderDearImgui(SGameState* GameState, const SVulkanContext* Vulkan, VkFram
 	END_GPU_PROFILER_BLOCK("IMGUI_RENDER", Vulkan->CommandBuffer, Vulkan->FrameInFlight);
 }
 
-void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanContext* Vulkan, SRenderer* Renderer)
+void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulkanContext* Vulkan, SRenderer* Renderer)
 {
-	SEditorState* EditorState = &GameState->EditorState;
-	SCamera* Camera = &GameState->Camera;
-	SLevel* Level = &GameState->Level;
+	SEditorState* EditorState = &EngineState->EditorState;
+	SCamera* Camera = &EngineState->Camera;
+	SLevel* Level = &EngineState->Level;
 
 	// NOTE(georgii): This is for velocity vectors to work in editor mode.
 	for (uint32_t EntityIndex = 0; EntityIndex < Level->EntityCount; EntityIndex++)
@@ -721,7 +708,7 @@ void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanCon
 		SPointLight *HitPointLight = 0;
 		if (!EditorState->bIsImguiWindowHovered)
 		{
-			if (!GameState->bHideEntities)
+			if (!EngineState->bHideEntities)
 			{
 				for (uint32_t I = 0; I < Level->EntityCount; I++)
 				{
@@ -1063,7 +1050,7 @@ void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanCon
 						uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
 						uint32_t Z = ID / (LevelDimX*LevelDimY);
 						
-						AddVoxelToLevel(GameState, X, Y, Z);
+						AddVoxelToLevel(EngineState, X, Y, Z);
 					}
 					EditorState->BuildingVoxelsToAddCount = 0;
 					
@@ -1138,7 +1125,7 @@ void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanCon
 						uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
 						uint32_t Z = ID / (LevelDimX*LevelDimY);
 						
-						MarkVoxelForDeletion(GameState, X, Y, Z);
+						MarkVoxelForDeletion(EngineState, X, Y, Z);
 					}
 					EditorState->SelectedVoxelsCount = 0;
 					
@@ -1780,8 +1767,8 @@ void UpdateEditor(SGameState* GameState, SGameInput* GameInput, const SVulkanCon
 				EditorState->LevelHistoryHead = LastIndex;
 			}
 			
-			GameState->Level = EditorState->LevelHistory[LastIndex];
-			GameState->bForceUpdateVoxels = true;
+			EngineState->Level = EditorState->LevelHistory[LastIndex];
+			EngineState->bForceUpdateVoxels = true;
 		}
 	}
 	

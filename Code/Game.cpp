@@ -1,12 +1,14 @@
-void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
+#include "Game.h"
+
+void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput)
 {
-	SCamera* Camera = &GameState->Camera;
-	SLevel* Level = &GameState->Level;
-	SAudioState* AudioState = &GameState->AudioState;
+	SCamera* Camera = &EngineState->Camera;
+	SLevel* Level = &EngineState->Level;
+	SAudioState* AudioState = &EngineState->AudioState;
 
 	if (WasDown(GameInput->Buttons[Button_R]))
 	{
-		ReloadGameLevel(GameState);
+		ReloadGameLevel(EngineState);
 		GameState->CurrentCheckpointIndex = 0;
 	}
 
@@ -18,7 +20,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 	Camera->PrevHead = Camera->Head;
 	
 	Camera->Pitch -= 0.1f*GameInput->MouseDeltaY;
-	if (GameState->bFlyMode)
+	if (EngineState->bFlyMode)
 	{
 		Camera->Pitch = Clamp(Camera->Pitch, -89.0f, 89.0f);
 	}
@@ -50,28 +52,28 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 	if (GameInput->Buttons[Button_W].IsDown)
 	{
 		HeroControl.Acceleration += Vec3(MovementDir.x, 0.0f, MovementDir.z);
-		if (GameState->bFlyMode) HeroControl.Acceleration = Camera->Dir;
+		if (EngineState->bFlyMode) HeroControl.Acceleration = Camera->Dir;
 	}
 	if (GameInput->Buttons[Button_S].IsDown)
 	{
 		HeroControl.Acceleration -= Vec3(MovementDir.x, 0.0f, MovementDir.z);
-		if (GameState->bFlyMode) HeroControl.Acceleration = -Camera->Dir;
+		if (EngineState->bFlyMode) HeroControl.Acceleration = -Camera->Dir;
 	} 
 	if (GameInput->Buttons[Button_D].IsDown)
 	{
 		HeroControl.Acceleration += Vec3(Camera->Right.x, 0.0f, Camera->Right.z);
-		if (GameState->bFlyMode) HeroControl.Acceleration = Camera->Right;
+		if (EngineState->bFlyMode) HeroControl.Acceleration = Camera->Right;
 	} 
 	if (GameInput->Buttons[Button_A].IsDown)
 	{
 		HeroControl.Acceleration -= Vec3(Camera->Right.x, 0.0f, Camera->Right.z);
-		if (GameState->bFlyMode) HeroControl.Acceleration = -Camera->Right;
+		if (EngineState->bFlyMode) HeroControl.Acceleration = -Camera->Right;
 	}
 
 #ifndef ENGINE_RELEASE
 	if (WasDown(GameInput->Buttons[Button_F]))
 	{
-		GameState->bFlyMode = !GameState->bFlyMode;
+		EngineState->bFlyMode = !EngineState->bFlyMode;
 	}
 
 	// NOTE(georgii): Teleport between checkpoints.
@@ -100,7 +102,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 		}
 		else
 		{
-			ReloadGameLevel(GameState);
+			ReloadGameLevel(EngineState, true, false);
 
 			if (GameState->CurrentCheckpointIndex == 0)
 			{
@@ -164,23 +166,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 			}
 		}
 		
-		if (bVoxelHitFirst)
-		{
-			uint32_t X = RaytraceVoxelsResult.X;
-			uint32_t Y = RaytraceVoxelsResult.Y;
-			uint32_t Z = RaytraceVoxelsResult.Z;
-			
-			if (IsVoxelDestroyable(Level->Voxels, RaytraceVoxelsResult.X, RaytraceVoxelsResult.Y, RaytraceVoxelsResult.Z))
-			{
-				MarkVoxelForDeletion(GameState, X, Y, Z);
-				
-				AddParticleEmitterBurst(Level->ParticleEmitters, Level->ParticleEmitterCount, true, true, 
-										VoxelDim * Vec3i(X, Y, Z) + 0.5f * Vec3(VoxelDim), -0.4f * Vec3(VoxelDim), 0.4f * Vec3(VoxelDim), 0.15f, 0.2f, 
-										Vec3(0.0f), Vec3(0.0f), GetVoxelColorVec3(Level->Voxels, X, Y, Z), GetVoxelColorVec3(Level->Voxels, X, Y, Z), 
-										0.15f, 0.2f, 8);
-			}
-		}
-		else if (HitEntity)
+		if (HitEntity)
 		{
 			SEntity* HeroEntity = &Level->Entities[0];
 			Assert(HeroEntity->Type == Entity_Hero);
@@ -376,12 +362,12 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 					}
 					Entity->LampOffset += 15.0f * (Entity->LampBaseOffset - Entity->LampOffset) * GameInput->dt;
 					
-					SMoveEntityInfo MoveInfo = { !GameState->bFlyMode, GameState->bFlyMode, true, true, HeroControl.Acceleration };
-					MoveEntity(GameState, Entity, Level, MoveInfo, GameInput->dt);
+					SMoveEntityInfo MoveInfo = { !EngineState->bFlyMode, EngineState->bFlyMode, true, true, HeroControl.Acceleration };
+					MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
 
 					Entity->PointLight.Color.rgb = Entity->Color;
-					Entity->PointLight.Radius = 2.0f;
-					Entity->PointLight.Pos = Vec3(0.0f);//(Entity->LampOffset.x * Entity->Dim.x * Camera->Right) + (0.3f * Entity->Dim.z * Camera->Dir) + (Entity->LampOffset.y * Camera->Up);
+					Entity->PointLight.Radius = 3.0f;
+					Entity->PointLight.Pos = (0.2f * Entity->LampOffset.x * Entity->Dim.x * Camera->Right) + (0.3f * Entity->Dim.z * Camera->Dir) + (0.2f * Entity->LampOffset.y * Camera->Up);
 				} break;
 				
 				case Entity_Door:
@@ -427,7 +413,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 						vec3 Acceleration = Normalize(Entity->TargetOffset) * Entity->Speed;
 						
 						SMoveEntityInfo MoveInfo = { false, false, false, true, Acceleration };
-						MoveEntity(GameState, Entity, Level, MoveInfo, GameInput->dt);
+						MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
 						
 						Entity->TimeToMoveCurrent += GameInput->dt;
 					}
@@ -438,7 +424,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 				} break;
 			}
 		}
-		
+
 		for (uint32_t EntityIndex = 0; EntityIndex < Level->EntityCount; EntityIndex++)
 		{
 			SEntity* Entity = Level->Entities + EntityIndex;
@@ -447,14 +433,43 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 			{
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
-					char LevelName[264] = {};
-					ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
-					LoadLevel(GameState, &GameState->LevelBaseState, LevelName, Level->Entities[0].Velocity);
+					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+					if (bTargetMainHub)
+					{
+						SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
+						if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+						{
+							uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl", Level->Entities[0].Velocity);
 
-					SEntity* HeroEntity = &GameState->LevelBaseState.Entities[0];
+							EndPointer += sizeof(float);
+							EndPointer += sizeof(float);
+							EndPointer += sizeof(uint32_t);
+							EndPointer += sizeof(EngineState->TextsToRender);
+
+							memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
+							EndPointer += sizeof(vec3);
+							memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
+							EndPointer += sizeof(float);
+
+							free(MainHubSaveFile.Memory);
+						}
+						else
+						{
+							char LevelName[264] = {};
+							ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
+							LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
+						}
+					}
+					else
+					{
+						char LevelName[264] = {};
+						ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
+						LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
+					}
+
+					SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
 
 					float GatesAngleDifference = 0.0f;
-					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
 					if (bTargetMainHub)
 					{
 						GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
@@ -510,7 +525,7 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 		Camera->Pos = Level->Entities[0].Pos + Camera->OffsetFromPlayer;
 	}
 
-	if (GameState->bDeathAnimation && !GameState->bReloadLevel && !GameState->bReloadLevelEditor)
+	if (GameState->bDeathAnimation && !EngineState->bReloadLevel && !EngineState->bReloadLevelEditor)
 	{
 		vec3 MoveDelta = GameState->DeathAnimationSpeed * GameInput->dt * NormalizeSafe0(GameState->DeathAnimationTargetPos - GameState->DeathPos);
 		GameState->DeathAnimationLengthMoved += Length(MoveDelta);
@@ -521,36 +536,38 @@ void UpdateGameMode(SGameState* GameState, const SGameInput* GameInput)
 		{
 			GameState->bDeathAnimation = false;
 			GameState->DeathAnimationLengthMoved = 0.0f;
+
+			Level->Entities[0].Pos = GameState->LastCheckpointPos;
 		}
 	}
 }
 
-void UpdateMenuDefault(SGameState* GameState, const SGameInput* GameInput)
+void UpdateMenuDefault(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput)
 {
-	AddTextMenu(GameState, "COLOR THIEF", Vec2(0.0f, 0.7f), 0.4f, &GameState->Renderer.KarminaBold, Vec4(1.0f));
+	AddTextMenu(EngineState, "COLOR THIEF", Vec2(0.0f, 0.7f), 0.4f, Font_KarminaBold, Vec4(1.0f));
 	for (int32_t MenuElement = MenuElement_DefaultNone; MenuElement < MenuElement_DefaultCount; MenuElement++)
 	{
 		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
 		bool bEnterDown = WasDown(GameInput->Buttons[Button_Enter]);
 
-		const SFont* Font = &GameState->Renderer.KarminaRegular;
+		const EFont Font = Font_KarminaRegular;
 		float Scale = 0.2f;
 		vec4 Color = bSelected ? Vec4(0.8f, 0.8f, 0.8f, 1.0f) : Vec4(0.5f, 0.5f, 0.5f, 1.0f);
 		switch (MenuElement)
 		{
 			case MenuElement_Settings:
 			{
-				AddTextMenu(GameState, "Settings", Vec2(0.0f, 0.12f), Scale, Font, Color);
+				AddTextMenu(EngineState, "Settings", Vec2(0.0f, 0.12f), Scale, Font, Color);
 			} break;
 
 			case MenuElement_StartNewGame:
 			{
-				AddTextMenu(GameState, "Start A New Game", Vec2(0.0f, 0.0f), Scale, Font, Color);
+				AddTextMenu(EngineState, "Start A New Game", Vec2(0.0f, 0.0f), Scale, Font, Color);
 			} break;
 
 			case MenuElement_Quit:
 			{
-				AddTextMenu(GameState, "Quit", Vec2(0.0f, -0.12f), Scale, Font, Color);
+				AddTextMenu(EngineState, "Quit", Vec2(0.0f, -0.12f), Scale, Font, Color);
 			} break;
 		}
 
@@ -565,8 +582,8 @@ void UpdateMenuDefault(SGameState* GameState, const SGameInput* GameInput)
 
 				case MenuElement_StartNewGame:
 				{
-					LoadLevel(GameState, &GameState->LevelBaseState, "MainHub.ctl");
-					GameState->bMenuOpened = false;
+					LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
+					EngineState->bMenuOpened = false;
 				} break;
 
 				case MenuElement_Quit:
@@ -578,9 +595,9 @@ void UpdateMenuDefault(SGameState* GameState, const SGameInput* GameInput)
 	}
 }
 
-void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVulkanContext* Vulkan)
+void UpdateMenuSettings(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, SVulkanContext* Vulkan)
 {
-	AddTextMenu(GameState, "SETTINGS", Vec2(0.0f, 0.7f), 0.4f, &GameState->Renderer.KarminaBold, Vec4(1.0f));
+	AddTextMenu(EngineState, "SETTINGS", Vec2(0.0f, 0.7f), 0.4f, Font_KarminaBold, Vec4(1.0f));
 	for (int32_t MenuElement = MenuElement_SettingsNone; MenuElement < MenuElement_SettingsCount; MenuElement++)
 	{
 		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
@@ -589,7 +606,7 @@ void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVul
 		bool bArrowRight = WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
 		bool bArrowUsed = bArrowLeft || bArrowRight;
 
-		const SFont* Font = &GameState->Renderer.KarminaRegular;
+		const EFont Font = Font_KarminaRegular;
 		const float LeftPos = -0.5f;
 		const float RightPos = 0.5f;
 		const float Scale = 0.15f;
@@ -599,41 +616,41 @@ void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVul
 			case MenuElement_Fullscreen:
 			{
 				const float YPos = 0.24f;
-				AddTextMenu(GameState, "Fullscreen:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(GameState, PlatformGetFullscreen() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				AddTextMenu(EngineState, "Fullscreen:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(EngineState, PlatformGetFullscreen() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
 			} break;
 
 			case MenuElement_VSync:
 			{
 				const float YPos = 0.12f;
-				AddTextMenu(GameState, "V-Sync:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(GameState, PlatformGetVSync() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				AddTextMenu(EngineState, "V-Sync:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(EngineState, PlatformGetVSync() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
 			} break;
 
 			case MenuElement_Resolution:
 			{
 				const float YPos = 0.0f;
-				AddTextMenu(GameState, "Resolution:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(GameState, "1920x1080", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				AddTextMenu(EngineState, "Resolution:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(EngineState, "NotImplemented", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
 			} break;
 
 			case MenuElement_Vignetting:
 			{
 				const float YPos = -0.12f;
-				AddTextMenu(GameState, "Vignetting:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(GameState, GameState->bVignetteEnabled ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				AddTextMenu(EngineState, "Vignetting:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(EngineState, EngineState->bVignetteEnabled ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
 			} break;
 
 			case MenuElement_Multisampling:
 			{
 				const float YPos = -0.24f;
-				AddTextMenu(GameState, "Multisampling:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
+				AddTextMenu(EngineState, "Multisampling:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
 
 				char MultisamplingText[32] = {};
 				const char ValueMSAA[2] = { char(Vulkan->SampleCountMSAA + '0'), '\0' };
 				ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), ValueMSAA, "x MSAA");
 
-				AddTextMenu(GameState, MultisamplingText, Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				AddTextMenu(EngineState, MultisamplingText, Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
 			} break;
 		}
 
@@ -657,7 +674,7 @@ void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVul
 
 				case MenuElement_Vignetting:
 				{
-					GameState->bVignetteEnabled = !GameState->bVignetteEnabled;
+					EngineState->bVignetteEnabled = !EngineState->bVignetteEnabled;
 				} break;
 
 				case MenuElement_Multisampling:
@@ -682,8 +699,8 @@ void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVul
 						}
 					}
 
-					GameState->bSampleCountMSAAChanged = true;
-					GameState->NewSampleCountMSAA = SampleCountMSAA;
+					EngineState->bSampleCountMSAAChanged = true;
+					EngineState->NewSampleCountMSAA = SampleCountMSAA;
 				} break;
 			}
 		}
@@ -696,7 +713,7 @@ void UpdateMenuSettings(SGameState* GameState, const SGameInput* GameInput, SVul
 	}
 }
 
-void UpdateMenu(SGameState* GameState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+void UpdateMenu(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
 {
 	EMenuElement MinMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultNone : MenuElement_SettingsNone;
 	EMenuElement MaxMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultCount : MenuElement_SettingsCount;
@@ -725,35 +742,182 @@ void UpdateMenu(SGameState* GameState, const SGameInput* GameInput, const SVulka
 	{
 		case MenuMode_Default:
 		{
-			UpdateMenuDefault(GameState, GameInput);
+			UpdateMenuDefault(GameState, EngineState, GameInput);
 		} break;
 
 		case MenuMode_Settings:
 		{
-			UpdateMenuSettings(GameState, GameInput, (SVulkanContext*) Vulkan);
+			UpdateMenuSettings(GameState, EngineState, GameInput, (SVulkanContext*) Vulkan);
 		} break;
 	}
 	
 }
 
-void UpdateGame(SGameState* GameState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
 {
+	if (!GameState->bInitialized)
+	{
+		SParsedConfigFile ConfigFile = ParseConfigFile("Game.cfg");
+		if (ConfigFile.ItemCount > 0)
+		{
+			for (uint32_t I = 0; I < ConfigFile.ItemCount; I++)
+			{
+				const SConfigFileItem& Item = ConfigFile.Items[I];
+
+				if (CompareStrings(Item.Name, "HeroSpeed"))
+				{
+					GameState->HeroSpeed = Item.Value;
+				}
+				else if (CompareStrings(Item.Name, "HeroDrag"))
+				{
+					GameState->HeroDrag = Item.Value;
+				}
+				else if (CompareStrings(Item.Name, "HeroJumpPower"))
+				{
+					GameState->HeroJumpPower = Item.Value;
+				}
+				else if (CompareStrings(Item.Name, "HeroLampDistance"))
+				{
+					GameState->HeroLampDistance = Item.Value;
+				}
+			}
+		}
+		else
+		{
+			// NOTE(georgii): Use these values if for some reason there is no config file.
+			GameState->HeroSpeed = 11.0f;
+			GameState->HeroDrag = 3.1f;
+			GameState->HeroJumpPower = 4.5f;
+			GameState->HeroLampDistance = 8.0f;
+		}
+
+        GameState->DeathAnimationSpeed = 10.0f;
+
+#if ENGINE_RELEASE
+		SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
+		if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
+		{
+			uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
+
+			char LastLevelName[260];
+			uint32_t LastLevelNameLength = 0;
+			memcpy(&LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+			memcpy(LastLevelName, SaveFilePointer, LastLevelNameLength);
+			SaveFilePointer += LastLevelNameLength;
+
+			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
+			{
+				SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
+				if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+				{
+					uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl");
+
+					memcpy(&EngineState->Camera.Pitch, EndPointer, sizeof(float));
+					EndPointer += sizeof(float);
+					memcpy(&EngineState->Camera.Head, EndPointer, sizeof(float));
+					EndPointer += sizeof(float);
+
+					memcpy(&EngineState->TextsToRenderCount, EndPointer, sizeof(uint32_t));
+					EndPointer += sizeof(uint32_t);
+					memcpy(EngineState->TextsToRender, EndPointer, sizeof(EngineState->TextsToRender));
+					EndPointer += sizeof(EngineState->TextsToRender);
+
+					memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
+					EndPointer += sizeof(vec3);
+					memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
+					EndPointer += sizeof(float);
+
+					free(MainHubSaveFile.Memory);
+				}
+			}
+			else
+			{
+				LoadLevel(EngineState, &EngineState->LevelBaseState, LastLevelName, false);
+			}
+		}
+		else
+		{
+			LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
+		}
+#else
+		LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
+#endif
+
+		GameState->bInitialized = true;
+	}
+
+	if (GameState->bReload)
+	{
+		GameState->bDeathAnimation = false;
+		GameState->DeathAnimationLengthMoved = 0.0f;
+		GameState->DeathPos = Vec3(0.0f);
+
+		GameState->CurrentCheckpointIndex = 0;
+		GameState->LastCheckpointPos = EngineState->Level.Entities[0].Pos;
+
+		GameState->bReload = false;
+	}
+
 	if (WasDown(GameInput->Buttons[Button_Escape]))
 	{
-		if (!GameState->bMenuOpened || (GameState->MenuMode != MenuMode_Settings))
+		if (!EngineState->bMenuOpened || (GameState->MenuMode != MenuMode_Settings))
 		{
-			GameState->bMenuOpened = !GameState->bMenuOpened;
+			EngineState->bMenuOpened = !EngineState->bMenuOpened;
 			GameState->MenuMode = MenuMode_Default;
 			GameState->SelectedMenuElement = MenuElement_DefaultNone;
 		}
 	}
 
-	if (!GameState->bMenuOpened)
+	char CurrentLevelName[ArrayCount(EngineState->LevelName)];
+	memcpy(CurrentLevelName, EngineState->LevelName, ArrayCount(CurrentLevelName));
+
+	if (!EngineState->bMenuOpened)
 	{
-		UpdateGameMode(GameState, GameInput);	
+		UpdateGameMode(GameState, EngineState, GameInput);	
 	}
 	else
 	{
-		UpdateMenu(GameState, GameInput, Vulkan);
+		UpdateMenu(GameState, EngineState, GameInput, Vulkan);
 	}
+	
+#if ENGINE_RELEASE
+	// TODO(georgii): Do it once in several frames, not every frame?
+
+	if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
+	{
+		FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
+		if (MainHubSaveFile)
+		{
+			// Save level
+			const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
+			fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
+			fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
+
+			// Save some camera info
+			fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
+			fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
+
+			// Save text stuff
+			fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
+			fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
+
+			// Save last base level stuff
+			fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
+			fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
+
+			fclose(MainHubSaveFile);
+		}
+	}
+
+	FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
+	if (GeneralSaveFile)
+	{
+		const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
+		fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
+
+		fclose(GeneralSaveFile);
+	}
+#endif
 }

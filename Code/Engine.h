@@ -35,20 +35,6 @@ struct SCamera
 	vec3 OffsetFromPlayer;
 };
 
-struct SCameraBuffer
-{
-	mat4 View;
-	mat4 Proj;
-	mat4 ProjUnjittered;
-
-	mat4 PrevView;
-	mat4 PrevProj;
-
-	vec4 Pos;
-	vec4 Viewport;
-	vec4 Frustums[6];
-};
-
 #include "VoxelCulling.cpp"
 #include "ForwardVoxelRender.cpp"
 #include "ForwardRender.cpp"
@@ -62,15 +48,9 @@ struct SCameraBuffer
 #include "DebugRender.cpp"
 #include "Renderer.h"
 
-struct SVoxelGameInfo
-{
-	bool bDestroyable;
-};
-
 struct SVoxels
 {
 	uint32_t ColorActive[LevelDimZ][LevelDimY][LevelDimX];
-	SVoxelGameInfo GameInfo[LevelDimZ][LevelDimY][LevelDimX];
 };
 
 struct SLevel
@@ -119,17 +99,6 @@ struct SParticleDraw
     float _Padding1;
 };
 
-struct SHUDProjectionBuffer
-{
-	mat4 OrthoProj;
-};
-
-struct SLightBuffer
-{
-	vec4 AmbientColor; // w - unused
-	vec4 AmbientConstant; // w - unused
-};
-
 enum ETextAlignment
 {
 	TextAlignment_Center,
@@ -152,7 +121,7 @@ struct SText
 	float TimeToStartAppear;
 
 	vec4 Color;
-	const SFont* Font;
+	EFont Font;
 
 	bool bMenuText;
 	ETextAlignment Alignment;
@@ -166,46 +135,17 @@ struct SHeroControl
 	bool bUseLamp;
 };
 
-enum EGameMode
+enum EEngineMode
 {
-	GameMode_Game,
-	GameMode_Editor,
+	EngineMode_Game,
+	EngineMode_Editor,
 };
 
-enum EMenuElement
-{
-	MenuElement_DefaultNone,
-
-	MenuElement_Settings,
-	MenuElement_StartNewGame,
-	MenuElement_Quit,
-
-	MenuElement_DefaultCount,
-
-
-	MenuElement_SettingsNone,
-
-	MenuElement_Fullscreen,
-	MenuElement_VSync,
-	MenuElement_Resolution,
-	MenuElement_Vignetting,
-	MenuElement_Multisampling,
-
-	MenuElement_SettingsCount,
-};
-
-enum EMenuMode
-{
-	MenuMode_Default,
-	MenuMode_Settings
-};
-
-struct SGameState
+struct SEngineState
 {
     bool bInitialized;
 
 	SGeometry Geometry;
-
 	SRenderer Renderer;
 
 	bool bSampleCountMSAAChanged;
@@ -232,41 +172,24 @@ struct SGameState
 	uint32_t VoxelsToChangeColorCount;
 	SVoxelChangeColor VoxelsToChangeColor[LevelDimZ*LevelDimY*LevelDimX];
 
-	vec3 LastBaseLevelPos;
-	float LastBaseLevelGatesAngle;
-
 	bool bReloadLevel;
+	bool bReloadGame;
 
 	SLoadedWAV LoadedSounds[32];
 	SAudioState AudioState;
-	SPlayingSound* BackgroundSound;
 
 	SMemoryArena MemoryArena;
 
 	uint32_t TextsToRenderCount;
 	SText TextsToRender[64];
 
-	vec3 LastCheckpointPos;
-
-    bool bDeathAnimation;
-    float DeathAnimationSpeed;
-    float DeathAnimationLengthMoved;
-    vec3 DeathPos;
-	vec3 DeathAnimationTargetPos;
-
-	// NOTE(georgii): Don't wanna resave every level when I change these params for hero, so I just store them in SGameState.
-	float HeroSpeed;
-	float HeroDrag;
-	float HeroJumpPower;
-	float HeroLampDistance;
-
-	EGameMode GameMode;
+	EEngineMode EngineMode;
 
 	bool bMenuOpened;
-	EMenuMode MenuMode;
-	EMenuElement SelectedMenuElement;
 
 	bool bVignetteEnabled;
+
+	float GameTime;
 
 	// Debug and editor stuff
 	bool bFlyMode;
@@ -276,17 +199,15 @@ struct SGameState
 	SLevel LevelGameStartState;
 	bool bForceUpdateVoxels;
 
-    uint8_t CurrentCheckpointIndex;
-
 #ifndef ENGINE_RELEASE
 	SEditorState EditorState;
 #endif
 };
 
-inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float Scale, vec4 Color = Vec4(1.0f), float Time = FloatMax, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
+inline void AddText(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, vec4 Color = Vec4(1.0f), float Time = FloatMax, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
 {
-	Assert(GameState->TextsToRenderCount < ArrayCount(GameState->TextsToRender));
-	SText* Text = &GameState->TextsToRender[GameState->TextsToRenderCount++];
+	Assert(EngineState->TextsToRenderCount < ArrayCount(EngineState->TextsToRender));
+	SText* Text = &EngineState->TextsToRender[EngineState->TextsToRenderCount++];
 
 	uint32_t Length = StringLength(String);
 	Assert(ArrayCount(Text->String) >= Length + 1);
@@ -308,13 +229,13 @@ inline void AddText(SGameState* GameState, const char* String, vec2 Pos, float S
 	Text->bMenuText = false;
 	Text->Alignment = TextAlignment_Center;
 
-	Text->Font = &GameState->Renderer.KarminaRegular;
+	Text->Font = Font_KarminaRegular;
 }
 
-inline void AddTextMenu(SGameState* GameState, const char* String, vec2 Pos, float Scale, const SFont* Font, vec4 Color = Vec4(1.0f), ETextAlignment Alignment = TextAlignment_Center)
+inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, EFont Font, vec4 Color = Vec4(1.0f), ETextAlignment Alignment = TextAlignment_Center)
 {
-	Assert(GameState->TextsToRenderCount < ArrayCount(GameState->TextsToRender));
-	SText* Text = &GameState->TextsToRender[GameState->TextsToRenderCount++];
+	Assert(EngineState->TextsToRenderCount < ArrayCount(EngineState->TextsToRender));
+	SText* Text = &EngineState->TextsToRender[EngineState->TextsToRenderCount++];
 
 	uint32_t Length = StringLength(String);
 	Assert(ArrayCount(Text->String) >= Length + 1);
@@ -358,17 +279,6 @@ inline void SetVoxelColor(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, u
 	Voxels.ColorActive[Z][Y][X] |= Color;
 }
 
-inline bool IsVoxelDestroyable(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
-{
-	bool bResult = Voxels.GameInfo[Z][Y][X].bDestroyable;
-	return bResult;
-}
-
-inline void SetVoxelDestroyable(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, bool bDestroyable)
-{
-	Voxels.GameInfo[Z][Y][X].bDestroyable = bDestroyable;
-}
-
 inline vec3 GetVoxelColorVec3(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
 {
 	float Red = (Voxels.ColorActive[Z][Y][X] >> 24) / 255.0f;
@@ -378,30 +288,30 @@ inline vec3 GetVoxelColorVec3(const SVoxels& Voxels, uint32_t X, uint32_t Y, uin
 	return Vec3(Red, Green, Blue);
 }
 
-void AddVoxelToLevel(SGameState* GameState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red = 77, uint8_t Green = 77, uint8_t Blue = 77)
+void AddVoxelToLevel(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red = 77, uint8_t Green = 77, uint8_t Blue = 77)
 {
-	Assert(GameState->VoxelsToAddCount < ArrayCount(GameState->VoxelsToAdd));
+	Assert(EngineState->VoxelsToAddCount < ArrayCount(EngineState->VoxelsToAdd));
 
 	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
 	SVoxelToAdd VoxelToAdd = { ID, Red, Green, Blue };
-	GameState->VoxelsToAdd[GameState->VoxelsToAddCount++] = VoxelToAdd;
+	EngineState->VoxelsToAdd[EngineState->VoxelsToAddCount++] = VoxelToAdd;
 }
 
-void MarkVoxelForDeletion(SGameState* GameState, uint32_t X, uint32_t Y, uint32_t Z)
+void MarkVoxelForDeletion(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z)
 {
-	Assert(GameState->VoxelsToDeleteCount < ArrayCount(GameState->VoxelsToDelete));
+	Assert(EngineState->VoxelsToDeleteCount < ArrayCount(EngineState->VoxelsToDelete));
 
 	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
-	GameState->VoxelsToDelete[GameState->VoxelsToDeleteCount++] = ID;
+	EngineState->VoxelsToDelete[EngineState->VoxelsToDeleteCount++] = ID;
 }
 
-void MarkVoxelForChangingColor(SGameState* GameState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red, uint8_t Green, uint8_t Blue)
+void MarkVoxelForChangingColor(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red, uint8_t Green, uint8_t Blue)
 {
-	Assert(GameState->VoxelsToChangeColorCount < ArrayCount(GameState->VoxelsToChangeColor));
+	Assert(EngineState->VoxelsToChangeColorCount < ArrayCount(EngineState->VoxelsToChangeColor));
 
 	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
 	SVoxelChangeColor VoxelChangeColor = { ID, Red, Green, Blue };
-	GameState->VoxelsToChangeColor[GameState->VoxelsToChangeColorCount++] = VoxelChangeColor;
+	EngineState->VoxelsToChangeColor[EngineState->VoxelsToChangeColorCount++] = VoxelChangeColor;
 }
 
 SPointLight* AddPointLight(SLevel& Level, vec3 Pos, float Radius, vec4 Color)
@@ -534,18 +444,18 @@ SDepthPyramidInfoResult GetDepthPyramidInfo(uint32_t SourceImageWidth, uint32_t 
 	return Result;
 }
 
-void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3 HeroVelocity = Vec3(0.0f))
-{
-	char Path[264] = {};
-	ConcStrings(Path, sizeof(Path), "Levels\\", LevelName);
+#define LEVEL_MAX_FILE_VERSION 1
 
+uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFileResult& File, char* Path, vec3 HeroVelocity = Vec3(0.0f))
+{
 	memset(Level, 0, sizeof(SLevel));
-	ReadEntireFileResult File = ReadEntireFile(Path);
+
+	uint8_t* EndPointer = (uint8_t*) File.Memory;
 	if (File.Memory)
 	{
 		uint32_t FileVersion = *(uint32_t*) File.Memory;
 
-		if (FileVersion == 1)
+		if (FileVersion == LEVEL_MAX_FILE_VERSION)
 		{
 			uint8_t* LevelMemory = (uint8_t*) File.Memory + sizeof(uint32_t);
 
@@ -619,11 +529,6 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 				memcpy(&Level->Entities[I].Color, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
 
-				if (Level->Entities[I].Type == Entity_Door)
-				{
-					Level->Entities[I].Color = Vec3(0.0f);
-				}
-
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 				memcpy(&Level->Entities[I].PrevPos, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
@@ -656,8 +561,6 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 				memcpy(&Level->Entities[I].TargetOffset, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
 
-				Level->Entities[I].BasePos = Level->Entities[I].Pos;
-
 				AlignAddress(&LevelMemory, GetAlignmentOf(bool));
 				memcpy(&Level->Entities[I].bCollisionWithHeroStarted, LevelMemory, sizeof(bool));
 				LevelMemory += sizeof(bool);
@@ -668,11 +571,6 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 				AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
 				memcpy(&Level->Entities[I].MeshIndex, LevelMemory, sizeof(uint32_t));
 				LevelMemory += sizeof(uint32_t);
-
-				if (Level->Entities[I].Type == Entity_Door)
-				{
-					Level->Entities[I].MeshIndex = 2;
-				}
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(char));
 				memcpy(&Level->Entities[I].TargetLevelName, LevelMemory, sizeof(SEntity::MessageText));
@@ -726,49 +624,56 @@ void LoadLevel(SGameState* GameState, SLevel* Level, const char* LevelName, vec3
 			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 			memcpy(&Level->AmbientConstant, LevelMemory, sizeof(Level->AmbientConstant));
 			LevelMemory += sizeof(Level->AmbientConstant);
+
+			EndPointer = LevelMemory;
 		}
 
-		free(File.Memory);
-
 #ifndef ENGINE_RELEASE
-		GameState->LevelGameStartState = *Level;
-		GameState->EditorState.LevelHistoryHead = GameState->EditorState.LevelHistoryTail = 0;
+		EngineState->LevelGameStartState = *Level;
+		EngineState->EditorState.LevelHistoryHead = EngineState->EditorState.LevelHistoryTail = 0;
 #endif
 
-		memcpy(GameState->LevelName, Path, StringLength(Path) + 1);
+		memcpy(EngineState->LevelName, Path, StringLength(Path) + 1);
 
 		Assert(Level->Entities[0].Type == Entity_Hero);
 		Level->Entities[0].Velocity = HeroVelocity;
 
-		GameState->bReloadLevel = true;
+		EngineState->bReloadLevel = true;
+		EngineState->bReloadGame = true;
 	}
+
+	return EndPointer;
 }
 
-void ReloadGameLevel(SGameState* GameState, bool bDeath = false)
+void LoadLevel(SEngineState* EngineState, SLevel* Level, const char* LevelName, bool bAddLevelsPath = true, vec3 HeroVelocity = Vec3(0.0f))
+{
+	char Path[264] = {};
+	ConcStrings(Path, sizeof(Path), bAddLevelsPath ? "Levels\\" : "", LevelName);
+
+	SReadEntireFileResult File = ReadEntireFile(Path);
+	LoadLevel(EngineState, Level, File, Path, HeroVelocity);
+
+	free(File.Memory);
+}
+
+void ReloadGameLevel(SEngineState* EngineState, bool bResetCameraPosition = true, bool bReloadGame = true)
 {
 #ifndef ENGINE_RELEASE
-	GameState->bReloadLevelEditor = true;
+	EngineState->bReloadLevelEditor = true;
 #else
-	GameState->bReloadLevel = true;
+	EngineState->bReloadLevel = true;
 #endif
 
-    if (bDeath)
-    {
-        SEntity* HeroEntity = &GameState->Level.Entities[0];
-        Assert(HeroEntity->Type == Entity_Hero);
-
-        GameState->bDeathAnimation = true;
-        GameState->DeathPos = HeroEntity->Pos;
-		GameState->DeathAnimationTargetPos = GameState->LastCheckpointPos;
-    }
-	else
+	if (bResetCameraPosition)
 	{
-		SEntity* HeroEntity = GameState->bReloadLevelEditor ? &GameState->LevelGameStartState.Entities[0] : &GameState->LevelBaseState.Entities[0];
+		SEntity* HeroEntity = EngineState->bReloadLevelEditor ? &EngineState->LevelGameStartState.Entities[0] : &EngineState->LevelBaseState.Entities[0];
         Assert(HeroEntity->Type == Entity_Hero);
 
-	    GameState->Camera.Pitch = 0.0f;
-	    GameState->Camera.Head = HeroEntity->Orientation.y;
+	    EngineState->Camera.Pitch = 0.0f;
+	    EngineState->Camera.Head = HeroEntity->Orientation.y;
 	}
+
+	EngineState->bReloadGame = bReloadGame;
 }
 
 void FixDoorIndex(SLevel* Level, uint32_t OldDoorIndex, uint32_t NewDoorIndex)
@@ -782,4 +687,71 @@ void FixDoorIndex(SLevel* Level, uint32_t OldDoorIndex, uint32_t NewDoorIndex)
 			Entity->DoorIndex = NewDoorIndex;
 		}
 	}
+}
+
+struct SConfigFileItem
+{
+	char Name[64];
+	float Value;
+};
+
+struct SParsedConfigFile
+{
+	uint32_t ItemCount;
+	SConfigFileItem Items[64];
+};
+
+SParsedConfigFile ParseConfigFile(const char* ConfigFileName)
+{
+	SParsedConfigFile ConfigFile = {};
+
+	SReadEntireFileResult File = ReadEntireTextFile(ConfigFileName);
+	if (File.Memory && File.Size)
+	{
+		char* FileText = (char*) File.Memory;
+
+		char* LineStart = FileText;
+		uint32_t LineLength = 0;
+		for (int I = 0; I < File.Size + 1; I++)
+		{
+			if ((FileText[I] != '\r') && (FileText[I] != '\n') && (FileText[I] != 0))
+			{
+				LineLength++;
+			}
+			else
+			{
+				char* NameStart = (char*) LineStart;
+				uint32_t NameLength = 0;
+				for (uint32_t J = 0; J < LineLength; J++)
+				{
+					if (NameStart[J] != ' ')
+					{
+						NameLength++;
+					}
+					else
+					{
+						break;
+					}
+				}
+
+				char *ValueStart = NameStart + NameLength + 1;
+				uint32_t ValueLength = LineLength - NameLength - 1;
+				
+				SConfigFileItem* Item = ConfigFile.Items + ConfigFile.ItemCount++;
+				ConcStrings(Item->Name, ArrayCount(Item->Name), "", NameStart, NameLength);
+				Item->Value = StrToFloat(ValueStart, ValueLength);
+
+				if (FileText[I] == '\r')
+				{
+					I++;
+				}
+				LineStart = FileText + I + 1;
+				LineLength = 0;
+			}
+		}
+
+		free(File.Memory);
+	}
+
+	return ConfigFile;
 }

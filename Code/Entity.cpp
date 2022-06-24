@@ -303,7 +303,7 @@ bool BlockOnCollision(const SEntity* A, const SEntity* B)
 	return bResult;
 }
 
-void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* B)
+void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* Level, SEntity* A, SEntity* B)
 {
 	if (A->Type > B->Type)
 	{
@@ -319,7 +319,7 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 			B->bCollisionWithHeroStarted = true;
 			B->CollisionWithHeroTimePassed = 0.0f;
 
-			if (CompareStrings(GameState->LevelName, "Levels\\MainHub.ctl"))
+			if (CompareStrings(EngineState->LevelName, "Levels\\MainHub.ctl"))
 			{
 				GameState->LastBaseLevelPos = A->PrevPos;
 				GameState->LastBaseLevelGatesAngle = B->Orientation.y;
@@ -330,14 +330,18 @@ void HandleCollision(SGameState* GameState, SLevel* Level, SEntity* A, SEntity* 
 	{
 		if ((Length(B->Color) > 0.0f) || B->bUndiffusable)
 		{
-			ReloadGameLevel(GameState, true);
+			ReloadGameLevel(EngineState, false, false);
+
+			GameState->bDeathAnimation = true;
+			GameState->DeathPos = A->Pos;
+			GameState->DeathAnimationTargetPos = GameState->LastCheckpointPos;
 		}
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_MessageToggler))
 	{
 		B->bRemoved = true;
 
-		AddText(GameState, B->MessageText, B->MessagePos, B->MessageScale, Vec4(1.0f), B->MessageLifeTime, true, B->MessageTimeToAppear, B->MessageTimeToStartAppear);
+		AddText(EngineState, B->MessageText, B->MessagePos, B->MessageScale, Vec4(1.0f), B->MessageLifeTime, true, B->MessageTimeToAppear, B->MessageTimeToStartAppear);
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Checkpoint))
 	{
@@ -379,7 +383,7 @@ struct SMoveEntityInfo
 
 	vec3 Acceleration;
 };
-void MoveEntity(SGameState* GameState, SEntity* Entity, SLevel* Level, const SMoveEntityInfo& MoveInfo, float dt)
+void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entity, SLevel* Level, const SMoveEntityInfo& MoveInfo, float dt)
 {
 	bool bGravity = MoveInfo.bGravity;
 	bool bFlyMode = MoveInfo.bFlyMode;
@@ -583,7 +587,7 @@ void MoveEntity(SGameState* GameState, SEntity* Entity, SLevel* Level, const SMo
 
 				if (HitEntity)
 				{
-					HandleCollision(GameState, Level, Entity, HitEntity);
+					HandleCollision(GameState, EngineState, Level, Entity, HitEntity);
 				}
 
 				if (Entity->Type == Entity_Fireball)

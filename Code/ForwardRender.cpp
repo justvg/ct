@@ -2,7 +2,7 @@ struct SForwardRenderPass
 {
 public:
     static SForwardRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float dt);
+    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
@@ -135,7 +135,7 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
     return ForwardRenderPass;
 }
 
-void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float dt)
+void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time)
 {
 	BEGIN_GPU_PROFILER_BLOCK("RENDER_ENTITIES", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
@@ -205,13 +205,9 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	static float Time = 0.0f;
 	SForwardRenderPushConstants PushConstants = {};
 	PushConstants.FrameNumber = FrameID % 8;
-	PushConstants.Time = Time;
-
-	// TODO(georgii): Can this become too big? Fix (Jonathan Blow wrote smth about this I think)
-	Time += dt;
+	PushConstants.Time = Time - 10.000f * Floor(Time / 10000.0f);
 
 	bool bFirstTranspEncountered = false;
 	EMeshMaterial LastMeshMaterial = MeshMaterial_Default;
@@ -277,7 +273,7 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 		PushConstants.Orientation = EulerToQuat(Entity.Orientation.xyz);
 		PushConstants.Color = Vec4(Entity.Color, Entity.Alpha);
 		PushConstants.Offset = Vec4(0.0f, 0.0f, 0.0f, float(PointLightCount));
-		PushConstants.PrevPosition = Vec4(Entity.PrevPos, 0.0f);
+		PushConstants.PrevPosition.xyz = Entity.PrevPos;
 		PushConstants.PrevOrientation = EulerToQuat(Entity.PrevOrientation.xyz);
 		PushConstants.FPWeaponDepthTest = true;
 

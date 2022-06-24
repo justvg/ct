@@ -5,7 +5,8 @@ REM To compile profile version use -O2 and -DENGINE_PROFILE
 REM To compile release version use -O2 and -DENGINE_RELEASE
 REM F4194304 is set to increase stack size to 4MB, needed for builds with editor. For release builds can be disabled.
 
-call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
+@REM call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
 
 set VulkanSDKPath=C:\VulkanSDK\1.3.211.0\
 

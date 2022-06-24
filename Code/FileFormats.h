@@ -33,7 +33,7 @@ uint8_t* LoadBMP(const char* Path, uint32_t* Width, uint32_t* Height, uint32_t* 
 {
 	uint8_t* Result = 0;
 
-	ReadEntireFileResult FileData = ReadEntireFile(Path);
+	SReadEntireFileResult FileData = ReadEntireFile(Path);
 
 	if (FileData.Size != 0)
 	{
@@ -122,7 +122,7 @@ SLoadedWAV LoadWAV(const char* Path)
 {
 	SLoadedWAV Result = {};
 
-	ReadEntireFileResult File = ReadEntireFile(Path);
+	SReadEntireFileResult File = ReadEntireFile(Path);
 	if (File.Memory)
 	{
 		SWAVHeader* Header = (SWAVHeader*) File.Memory;
@@ -621,7 +621,7 @@ SAttributeInfoGLTF GetAttributeInfoGLTF(STokenJSON* Accessor, STokenJSON* Buffer
 
 bool LoadGLTF(uint32_t MaxVertexCount, SVertex* Vertices, uint32_t MaxIndexCount, uint32_t* Indices, const char* Path, uint32_t& VertexCount, uint32_t& IndexCount)
 {
-    ReadEntireFileResult FileData = ReadEntireTextFile(Path);
+    SReadEntireFileResult FileData = ReadEntireTextFile(Path);
 	if (FileData.Memory)
 	{
 		char* JSONString = (char*) FileData.Memory;
@@ -704,7 +704,7 @@ bool LoadGLTF(uint32_t MaxVertexCount, SVertex* Vertices, uint32_t MaxIndexCount
 		char BufferPath[128];
 		ConcStrings(BufferPath, ArrayCount(BufferPath), "Models\\", BufferURI, BufferURILength);
 
-		ReadEntireFileResult BufferFile = ReadEntireFile(BufferPath);
+		SReadEntireFileResult BufferFile = ReadEntireFile(BufferPath);
 
 		Assert(MaxVertexCount >= PositionAttributeInfo.Count);
 		VertexCount = PositionAttributeInfo.Count;

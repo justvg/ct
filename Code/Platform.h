@@ -39,15 +39,15 @@ void AlignAddress(uint8_t** Address, uint32_t Alignment)
 	AlignAddress((void**)Address, Alignment);
 }
 
-struct ReadEntireFileResult
+struct SReadEntireFileResult
 {
 	void* Memory;
 	size_t Size;
 };
 
-ReadEntireFileResult ReadEntireFile(const char* Path)
+SReadEntireFileResult ReadEntireFile(const char* Path)
 {
-	ReadEntireFileResult Result = {};
+	SReadEntireFileResult Result = {};
 
 	FILE* File = fopen(Path, "rb");
 	Assert(File);
@@ -73,9 +73,9 @@ ReadEntireFileResult ReadEntireFile(const char* Path)
 }
 
 // NOTE(georgii): Adds null termination at the end
-ReadEntireFileResult ReadEntireTextFile(const char* Path)
+SReadEntireFileResult ReadEntireTextFile(const char* Path)
 {
-	ReadEntireFileResult Result = {};
+	SReadEntireFileResult Result = {};
 
 	FILE* File = fopen(Path, "rb");
 	Assert(File);

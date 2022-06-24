@@ -195,7 +195,7 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 	Font.BitmapFontDescrSet = CreateDescriptorSet(Device, DescriptorPool, DescrSetLayout);
 	UpdateDescriptorSetImage(Device, Font.BitmapFontDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, Font.BitmapSampler, Font.BitmapFont.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	ReadEntireFileResult FontInfoFile = ReadEntireTextFile(FontInfoPath);
+	SReadEntireFileResult FontInfoFile = ReadEntireTextFile(FontInfoPath);
 	Assert(FontInfoFile.Memory);
 
 	const char *CurrentLine = (const char*) FontInfoFile.Memory;

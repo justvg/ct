@@ -833,7 +833,7 @@ VkQueryPool CreateQueryPool(VkDevice Device, uint32_t QueriesCount)
 
 VkShaderModule LoadShader(VkDevice Device, const char* Path)
 {
-	ReadEntireFileResult FileData = ReadEntireFile(Path);
+	SReadEntireFileResult FileData = ReadEntireFile(Path);
 	Assert(FileData.Size % 4 == 0);
 
 	VkShaderModuleCreateInfo CreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };

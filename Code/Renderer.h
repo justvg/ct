@@ -1,5 +1,38 @@
 #pragma once
 
+struct SCameraBuffer
+{
+	mat4 View;
+	mat4 Proj;
+	mat4 ProjUnjittered;
+
+	mat4 PrevView;
+	mat4 PrevProj;
+
+	vec4 Pos;
+	vec4 Viewport;
+	vec4 Frustums[6];
+};
+
+struct SHUDProjectionBuffer
+{
+	mat4 OrthoProj;
+};
+
+struct SLightBuffer
+{
+	vec4 AmbientColor; // w - unused
+	vec4 AmbientConstant; // w - unused
+};
+
+enum EFont
+{
+	Font_KarminaRegular,
+	Font_KarminaBold,
+
+	Font_Count
+};
+
 struct SRenderer
 {
 	uint32_t StagingBufferOffsets[FramesInFlight];
@@ -68,8 +101,7 @@ struct SRenderer
 	SHUDRenderPass HudRenderPass;
 	SDebugRenderPass DebugRenderPass;
 
-	SFont KarminaRegular;
-	SFont KarminaBold;
+	SFont Fonts[Font_Count];
 
 	SImage BlueNoiseTexture;
 

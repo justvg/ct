@@ -8,9 +8,9 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	}
 	Renderer->VertexBuffer = CreateBuffer(Vulkan.MemoryAllocator, Megabytes(8), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->IndexBuffer = CreateBuffer(Vulkan.MemoryAllocator, Megabytes(8), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	Renderer->VoxelDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SGameState::VoxelDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	Renderer->VoxelVisibilityBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SGameState::VoxelVisibilities), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	Renderer->ParticleDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SGameState::ParticleDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	Renderer->VoxelDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::VoxelDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	Renderer->VoxelVisibilityBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::VoxelVisibilities), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	Renderer->ParticleDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::ParticleDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->IndirectBuffer = CreateBuffer(Vulkan.MemoryAllocator, Megabytes(64), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->CountBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->VoxelsBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SVoxels), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
@@ -99,8 +99,8 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->AimTextureDescrSet = CreateDescriptorSet(Vulkan.Device, Renderer->DescriptorPool, Renderer->HudRenderPass.GetTextureDescrSetLayout());
 	UpdateDescriptorSetImage(Vulkan.Device, Renderer->AimTextureDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, Renderer->LinearEdgeSampler, Renderer->AimTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	Renderer->KarminaRegular = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaRegular");
-	Renderer->KarminaBold = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaBold");
+	Renderer->Fonts[Font_KarminaRegular] = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaRegular");
+	Renderer->Fonts[Font_KarminaBold] = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaBold");
 
 	vec2 QuadVertices[] =
 	{
@@ -158,7 +158,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->CubeIB, Renderer->StagingBuffers[0], CubeIndices, sizeof(CubeIndices));
 }
 
-VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float dt, bool bSwapchainChanged)
+VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float GameTime, bool bSwapchainChanged)
 {
 	// Rendering
 	BEGIN_PROFILER_BLOCK("RENDERING");
@@ -172,10 +172,10 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	BEGIN_GPU_PROFILER_BLOCK("RENDER", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
 	// Frustum cull voxels visible last frame
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, false, bSwapchainChanged);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, false, bSwapchainChanged);
     
 	// Forward render voxels visibile last frame and frustum culled in this frame
-	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(GameState->VoxelDraws), PointLightCount, Level->AmbientColor, FrameID);
+	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Level->AmbientColor, FrameID);
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_LINEAR_DEPTH", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
@@ -213,18 +213,18 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	Renderer->DownscaleComputePass.Dispatch(Vulkan, Renderer->LinearDepthImage, Renderer->DepthPyramidImage, Renderer->DepthPyramidMipCount);
     
 	// Frustum and occlusion cull all voxels
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(GameState->VoxelDraws), FrameID, true, bSwapchainChanged);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, true, bSwapchainChanged);
     
 	// Render voxels visible this frame that are not already rendered
-	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(GameState->VoxelDraws), PointLightCount, FrameID);
+	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, FrameID);
     
 	// Forward render particles
 	Renderer->ForwardPartRenderPass.Render(Vulkan, TotalParticleCount, Renderer->CubeVB, Renderer->CubeIB, PointLightCount, FrameID);
 
 	// Forward render entities
-	if (!GameState->bHideEntities)
+	if (!EngineState->bHideEntities)
 	{
-		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, GameState->Camera, GameState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, GameState->GameMode == GameMode_Game, MemoryArena, GameState->bMenuOpened ? 0.0f : dt);
+		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, EngineState->Camera, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, EngineState->EngineMode == EngineMode_Game, MemoryArena, EngineState->bMenuOpened ? 0.0f : GameTime);
 	}
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_MSAA_TARGETS", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
@@ -314,7 +314,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
 	Renderer->BloomRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BloomImage, FrameID);
     
 	// Tone mapping
-	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID, GameState->bMenuOpened, GameState->bVignetteEnabled);
+	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID, EngineState->bMenuOpened, EngineState->bVignetteEnabled);
     
 	// HUD
 	SHUDProjectionBuffer HUDProjectionData = { Orthographic(-0.5f*Vulkan.Width, 0.5f*Vulkan.Width, -0.5f*Vulkan.Height, 0.5f*Vulkan.Height, -1.0f, 1.0f)  };
@@ -322,18 +322,18 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
     
 	Renderer->HudRenderPass.BeginRender(Vulkan, Renderer->QuadVB);
 	
-	if (GameState->GameMode == GameMode_Game)
+	if (EngineState->EngineMode == EngineMode_Game)
 	{
 		Renderer->HudRenderPass.Render(Vulkan, Renderer->AimTextureDescrSet, Vec2(0.0f, 0.0f), Vec2i(Renderer->AimTexture.Width, Renderer->AimTexture.Height));
 	}
 
-	for (uint32_t I = 0; I < GameState->TextsToRenderCount; I++)
+	for (uint32_t I = 0; I < EngineState->TextsToRenderCount; I++)
 	{
-		const SText& Text = GameState->TextsToRender[I];
+		const SText& Text = EngineState->TextsToRender[I];
 
-		if ((GameState->bMenuOpened && Text.bMenuText) || (!GameState->bMenuOpened && !Text.bMenuText))
+		if ((EngineState->bMenuOpened && Text.bMenuText) || (!EngineState->bMenuOpened && !Text.bMenuText))
 		{
-			const SFont* Font = Text.Font;
+			const SFont* Font = &Renderer->Fonts[Text.Font];
 
 			vec2 ScreenSizeScale = Vec2(Vulkan.Width / 1920.0f, Vulkan.Height / 1080.0f);
 			vec2 TextScale = Hadamard(Text.Scale, ScreenSizeScale);
@@ -381,7 +381,7 @@ VkImage RenderScene(SGameState* GameState, SRenderer* Renderer, const SVulkanCon
     
 #ifndef ENGINE_RELEASE
 	// DearImgui
-	RenderDearImgui(GameState, &Vulkan, Renderer->HudRenderPass.GetFramebuffer());
+	RenderDearImgui(EngineState, &Vulkan, Renderer->HudRenderPass.GetFramebuffer());
 #endif
     
 	VkImageMemoryBarrier FinalRenderBarrier = CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->FinalImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
