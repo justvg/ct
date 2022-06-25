@@ -323,6 +323,18 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 				PushConstants.Color.rgb *= 150.0f;
 			} break;
 
+			case Entity_Gates:
+			{
+				if (Entity.bFinishedLevel)
+				{
+					PushConstants.Color.rgb = Vec3(0.25f, 1.0f, 0.45f);
+				}
+				else if (Entity.bClosedGates)
+				{
+					PushConstants.Color.rgb = Vec3(1.0f, 0.3f, 0.3f);
+				}
+			} break;
+
 			case Entity_MessageToggler:
 			{
 				if (bGameMode)

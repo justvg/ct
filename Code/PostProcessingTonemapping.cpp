@@ -1,7 +1,7 @@
 struct SToneMappingRenderPass
 {
 public:
-    static SToneMappingRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage);
+    static SToneMappingRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, VkSampler NoiseSampler, const SImage& NoiseTexture, const SImage& FinalImage);
     void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, bool bVignette);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage* HistoryImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage);
 
@@ -27,15 +27,17 @@ struct STonemappingRenderPassPushConstants
 {
 	uint32_t MenuOpened;
     uint32_t VignetteEnabled;
+	uint32_t FrameNubmer;
 };
 
-SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage)
+SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, VkSampler NoiseSampler, const SImage& NoiseTexture, const SImage& FinalImage)
 {
     VkDescriptorSetLayoutBinding InputBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding ExposureBinding = CreateDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding BloomBinding = CreateDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayoutBinding NoiseBinding = CreateDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     
-    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { InputBinding, ExposureBinding, BloomBinding };
+    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { InputBinding, ExposureBinding, BloomBinding, NoiseBinding };
     VkDescriptorSetLayout DescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(DescrSetLayoutBindings), DescrSetLayoutBindings);
 
     VkDescriptorSet DescrSets[2] = {};
@@ -45,6 +47,7 @@ SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulk
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, HistoryImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, ExposureImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, BloomImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, NoiseSampler, NoiseTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
         
     VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, FinalImage.Format);
@@ -85,7 +88,7 @@ void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer&
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[FrameID % 2], 0, 0);
 
-	STonemappingRenderPassPushConstants PushConstants = { bMenuOpened ? 1u : 0u, bVignette ? 1u : 0u };
+	STonemappingRenderPassPushConstants PushConstants = { bMenuOpened ? 1u : 0u, bVignette ? 1u : 0u, FrameID % 8 };
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(STonemappingRenderPassPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;

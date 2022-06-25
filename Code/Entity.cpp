@@ -314,7 +314,7 @@ void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* L
 
 	if ((A->Type == Entity_Hero) && (B->Type == Entity_Gates))
 	{
-		if (!B->bCollisionWithHeroStarted)
+		if (!B->bClosedGates && !B->bCollisionWithHeroStarted)
 		{
 			B->bCollisionWithHeroStarted = true;
 			B->CollisionWithHeroTimePassed = 0.0f;

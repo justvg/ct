@@ -105,6 +105,8 @@ struct SEntity
 			float TimeToChangeColor;
 			float TimeToChangeColorCurrent;
 		};
+
+		bool bClosedGates; // NOTE(georgii): Should be set for gates that are closed.
 	};
 	vec3 BasePos;
 	vec3 TargetOffset;
@@ -126,12 +128,14 @@ struct SEntity
 		bool bGoBack; // NOTE(georgii): Used for doors to go back to base position when current color != target color.
 		bool bUndiffusable; // NOTE(georgii): Used for fireballs that can't be diffused.
 		bool bChangeColorAnimation; // NOTE(georgii): Used to check if we should animate color changing for hero.
+		bool bFinishGates; // NOTE(georgii): Should be set for gates that are finish of a level.
 	};
 
     union
     {
 	    bool bForceClose; // NOTE(georgii): Used to force door to close. Currently only checkpoints do that.
         uint8_t CheckpointIndex; // NOTE(georgii): Used for checkpoint to easily teleport between them during development.
+		bool bFinishedLevel; // NOTE(georgii): Should be set for gates of the levels that are finished.
     };
 
 	bool bRemoved;

@@ -1,6 +1,6 @@
 #include "Game.h"
 
-void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput)
+void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const char* CurrentLevelName)
 {
 	SCamera* Camera = &EngineState->Camera;
 	SLevel* Level = &EngineState->Level;
@@ -469,6 +469,28 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
 					}
 
+					if (bTargetMainHub && Entity->bFinishGates)
+					{
+						SLevel* LoadedLevel = &EngineState->LevelBaseState;
+						for (uint32_t LoadedLevelEntityIndex = 0; LoadedLevelEntityIndex < LoadedLevel->EntityCount; LoadedLevelEntityIndex++)
+						{
+							SEntity* LoadedLevelEntity = LoadedLevel->Entities + LoadedLevelEntityIndex;
+
+							if (LoadedLevelEntity->Type == Entity_Gates)
+							{
+								char LevelName[264] = {};
+								ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
+								ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
+
+								if (CompareStrings(LevelName, CurrentLevelName))
+								{
+									LoadedLevelEntity->bFinishedLevel = true;
+									break;
+								}
+							}
+						}
+					}
+
 					SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
 
 					float GatesAngleDifference = 0.0f;
@@ -550,7 +572,7 @@ void UpdateMenuDefault(SGameState* GameState, SEngineState* EngineState, const S
 	for (int32_t MenuElement = MenuElement_DefaultNone; MenuElement < MenuElement_DefaultCount; MenuElement++)
 	{
 		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
-		bool bEnterDown = WasDown(GameInput->Buttons[Button_Enter]);
+		bool bEnterDown = WasDown(GameInput->Buttons[Button_Enter]) || WasDown(GameInput->Buttons[Button_Space]);
 
 		const EFont Font = Font_KarminaRegular;
 		float Scale = 0.2f;
@@ -876,7 +898,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 
 	if (!EngineState->bMenuOpened)
 	{
-		UpdateGameMode(GameState, EngineState, GameInput);	
+		UpdateGameMode(GameState, EngineState, GameInput, CurrentLevelName);	
 	}
 	else
 	{
@@ -884,42 +906,53 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 	}
 	
 #if ENGINE_RELEASE
-	// TODO(georgii): Do it once in several frames, not every frame?
-
-	if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
+	// NOTE(georgii): Save the game every SaveTime seconds
+	const float SaveTime = 1.0f;
+	static float TimeToSave = 0.0f;
+	// if (TimeToSave >= SaveTime) 
+	if (true)
 	{
-		FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
-		if (MainHubSaveFile)
+		if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
 		{
-			// Save level
-			const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-			fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
-			fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
+			FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
+			if (MainHubSaveFile)
+			{
+				// Save level
+				const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
+				fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
+				fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
 
-			// Save some camera info
-			fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
-			fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
+				// Save some camera info
+				fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
+				fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
 
-			// Save text stuff
-			fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
-			fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
+				// Save text stuff
+				fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
+				fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
 
-			// Save last base level stuff
-			fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
-			fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
+				// Save last base level stuff
+				fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
+				fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
 
-			fclose(MainHubSaveFile);
+				fclose(MainHubSaveFile);
+			}
 		}
+
+		FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
+		if (GeneralSaveFile)
+		{
+			const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
+			fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
+			fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
+
+			fclose(GeneralSaveFile);
+		}
+
+		TimeToSave = 0.0f;
 	}
-
-	FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
-	if (GeneralSaveFile)
+	else
 	{
-		const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
-		fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
-
-		fclose(GeneralSaveFile);
+		TimeToSave += GameInput->dt;
 	}
 #endif
 }

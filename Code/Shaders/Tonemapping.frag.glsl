@@ -1,5 +1,7 @@
 #version 450
 
+#extension GL_GOOGLE_include_directive: require
+
 layout (location = 0) out vec4 FragColor;
 
 layout (location = 0) in vec2 TexCoords;
@@ -7,16 +9,21 @@ layout (location = 0) in vec2 TexCoords;
 layout (set = 0, binding = 0) uniform sampler2D InputTexture;
 layout (set = 0, binding = 1) uniform sampler2D ExposureTexture;
 layout (set = 0, binding = 2) uniform sampler2D BloomTexture;
+layout (set = 0, binding = 3) uniform sampler2D BlueNoiseTexture;
 
 layout (push_constant) uniform PushConstants
 {
     uint MenuOpened;
     uint VignetteEnabled;
+	uint FrameNumber;
 };
+
+#include "BlueNoise.incl.glsl"
 
 float GetVignetteMask()
 {
-	float DistanceFromCenter = length(TexCoords - vec2(0.5, 0.5));
+	vec2 TC = TexCoords + 0.1 * (BlueNoiseVec2() - vec2(0.5));
+	float DistanceFromCenter = length(TC - vec2(0.5, 0.5));
    
 	float X = DistanceFromCenter * 2.0 - 0.55;
 	X = clamp(X * 1.219512 , 0.0, 1.0);

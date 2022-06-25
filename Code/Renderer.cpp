@@ -91,7 +91,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->ExposureRenderPass = SExposureRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->LinearEdgeSamplerMips, Renderer->BrightnessImage, Renderer->BrightnessMipViews, Renderer->PointEdgeSampler, Renderer->ExposureImages);
 	Renderer->BloomRenderPass = SBloomRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
 	Renderer->TaaRenderPass = STaaRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HDRTargetImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImages);
-	Renderer->ToneMappingRenderPass = SToneMappingRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->PointEdgeSampler, Renderer->HistoryImages, Renderer->ExposureImages, Renderer->LinearEdgeSampler, Renderer->BloomImage, Renderer->FinalImage);
+	Renderer->ToneMappingRenderPass = SToneMappingRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->PointEdgeSampler, Renderer->HistoryImages, Renderer->ExposureImages, Renderer->LinearEdgeSampler, Renderer->BloomImage, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->FinalImage);
 	Renderer->HudRenderPass = SHUDRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->HUDProjectionBuffers, Renderer->FinalImage);
 	Renderer->DebugRenderPass = SDebugRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->FinalImage);
 	

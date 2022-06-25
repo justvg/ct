@@ -245,7 +245,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			{
 				EditorState->SelectedVoxelsCount = 0;
 				EditorState->SelectedVoxelColorFloat = Vec3(0.0f);
-                
+
+				EngineState->LevelGameStartState = EngineState->Level;
 				ReloadGameLevel(EngineState);
                 
 				EngineState->EngineMode = EngineMode_Game;
@@ -375,6 +376,14 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 						case Entity_Gates:
 						{
 							EditorInputText(EditorState, "TeleportLevel", Entity->TargetLevelName, ArrayCount(Entity->TargetLevelName));
+							
+							bValueChanged |= ImGui::Checkbox("FinishGates", &Entity->bFinishGates);
+							bValueChanged |= ImGui::Checkbox("ClosedGates", &Entity->bClosedGates);
+
+							if (Entity->bFinishGates)
+							{
+								Entity->bClosedGates = false;
+							}
 						} break;
 
 						case Entity_MessageToggler:
