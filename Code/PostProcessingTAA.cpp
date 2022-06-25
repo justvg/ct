@@ -45,7 +45,7 @@ STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptor
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, VelocityImages[(I + 1) % ArrayCount(DescrSets)].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
         
-    VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, VK_FORMAT_R16G16B16A16_SFLOAT);
+    VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, HistoryImages[0].Format);
 
     VkFramebuffer Framebuffers[2] = {};
     for (uint32_t I = 0; I < ArrayCount(Framebuffers); I++)

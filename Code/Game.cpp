@@ -434,6 +434,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
 					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+				#if ENGINE_RELEASE
 					if (bTargetMainHub)
 					{
 						SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
@@ -461,6 +462,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						}
 					}
 					else
+				#endif
 					{
 						char LevelName[264] = {};
 						ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");

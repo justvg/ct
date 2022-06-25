@@ -35,14 +35,14 @@ float GradientNoiseFloat(vec2 UV, float Scale)
 }
 
 // NOTE(georgii): Simple noise. Taken from Unity source code
+// float NoiseRandomValue(vec2 UV)
+// {
+//     return fract(sin(dot(UV, vec2(12.9898, 78.233))) * 43758.5453);
+// }
+
 float NoiseRandomValue(vec2 UV)
 {
-    return fract(sin(dot(UV, vec2(12.9898, 78.233)))*43758.5453);
-}
-
-float NoiseInterpolate(float A, float B, float t)
-{
-    return (1.0-t)*A + (t*B);
+    return fract(tan(distance(UV * 1.61803398874989484820459, UV)) * UV.x);
 }
 
 float NoiseValue(vec2 UV)
@@ -61,9 +61,9 @@ float NoiseValue(vec2 UV)
     float r2 = NoiseRandomValue(c2);
     float r3 = NoiseRandomValue(c3);
 
-    float BottomOfGrid = NoiseInterpolate(r0, r1, f.x);
-    float TopOfGrid = NoiseInterpolate(r2, r3, f.x);
-    float t = NoiseInterpolate(BottomOfGrid, TopOfGrid, f.y);
+    float BottomOfGrid = mix(r0, r1, f.x);
+    float TopOfGrid = mix(r2, r3, f.x);
+    float t = mix(BottomOfGrid, TopOfGrid, f.y);
     return t;
 }
 
@@ -71,17 +71,9 @@ float SimpleNoise(vec2 UV, float Scale)
 {
     float t = 0.0;
 
-    float freq = pow(2.0, float(0));
-    float amp = pow(0.5, float(3-0));
-    t += NoiseValue(vec2(UV.x*Scale/freq, UV.y*Scale/freq))*amp;
-
-    freq = pow(2.0, float(1));
-    amp = pow(0.5, float(3-1));
-    t += NoiseValue(vec2(UV.x*Scale/freq, UV.y*Scale/freq))*amp;
-
-    freq = pow(2.0, float(2));
-    amp = pow(0.5, float(3-2));
-    t += NoiseValue(vec2(UV.x*Scale/freq, UV.y*Scale/freq))*amp;
+    t += NoiseValue(vec2(UV.x * Scale, UV.y * Scale)) * 0.125;
+    t += NoiseValue(vec2(UV.x * Scale / 2.0, UV.y * Scale / 2.0)) * 0.25;
+    t += NoiseValue(vec2(UV.x * Scale / 4.0, UV.y * Scale / 4.0)) * 0.5;
 
     return t;
 }
