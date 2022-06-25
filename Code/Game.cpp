@@ -830,6 +830,31 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(LastLevelName, SaveFilePointer, LastLevelNameLength);
 			SaveFilePointer += LastLevelNameLength;
 
+			bool bFullscreen;
+			memcpy(&bFullscreen, SaveFilePointer, sizeof(bool));
+			SaveFilePointer += sizeof(bool);
+
+			bool bVSync;
+			memcpy(&bVSync, SaveFilePointer, sizeof(bool));
+			SaveFilePointer += sizeof(bool);
+
+			bool bVignetteEnabled;
+			memcpy(&bVignetteEnabled, SaveFilePointer, sizeof(bool));
+			SaveFilePointer += sizeof(bool);
+
+			int32_t SampleCountMSAA;
+			memcpy(&SampleCountMSAA, SaveFilePointer, sizeof(int32_t));
+			SaveFilePointer += sizeof(int32_t);
+
+			PlatformChangeFullscreen(bFullscreen);
+			PlatformChangeVSync(bVSync);
+			EngineState->bVignetteEnabled = bVignetteEnabled;
+			if (Vulkan->SampleCountMSAA != SampleCountMSAA)
+			{
+				EngineState->bSampleCountMSAAChanged = true;
+				EngineState->NewSampleCountMSAA = SampleCountMSAA;
+			}
+
 			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
 			{
 				SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
@@ -944,6 +969,16 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
 			fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
 			fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
+
+			bool bFullscreen = PlatformGetFullscreen();
+			bool bVSync = PlatformGetVSync();
+			bool bVignetteEnabled = EngineState->bVignetteEnabled;
+			int32_t SampleCountMSAA = int32_t(Vulkan->SampleCountMSAA);
+
+			fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
+			fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
+			fwrite(&bVignetteEnabled, sizeof(bool), 1, GeneralSaveFile);
+			fwrite(&SampleCountMSAA, sizeof(int32_t), 1, GeneralSaveFile);
 
 			fclose(GeneralSaveFile);
 		}
