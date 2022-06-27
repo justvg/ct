@@ -156,7 +156,7 @@ uint32_t UpdateParticles(SEngineState* EngineState, const SVulkanContext& Vulkan
 	return TotalParticleCount;
 }
 
-VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemory, const SGameInput& GameInput, const SGameSoundBuffer& SoundBuffer)
+VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, const SGameInput& GameInput, const SGameSoundBuffer& SoundBuffer)
 {
 	Assert((sizeof(SEngineState) + sizeof(SGameState)) <= GameMemory->StorageSize);
 
@@ -210,14 +210,21 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
     }
     
 	bool bSwapchainChanged = false;
-	if (Vulkan.bSwapchainChanged || EngineState->bSampleCountMSAAChanged)
+	if (Vulkan.bSwapchainChanged || EngineState->bSwapchainChanged || EngineState->bSampleCountMSAAChanged)
 	{
 		if (EngineState->bSampleCountMSAAChanged)
 		{
 			((SVulkanContext&) Vulkan).SampleCountMSAA = VkSampleCountFlagBits(EngineState->NewSampleCountMSAA);
 		}
 
+		if (EngineState->bSwapchainChanged)
+		{
+			Vulkan.InternalWidth = EngineState->NewInternalWidth;
+			Vulkan.InternalHeight = EngineState->NewInternalHeight;
+		}
+
 		RendererHandleChanges(&EngineState->Renderer, Vulkan, EngineState->bSampleCountMSAAChanged);
+		EngineState->bSwapchainChanged = false;
 		EngineState->bSampleCountMSAAChanged = false;
 
 		bSwapchainChanged = true;
@@ -287,7 +294,7 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 #ifndef ENGINE_RELEASE
 	if (WasDown(GameInput.Buttons[Button_F1]))
     {
-		PlatformToggleCursorOnOff((SGameInput*) &GameInput);
+		PlatformToggleCursor((SGameInput*) &GameInput, !PlatformIsCursorEnabled() || EngineState->bMenuOpened, !PlatformIsCursorShowed());
     }
 #endif
     
@@ -349,8 +356,10 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 	EndTempMemoryArena(&SoundTempMemory);
     
 	// Render
+	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
+
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged);
+	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged, MousePos);
 	EndTempMemoryArena(&RenderTempMemory);
 
 	// Update text stuff
@@ -401,7 +410,10 @@ VkImage GameUpdateAndRender(const SVulkanContext& Vulkan, SGameMemory* GameMemor
 		}
 	}
 
-	EngineState->GameTime += GameInput.dt;
+	if (!EngineState->bMenuOpened)
+	{
+		EngineState->GameTime += GameInput.dt;
+	}
     
 	return FinalImage;
 }

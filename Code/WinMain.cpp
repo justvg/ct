@@ -141,6 +141,7 @@ static bool bGlobalWindowFocused = true;
 static bool bGlobalShowMouse = true;
 static bool bGlobalMouseStateBeforeMinimization = false;
 static bool bGlobalCursorWasJustDisabled = false;
+static bool bGlobalShowCursor = true;
 
 static int64_t GlobalPerfCounterFrequency;
 
@@ -273,17 +274,21 @@ void WinSetCursorPos(SPlatformData* PlatformData, int XPos, int YPos)
     SetCursorPos(Pos.x, Pos.y);
 }
 
-void WinEnableCursor(SPlatformData* PlatformData, SGameInput* GameInput)
+void WinEnableCursor(SPlatformData* PlatformData, SGameInput* GameInput, bool bShowCursor = true)
 {
 	if (!bGlobalShowMouse)
 	{
 		ClipCursor(0);
 		SetCursorPos(int(PlatformData->MouseRestoreX), int(PlatformData->MouseRestoreY));
 
-		ShowCursor(TRUE);
-
 		bGlobalShowMouse = true;
 		GameInput->bShowMouse = true;
+	}
+
+	if (bShowCursor != bGlobalShowCursor)
+	{
+		ShowCursor(bShowCursor);
+		bGlobalShowCursor = bShowCursor;
 	}
 }
 
@@ -310,10 +315,15 @@ void WinDisableCursor(SPlatformData* PlatformData, SGameInput* GameInput)
 
 	if (bGlobalShowMouse)
 	{
-		ShowCursor(FALSE);
 		bGlobalShowMouse = false;
 		GameInput->bShowMouse = false;
 		bGlobalCursorWasJustDisabled = true;
+	}
+
+	if (bGlobalShowCursor)
+	{
+		ShowCursor(FALSE);
+		bGlobalShowCursor = false;
 	}
 	
 	ClientToScreen(PlatformData->Window, (POINT*)&Rect.left);
@@ -336,18 +346,27 @@ void PlatformEnableCursor(SGameInput* GameInput)
 	WinEnableCursor(&GlobalPlatformData, GameInput);
 }
 
-void PlatformToggleCursorOnOff(SGameInput* GameInput)
+void PlatformToggleCursor(SGameInput* GameInput, bool bEnable, bool bShowCursor)
 {
-	if (!bGlobalShowMouse)
-		WinEnableCursor(&GlobalPlatformData, GameInput);
-	else
+	if (bEnable)
+	{
+		WinEnableCursor(&GlobalPlatformData, GameInput, bShowCursor);
+	}
+	else if (!bEnable)
+	{
 		WinDisableCursor(&GlobalPlatformData, GameInput);
+	}
 }
 
 bool PlatformIsCursorEnabled()
 {
 	bool bResult = bGlobalShowMouse;
 	return bResult;
+}
+
+bool PlatformIsCursorShowed()
+{
+	return bGlobalShowCursor;
 }
 
 void WinProcessKeyboardMessage(SButton& Button, bool IsDown)
@@ -359,16 +378,23 @@ void WinProcessKeyboardMessage(SButton& Button, bool IsDown)
 	}
 }
 
+static HWND GlobalWindow;
+static WINDOWPLACEMENT GlobalWindowPosition = { sizeof(GlobalWindowPosition) };
 void WinToggleFullscreen(HWND Window)
 {
     // NOTE(georgii): This follows Raymond Chen's prescription for fullscreen toggling, see:
     // https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
-	static WINDOWPLACEMENT GlobalWindowPosition = { sizeof(GlobalWindowPosition) };
 	static bool bFullscreen = false;
+
+	// NOTE(georgii): This is here just to update GlobalWindowPosititon every time
+	DWORD Style = GetWindowLong(Window, GWL_STYLE);
+	if (Style & WS_OVERLAPPEDWINDOW) 
+	{
+		GetWindowPlacement(Window, &GlobalWindowPosition);
+	}
 
 	if (bFullscreen != bGlobalFullscreen)
 	{
-		DWORD Style = GetWindowLong(Window, GWL_STYLE);
 		if (Style & WS_OVERLAPPEDWINDOW) 
 		{
 			MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
@@ -396,6 +422,23 @@ void WinToggleFullscreen(HWND Window)
 			bFullscreen = false;
 		}
 	}
+}
+
+SWindowPlacementInfo PlatformGetWindowPlacement()
+{
+	SWindowPlacementInfo PlacementInfo = { &GlobalWindowPosition, sizeof(GlobalWindowPosition) };
+
+	return PlacementInfo;
+}
+
+void PlatformSetWindowPlacement(SWindowPlacementInfo PlacementInfo)
+{
+	DWORD Style = GetWindowLong(GlobalWindow, GWL_STYLE);
+	SetWindowLong(GlobalWindow, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+	SetWindowPlacement(GlobalWindow, (const WINDOWPLACEMENT*) PlacementInfo.InfoPointer);
+	SetWindowPos(GlobalWindow, NULL, 0, 0, 0, 0,
+				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 }
 
 LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
@@ -765,6 +808,8 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 		{
 			SLogger::Log("Window created.\n", LoggerVerbosity_Release);
 
+			GlobalWindow = Window;
+
 			GlobalPlatformData.Window = Window;
 			
 			SGameInput GameInput = {};
@@ -783,6 +828,53 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 			if (GameMemory.Storage)
 			{
 				SLogger::Log("Game memory allocated.\n\n", LoggerVerbosity_Release);
+
+#if ENGINE_RELEASE
+				uint32_t InternalWidthSaved = 0;
+				uint32_t InternalHeightSaved = 0;
+
+				SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
+				if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
+				{
+					uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
+
+					uint32_t LastLevelNameLength = 0;
+					memcpy(&LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
+					SaveFilePointer += sizeof(uint32_t);
+					SaveFilePointer += LastLevelNameLength;
+
+					bool bFullscreen;
+					memcpy(&bFullscreen, SaveFilePointer, sizeof(bool));
+					SaveFilePointer += sizeof(bool);
+
+					SaveFilePointer += sizeof(bool);
+					SaveFilePointer += sizeof(bool);
+					SaveFilePointer += sizeof(int32_t);
+					SaveFilePointer += sizeof(int32_t);
+
+					memcpy(&InternalWidthSaved, SaveFilePointer, sizeof(uint32_t));
+					SaveFilePointer += sizeof(uint32_t);
+
+					memcpy(&InternalHeightSaved, SaveFilePointer, sizeof(uint32_t));
+					SaveFilePointer += sizeof(uint32_t);
+
+					uint64_t WindowPlacementSize;
+					memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
+					SaveFilePointer += sizeof(uint64_t);
+
+					void *WindowPlacement = malloc(WindowPlacementSize);
+					memcpy(WindowPlacement, SaveFilePointer, WindowPlacementSize);
+					SaveFilePointer += WindowPlacementSize;
+
+					PlatformChangeFullscreen(bFullscreen);
+					if (!bFullscreen)
+					{
+						SWindowPlacementInfo WindowPlacementInfo = { WindowPlacement, WindowPlacementSize };
+						PlatformSetWindowPlacement(WindowPlacementInfo);
+					}
+					free(WindowPlacement);
+				}
+#endif
 
 				WinToggleFullscreen(Window);
 
@@ -861,6 +953,18 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				Vulkan.DepthFormat = DepthFormat;
 				Vulkan.MaxSampleCountMSAA = MaxSampleCountMSAA;
 				Vulkan.SampleCountMSAA = SampleCountMSAA;
+				Vulkan.InternalWidth = Swapchain.Width;
+				Vulkan.InternalHeight = Swapchain.Height;
+				Vulkan.Width = Swapchain.Width; 
+				Vulkan.Height = Swapchain.Height;
+
+#if ENGINE_RELEASE
+				if ((InternalWidthSaved > 0) && (InternalHeightSaved > 0))
+				{
+					Vulkan.InternalWidth = InternalWidthSaved;
+					Vulkan.InternalHeight = InternalHeightSaved;
+				}
+#endif
 
 #ifndef ENGINE_RELEASE
 				VkRenderPass ImguiRenderPass = InitializeDearImgui(Window, Instance, PhysicalDevice, Device, CommandBuffers[0], GraphicsFamilyIndex, GraphicsQueue, 0, Swapchain, SwapchainFormat);
@@ -968,6 +1072,12 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						Vulkan.Width = Swapchain.Width; 
 						Vulkan.Height = Swapchain.Height;
 						Vulkan.FrameInFlight = FrameInFlight;
+
+						if (!PlatformGetFullscreen())
+						{
+							Vulkan.InternalWidth = Swapchain.Width;
+							Vulkan.InternalHeight = Swapchain.Height;
+						}
 
 						BEGIN_PROFILER_BLOCK("GAME_UPDATE_AND_RENDER");
 

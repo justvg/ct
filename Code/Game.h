@@ -15,17 +15,57 @@ enum EMenuElement
 
 	MenuElement_Fullscreen,
 	MenuElement_VSync,
-	MenuElement_Resolution,
 	MenuElement_Vignetting,
+	MenuElement_AOQuality,
+	MenuElement_Resolution,
 	MenuElement_Multisampling,
 
 	MenuElement_SettingsCount,
+
+
+	MenuElement_StartNewGameNone,
+
+	MenuElement_StartNewGameYes,
+	MenuElement_StartNewGameNo,
+
+	MenuElement_StartNewGameCount
 };
 
 enum EMenuMode
 {
 	MenuMode_Default,
-	MenuMode_Settings
+	MenuMode_Settings,
+	MenuMode_StartNewGame
+};
+
+struct SMenuState
+{
+	EMenuMode MenuMode;
+	EMenuElement SelectedMenuElement;
+
+	vec2 MousePos;
+	vec2 LastMousePos;
+
+	vec2 ScreenDim;
+
+	bool bJustOpened;
+
+	bool bMousePosChanged;
+	bool bEnterDown;
+	bool bMouseLeftReleased;
+
+	bool bArrowLeft;
+	bool bArrowRight;
+	bool bArrowUsed;
+
+	bool bDisableStarted;
+
+	float OpenTime;
+	float OpenAnimationTime;
+
+	float SelectedTime;
+	float SelectedStayBrightTime;
+	float SelectedAnimationTime;
 };
 
 struct SGameState
@@ -48,8 +88,7 @@ struct SGameState
 	float HeroJumpPower;
 	float HeroLampDistance;
 
-	EMenuMode MenuMode;
-	EMenuElement SelectedMenuElement;
+	SMenuState MenuState;
 
     uint8_t CurrentCheckpointIndex;
 	vec3 LastCheckpointPos;

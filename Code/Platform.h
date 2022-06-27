@@ -229,6 +229,7 @@ struct SVulkanContext
 	VkSampleCountFlagBits SampleCountMSAA;
 
 	bool bSwapchainChanged;
+	uint32_t InternalWidth, InternalHeight;
 	uint32_t Width, Height;
 
 	uint32_t FrameInFlight;
@@ -238,6 +239,12 @@ struct SVulkanContext
 #endif
 };
 
+struct SWindowPlacementInfo
+{
+	void* InfoPointer;
+	uint64_t InfoSizeInBytes;
+};
+
 //
 // NOTE(georgii): Platform abstracted functions.
 //
@@ -245,12 +252,16 @@ struct SVulkanContext
 void PlatformDisableCursor(SGameInput* GameInput);
 void PlatformEnableCursor(SGameInput* GameInput);
 void PlatformToggleCursorOnOff(SGameInput* GameInput);
+void PlatformToggleCursor(SGameInput* GameInput, bool bEnable, bool bShowCursor = true);
 bool PlatformIsCursorEnabled();
+bool PlatformIsCursorShowed();
 
 void PlatformGetAllFilenamesFromDir(const char* WildcardPath, char* Filenames, uint32_t Stride, uint32_t& FileCount);
 
 bool PlatformGetFullscreen();
 void PlatformChangeFullscreen(bool bFullscreen);
+SWindowPlacementInfo PlatformGetWindowPlacement();
+void PlatformSetWindowPlacement(SWindowPlacementInfo PlacementInfo);
 
 bool PlatformGetVSync();
 void PlatformChangeVSync(bool bEnabled);

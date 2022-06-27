@@ -2,12 +2,12 @@ struct SForwardRenderPass
 {
 public:
     static SForwardRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time);
+    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
 private:
-    VkPipeline Pipeline;
+    VkPipeline Pipeline[AOQuality_Count];
     VkPipelineLayout PipelineLayout;
 
     VkRenderPass RenderPass;
@@ -32,7 +32,7 @@ private:
 
 private:
     static VkRenderPass CreateRenderPass(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount);
-	static VkPipeline CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount);
+	static VkPipeline CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO);
 
     static VkRenderPass CreateRenderPassTransp(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount);
 	static VkPipeline CreateGraphicsPipelineTransp(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount);
@@ -92,18 +92,24 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
     VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
 
 	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    VkFramebuffer Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+    VkFramebuffer Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
 
     VkShaderModule VShader = LoadShader(Vulkan.Device, "Shaders\\Mesh.vert.spv");
     VkShaderModule FShader = LoadShader(Vulkan.Device, "Shaders\\Mesh.frag.spv");
 
+    SForwardRenderPass ForwardRenderPass = {};
     VkPipelineLayout PipelineLayout = CreatePipelineLayout(Vulkan.Device, 1, &DescrSetLayout, sizeof(SForwardRenderPushConstants), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkPipeline Pipeline = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
+
+	for (uint32_t I = 0; I < AOQuality_Count; I++)
+	{
+		const int32_t SampleCountAO = 1 << I;
+    	ForwardRenderPass.Pipeline[I] = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
+	}
 
     VkRenderPass RenderPassTransp = CreateRenderPassTransp(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
 
 	VkImageView FramebufferAttachmentsTransp[] = { HDRTargetImage.View, DepthImage.View };
-    VkFramebuffer FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), Vulkan.Width, Vulkan.Height);
+    VkFramebuffer FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), HDRTargetImage.Width, HDRTargetImage.Height);
 
 	VkShaderModule FShaderTransp = LoadShader(Vulkan.Device, "Shaders\\MeshTransparent.frag.spv");
 	VkPipeline PipelineTransp = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderTransp, Vulkan.SampleCountMSAA);
@@ -114,8 +120,6 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
 	VkShaderModule FShaderDoor = LoadShader(Vulkan.Device, "Shaders\\Door.frag.spv");
 	VkPipeline PipelineDoor = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderDoor, Vulkan.SampleCountMSAA);
 
-    SForwardRenderPass ForwardRenderPass = {};
-    ForwardRenderPass.Pipeline = Pipeline;
     ForwardRenderPass.PipelineLayout = PipelineLayout;
     ForwardRenderPass.RenderPass = RenderPass;
     ForwardRenderPass.Framebuffer = Framebuffer;
@@ -135,7 +139,7 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
     return ForwardRenderPass;
 }
 
-void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time)
+void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time)
 {
 	BEGIN_GPU_PROFILER_BLOCK("RENDER_ENTITIES", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
@@ -194,11 +198,11 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 	VkRenderPassBeginInfo RenderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	RenderPassBeginInfo.renderPass = RenderPass;
 	RenderPassBeginInfo.framebuffer = Framebuffer;
-	RenderPassBeginInfo.renderArea.extent.width = Vulkan.Width;
-	RenderPassBeginInfo.renderArea.extent.height = Vulkan.Height;
+	RenderPassBeginInfo.renderArea.extent.width = Vulkan.InternalWidth;
+	RenderPassBeginInfo.renderArea.extent.height = Vulkan.InternalHeight;
 	vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline[AOQuality]);
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
 
 	VkDeviceSize Offset = 0;
@@ -224,8 +228,8 @@ void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 			VkRenderPassBeginInfo RenderPassTranspBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 			RenderPassTranspBeginInfo.renderPass = RenderPassTransp;
 			RenderPassTranspBeginInfo.framebuffer = FramebufferTransp;
-			RenderPassTranspBeginInfo.renderArea.extent.width = Vulkan.Width;
-			RenderPassTranspBeginInfo.renderArea.extent.height = Vulkan.Height;
+			RenderPassTranspBeginInfo.renderArea.extent.width = Vulkan.InternalWidth;
+			RenderPassTranspBeginInfo.renderArea.extent.height = Vulkan.InternalHeight;
 			vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassTranspBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
@@ -401,15 +405,18 @@ void SForwardRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, const S
 	vkDestroyFramebuffer(Vulkan.Device, FramebufferTransp, 0);
 	
 	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
 
 	VkImageView FramebufferAttachmentsTransp[] = { HDRTargetImage.View, DepthImage.View };
-    FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), Vulkan.Width, Vulkan.Height);
+    FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), HDRTargetImage.Width, HDRTargetImage.Height);
 }
 
 void SForwardRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
 {
-	vkDestroyPipeline(Vulkan.Device, Pipeline, 0);
+	for (uint32_t I = 0; I < AOQuality_Count; I++)
+	{
+		vkDestroyPipeline(Vulkan.Device, Pipeline[I], 0);
+	}
 	vkDestroyPipeline(Vulkan.Device, PipelineTransp, 0);
 	vkDestroyPipeline(Vulkan.Device, PipelinePortal, 0);
 	vkDestroyPipeline(Vulkan.Device, PipelineDoor, 0);
@@ -424,12 +431,16 @@ void SForwardRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, co
     RenderPassTransp = CreateRenderPassTransp(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
 
 	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), Vulkan.Width, Vulkan.Height);
+    Framebuffer = CreateFramebuffer(Vulkan.Device, RenderPass, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
 
 	VkImageView FramebufferAttachmentsTransp[] = { HDRTargetImage.View, DepthImage.View };
-    FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), Vulkan.Width, Vulkan.Height);
+    FramebufferTransp = CreateFramebuffer(Vulkan.Device, RenderPassTransp, FramebufferAttachmentsTransp, ArrayCount(FramebufferAttachmentsTransp), HDRTargetImage.Width, HDRTargetImage.Height);
 
-    Pipeline = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA);
+	for (uint32_t I = 0; I < AOQuality_Count; I++)
+	{
+		const int32_t SampleCountAO = 1 << I;
+    	Pipeline[I] = CreateGraphicsPipeline(Vulkan.Device, RenderPass, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
+	}
 	PipelineTransp = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderTransp, Vulkan.SampleCountMSAA);
 	PipelinePortal = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderPortal, Vulkan.SampleCountMSAA);
 	PipelineDoor = CreateGraphicsPipelineTransp(Vulkan.Device, RenderPassTransp, PipelineLayout, VShader, FShaderDoor, Vulkan.SampleCountMSAA);
@@ -501,8 +512,11 @@ VkRenderPass SForwardRenderPass::CreateRenderPass(VkDevice Device, VkFormat Colo
 	return RenderPass;
 }
 
-VkPipeline SForwardRenderPass::CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount)
+VkPipeline SForwardRenderPass::CreateGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO)
 {
+	VkSpecializationMapEntry SpecializationEntry = { 0, 0, sizeof(int32_t) };
+	VkSpecializationInfo SpecializationInfo = { 1, &SpecializationEntry, sizeof(int32_t), &SampleCountAO };
+
 	VkPipelineShaderStageCreateInfo ShaderStages[2] = {};
 	ShaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	ShaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -512,6 +526,7 @@ VkPipeline SForwardRenderPass::CreateGraphicsPipeline(VkDevice Device, VkRenderP
 	ShaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	ShaderStages[1].module = FS;
 	ShaderStages[1].pName = "main";
+	ShaderStages[1].pSpecializationInfo = &SpecializationInfo;
 
 	VkVertexInputBindingDescription BindingDescr = {};
 	BindingDescr.binding = 0;

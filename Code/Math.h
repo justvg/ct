@@ -218,6 +218,14 @@ inline int32_t Clamp(int32_t Value, int32_t Min, int32_t Max)
     return(Value);
 }
 
+inline bool IsEqual(vec2 A, vec2 B)
+{
+    bool Result = (Absolute(A.x - B.x) <= FloatEpsilon) &&
+                  (Absolute(A.y - B.y) <= FloatEpsilon);
+
+    return Result;
+}
+
 // 
 // NOTE(georgii): vec2
 // 
@@ -1728,6 +1736,14 @@ EIntersectMovingRectsResult IntersectMovingRects(const Rect& A, const Rect& B, v
     }
 
     return Result;
+}
+
+inline bool IsPointInRect(vec2 Point, vec4 Rect)
+{
+	bool bResult = !(Point.x < Rect.x || Point.x >= Rect.z ||
+					 Point.y < Rect.y || Point.y >= Rect.w);
+	
+	return bResult;
 }
 
 //

@@ -1,5 +1,7 @@
 #include "BlueNoise.incl.glsl"
 
+layout (constant_id = 0) const int AO_SAMPLES = 4;
+
 uint IsVoxelActive(int X, int Y, int Z)
 {
     return VoxelActive[Z][Y][X] & 1;
@@ -92,8 +94,7 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
     Tangent = normalize(Tangent - Normal*dot(Normal, Tangent));
     vec3 Bitangent = cross(Normal, Tangent);
 
-    const int Samples = 4;
-    for(int I = 0; I < Samples; I++)
+    for(int I = 0; I < AO_SAMPLES; I++)
     {
         const float MaxDistance = 2.5;
         vec3 StartPos = FragPosWS;
@@ -112,7 +113,7 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
         Ambient += AmbientColor.rgb * t;
         Ambient += AmbientConstant.rgb * max(1.0, HitDist / (2.0 * VoxelDim));
     }
-    Ambient /= float(Samples);
+    Ambient /= float(AO_SAMPLES);
 
     return Ambient;
 }

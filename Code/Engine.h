@@ -35,6 +35,16 @@ struct SCamera
 	vec3 OffsetFromPlayer;
 };
 
+enum EAOQuality
+{
+	AOQuality_Low,
+	AOQuality_Medium,
+	AOQuality_High,
+	AOQuality_VeryHigh,
+
+	AOQuality_Count
+};
+
 #include "VoxelCulling.cpp"
 #include "ForwardVoxelRender.cpp"
 #include "ForwardRender.cpp"
@@ -121,6 +131,7 @@ struct SText
 	float TimeToStartAppear;
 
 	vec4 Color;
+	float BlendFactor;
 	EFont Font;
 
 	bool bMenuText;
@@ -147,6 +158,10 @@ struct SEngineState
 
 	SGeometry Geometry;
 	SRenderer Renderer;
+
+	bool bSwapchainChanged;
+	uint32_t NewInternalWidth;
+	uint32_t NewInternalHeight;
 
 	bool bSampleCountMSAAChanged;
 	uint32_t NewSampleCountMSAA;
@@ -186,6 +201,7 @@ struct SEngineState
 	EEngineMode EngineMode;
 
 	bool bMenuOpened;
+	float MenuOpenedBlend;
 
 	bool bVignetteEnabled;
 
@@ -226,13 +242,14 @@ inline void AddText(SEngineState* EngineState, const char* String, vec2 Pos, flo
 	Text->TimeToStartAppear = TimeToStartAppear;
 
 	Text->Color = Color;
+	Text->BlendFactor = 1.0f;
 	Text->bMenuText = false;
 	Text->Alignment = TextAlignment_Center;
 
 	Text->Font = Font_KarminaRegular;
 }
 
-inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, EFont Font, vec4 Color = Vec4(1.0f), ETextAlignment Alignment = TextAlignment_Center)
+inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, EFont Font, vec4 Color = Vec4(1.0f), float BlendFactor = 1.0f, ETextAlignment Alignment = TextAlignment_Center)
 {
 	Assert(EngineState->TextsToRenderCount < ArrayCount(EngineState->TextsToRender));
 	SText* Text = &EngineState->TextsToRender[EngineState->TextsToRenderCount++];
@@ -254,6 +271,7 @@ inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos,
 	Text->TimeToStartAppear = 0.0f;
 
 	Text->Color = Color;
+	Text->BlendFactor = BlendFactor;
 	Text->bMenuText = true;
 	Text->Alignment = Alignment;
 

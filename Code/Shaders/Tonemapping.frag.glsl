@@ -14,6 +14,7 @@ layout (set = 0, binding = 3) uniform sampler2D BlueNoiseTexture;
 layout (push_constant) uniform PushConstants
 {
     uint MenuOpened;
+	float MenuOpenedBlend;
     uint VignetteEnabled;
 	uint FrameNumber;
 };
@@ -52,7 +53,7 @@ void main()
     vec3 ColorFinal = vec3(1.0) - exp(-Color);
 
 	// Vignette effect
-	if ((VignetteEnabled > 0) && (MenuOpened == 0))
+	if (VignetteEnabled > 0)
 	{
 		vec3 GammaCorrectedColor = pow(ColorFinal, vec3(1.0 / Gamma));
 
@@ -68,7 +69,8 @@ void main()
 
 	if (MenuOpened > 0)
 	{
-		ColorFinal = mix(vec3(0.0), ColorFinal, 0.2);
+		float BlendFactor = mix(1.0, 0.2, MenuOpenedBlend);
+		ColorFinal = mix(vec3(0.0), ColorFinal, BlendFactor);
 	}
 
     FragColor = vec4(ColorFinal, 1.0);

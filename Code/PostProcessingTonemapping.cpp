@@ -2,7 +2,7 @@ struct SToneMappingRenderPass
 {
 public:
     static SToneMappingRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler PointEdgeSampler, const SImage* HistoryImages, const SImage* ExposureImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, VkSampler NoiseSampler, const SImage& NoiseTexture, const SImage& FinalImage);
-    void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, bool bVignette);
+    void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, float MenuOpenedBlend, bool bVignette);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage* HistoryImages, VkSampler LinearEdgeSampler, const SImage& BloomImage, const SImage& FinalImage);
 
 private:
@@ -26,6 +26,7 @@ private:
 struct STonemappingRenderPassPushConstants
 {
 	uint32_t MenuOpened;
+	float MenuOpenedBlend;
     uint32_t VignetteEnabled;
 	uint32_t FrameNubmer;
 };
@@ -44,7 +45,7 @@ SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulk
     for (uint32_t I = 0; I < ArrayCount(DescrSets); I++)
     {
         DescrSets[I] = CreateDescriptorSet(Vulkan.Device, DescrPool, DescrSetLayout);
-        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, HistoryImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HistoryImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, ExposureImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, BloomImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, NoiseSampler, NoiseTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -73,7 +74,7 @@ SToneMappingRenderPass SToneMappingRenderPass::Create(const SVulkanContext& Vulk
     return ToneMappingPass;
 }
 
-void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, bool bVignette)
+void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, uint32_t FrameID, bool bMenuOpened, float MenuOpenedBlend, bool bVignette)
 {
 	BEGIN_GPU_PROFILER_BLOCK("TONEMAPPING", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
@@ -88,7 +89,7 @@ void SToneMappingRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer&
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[FrameID % 2], 0, 0);
 
-	STonemappingRenderPassPushConstants PushConstants = { bMenuOpened ? 1u : 0u, bVignette ? 1u : 0u, FrameID % 8 };
+	STonemappingRenderPassPushConstants PushConstants = { bMenuOpened ? 1u : 0u, MenuOpenedBlend, bVignette ? 1u : 0u, FrameID % 8 };
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(STonemappingRenderPassPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;
@@ -105,7 +106,7 @@ void SToneMappingRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkS
 {
     for (uint32_t I = 0; I < ArrayCount(DescrSets); I++)
     {
-        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, HistoryImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HistoryImages[I].View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, BloomImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
         

@@ -566,48 +566,125 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	}
 }
 
-void UpdateMenuDefault(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput)
+bool MenuItemDefault(SEngineState* EngineState, SMenuState* MenuState, const char* String, vec2 Pos, float Scale, vec2 ScreenDim, vec4 Color, vec2 MousePos, EFont Font = Font_KarminaRegular, ETextAlignment Alignment = TextAlignment_Center)
+{
+	float Blend = Clamp(MenuState->OpenTime / MenuState->OpenAnimationTime, 0.0f, 1.0f);
+	AddTextMenu(EngineState, String, Pos, Scale, Font, Color, Blend, Alignment);
+
+	vec2 ScreenSizeScale = Vec2(ScreenDim.x / 1920.0f, ScreenDim.y / 1080.0f);
+	vec2 TextScale = Scale * ScreenSizeScale;
+	vec2 TextSize = GetTextSize(&EngineState->Renderer.Fonts[Font], TextScale, String);
+
+	vec2 ScreenPosition = Hadamard(Pos, 0.5f * ScreenDim);
+	if (Alignment == TextAlignment_Center)
+	{
+		ScreenPosition -= 0.5f * TextSize;
+	}
+	else if (Alignment == TextAlignment_Left)
+	{
+		ScreenPosition.y -= 0.5f * TextSize.y;
+	}
+	else
+	{
+		Assert(Alignment == TextAlignment_Right);
+		ScreenPosition -= Vec2(TextSize.x, 0.5f * TextSize.y);
+	}
+
+	vec4 TextRect = Vec4(ScreenPosition, ScreenPosition + TextSize);
+	return IsPointInRect(MousePos, TextRect);
+}
+
+vec4 GetMenuItemColor(SMenuState* MenuState, bool bSelected)
+{
+	vec4 Color = Vec4(0.5f, 0.5f, 0.5f, 1.0f);
+	if (bSelected)
+	{
+		vec4 MinColor = Vec4(0.6f, 0.6f, 0.6f, 1.0f);
+		vec4 MaxColor = Vec4(0.9f, 0.9f, 0.9f, 1.0f);
+
+		if (MenuState->SelectedTime <= MenuState->SelectedStayBrightTime)
+		{
+			Color = MaxColor;
+		}
+		else
+		{
+			float SelectedAnimationPeriod = 0.5f * MenuState->SelectedAnimationTime;
+			float BlendFactor = Absolute(SelectedAnimationPeriod - (MenuState->SelectedTime - MenuState->SelectedStayBrightTime));
+			Color = Lerp(MinColor, MaxColor, BlendFactor);
+		}
+	}
+
+	return Color;
+}
+
+void UpdateMenuDefault(SMenuState* MenuState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
 {
 	AddTextMenu(EngineState, "COLOR THIEF", Vec2(0.0f, 0.7f), 0.4f, Font_KarminaBold, Vec4(1.0f));
+
+	const float TextScale = 0.2f;
 	for (int32_t MenuElement = MenuElement_DefaultNone; MenuElement < MenuElement_DefaultCount; MenuElement++)
 	{
-		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
-		bool bEnterDown = WasDown(GameInput->Buttons[Button_Enter]) || WasDown(GameInput->Buttons[Button_Space]);
+		bool bSelected = (MenuState->SelectedMenuElement == MenuElement);
+		vec4 Color = GetMenuItemColor(MenuState, bSelected);
 
-		const EFont Font = Font_KarminaRegular;
-		float Scale = 0.2f;
-		vec4 Color = bSelected ? Vec4(0.8f, 0.8f, 0.8f, 1.0f) : Vec4(0.5f, 0.5f, 0.5f, 1.0f);
+		bool bMouseInItem = false;
 		switch (MenuElement)
 		{
 			case MenuElement_Settings:
 			{
-				AddTextMenu(EngineState, "Settings", Vec2(0.0f, 0.12f), Scale, Font, Color);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Settings", Vec2(0.0f, 0.12f), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos);
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Settings;
+				}
 			} break;
 
 			case MenuElement_StartNewGame:
 			{
-				AddTextMenu(EngineState, "Start A New Game", Vec2(0.0f, 0.0f), Scale, Font, Color);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Start A New Game", Vec2(0.0f, 0.0f), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos);
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_StartNewGame;
+				}
 			} break;
 
 			case MenuElement_Quit:
 			{
-				AddTextMenu(EngineState, "Quit", Vec2(0.0f, -0.12f), Scale, Font, Color);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Quit", Vec2(0.0f, -0.12f), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos);
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Quit;
+				}
 			} break;
 		}
 
-		if (bSelected && bEnterDown)
+		if ((bSelected && MenuState->bEnterDown) || (bSelected && bMouseInItem && MenuState->bMouseLeftReleased))
 		{
 			switch (MenuElement)
 			{
 				case MenuElement_Settings:
 				{
-					GameState->MenuMode = MenuMode_Settings;
+					MenuState->MenuMode = MenuMode_Settings;
 				} break;
 
 				case MenuElement_StartNewGame:
 				{
-					LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
-					EngineState->bMenuOpened = false;
+					MenuState->MenuMode = MenuMode_StartNewGame;
 				} break;
 
 				case MenuElement_Quit:
@@ -619,66 +696,160 @@ void UpdateMenuDefault(SGameState* GameState, SEngineState* EngineState, const S
 	}
 }
 
-void UpdateMenuSettings(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, SVulkanContext* Vulkan)
+void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const SGameInput* GameInput, SVulkanContext* Vulkan)
 {
 	AddTextMenu(EngineState, "SETTINGS", Vec2(0.0f, 0.7f), 0.4f, Font_KarminaBold, Vec4(1.0f));
+
+	const float TextScale = 0.15f;
+	const float LeftPos = -0.5f;
+	const float RightPos = 0.5f;
+	const EFont Font = Font_KarminaRegular;
 	for (int32_t MenuElement = MenuElement_SettingsNone; MenuElement < MenuElement_SettingsCount; MenuElement++)
 	{
-		bool bSelected = (GameState->SelectedMenuElement == MenuElement);
+		bool bSelected = (MenuState->SelectedMenuElement == MenuElement);
+		vec4 Color = GetMenuItemColor(MenuState, bSelected);
 
-		bool bArrowLeft = WasDown(GameInput->Buttons[Button_A]) || WasDown(GameInput->Buttons[Button_ArrowLeft]);
-		bool bArrowRight = WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
-		bool bArrowUsed = bArrowLeft || bArrowRight;
-
-		const EFont Font = Font_KarminaRegular;
-		const float LeftPos = -0.5f;
-		const float RightPos = 0.5f;
-		const float Scale = 0.15f;
-		const vec4 Color = bSelected ? Vec4(0.8f, 0.8f, 0.8f, 1.0f) : Vec4(0.5f, 0.5f, 0.5f, 1.0f);
+		bool bMouseInItem = false;
 		switch (MenuElement)
 		{
 			case MenuElement_Fullscreen:
 			{
-				const float YPos = 0.24f;
-				AddTextMenu(EngineState, "Fullscreen:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(EngineState, PlatformGetFullscreen() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				const float YPos = 0.36f;
+
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Fullscreen:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, PlatformGetFullscreen() ? "Yes" : "No", Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Fullscreen;
+				}
 			} break;
 
 			case MenuElement_VSync:
 			{
-				const float YPos = 0.12f;
-				AddTextMenu(EngineState, "V-Sync:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(EngineState, PlatformGetVSync() ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
-			} break;
+				const float YPos = 0.24f;
 
-			case MenuElement_Resolution:
-			{
-				const float YPos = 0.0f;
-				AddTextMenu(EngineState, "Resolution:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(EngineState, "NotImplemented", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "V-Sync:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, PlatformGetVSync() ? "Yes" : "No", Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_VSync;
+				}
 			} break;
 
 			case MenuElement_Vignetting:
 			{
+				const float YPos = 0.12f;
+
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Vignetting:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, EngineState->bVignetteEnabled ? "Yes" : "No", Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Vignetting;
+				}
+			} break;
+
+			case MenuElement_AOQuality:
+			{
+				const float YPos = 0.0f;
+
+				char *AOText = 0;
+				switch (EngineState->Renderer.AOQuality)
+				{
+					case AOQuality_Low:
+					{
+						AOText = "Low";
+					} break;
+
+					case AOQuality_Medium:
+					{
+						AOText = "Medium";
+					} break;
+
+					case AOQuality_High:
+					{
+						AOText = "High";
+					} break;
+
+					case AOQuality_VeryHigh:
+					{
+						AOText = "Very High";
+					} break;
+				}
+
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Ambient Occlusion:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, AOText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_AOQuality;
+				}
+			} break;
+
+			case MenuElement_Resolution:
+			{
 				const float YPos = -0.12f;
-				AddTextMenu(EngineState, "Vignetting:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
-				AddTextMenu(EngineState, EngineState->bVignetteEnabled ? "Yes" : "No", Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+
+				char ResolutionText[32] = {};
+				snprintf(ResolutionText, sizeof(ResolutionText), "%d", Vulkan->InternalHeight);
+	
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Resolution:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, ResolutionText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Resolution;
+				}
 			} break;
 
 			case MenuElement_Multisampling:
 			{
 				const float YPos = -0.24f;
-				AddTextMenu(EngineState, "Multisampling:", Vec2(LeftPos, YPos), Scale, Font, Color, TextAlignment_Left);
 
 				char MultisamplingText[32] = {};
-				const char ValueMSAA[2] = { char(Vulkan->SampleCountMSAA + '0'), '\0' };
-				ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), ValueMSAA, "x MSAA");
+				if (Vulkan->SampleCountMSAA == 1)
+				{
+					ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), MultisamplingText, "Disabled");
+				}
+				else
+				{
+					const char ValueMSAA[2] = { char(Vulkan->SampleCountMSAA + '0'), '\0' };
+					ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), ValueMSAA, "x MSAA");
+				}
 
-				AddTextMenu(EngineState, MultisamplingText, Vec2(RightPos, YPos), Scale, Font, Color, TextAlignment_Right);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Multisampling:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, MultisamplingText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					bSelected = true;
+					MenuState->SelectedMenuElement = MenuElement_Multisampling;
+				}
 			} break;
 		}
 
-		if (bSelected && bArrowUsed)
+		if ((bSelected && MenuState->bArrowUsed) || (bSelected && bMouseInItem && MenuState->bMouseLeftReleased))
 		{
 			switch (MenuElement)
 			{
@@ -692,13 +863,76 @@ void UpdateMenuSettings(SGameState* GameState, SEngineState* EngineState, const 
 					PlatformChangeVSync(!PlatformGetVSync());
 				} break;
 
-				case MenuElement_Resolution:
-				{
-				} break;
-
 				case MenuElement_Vignetting:
 				{
 					EngineState->bVignetteEnabled = !EngineState->bVignetteEnabled;
+				} break;
+
+				case MenuElement_AOQuality:
+				{
+					int32_t AOQuality = EngineState->Renderer.AOQuality;
+					if (MenuState->bArrowRight || (!MenuState->bArrowRight && !MenuState->bArrowLeft))
+					{
+						AOQuality++;
+						if (AOQuality == AOQuality_Count)
+						{
+							AOQuality = AOQuality_Low;
+						}
+					}
+					else
+					{
+						AOQuality--;
+						if (AOQuality < 0)
+						{
+							AOQuality = AOQuality_VeryHigh;
+						}
+					}
+
+					EngineState->Renderer.AOQuality = EAOQuality(AOQuality);
+				} break;
+
+				case MenuElement_Resolution:
+				{
+					if (PlatformGetFullscreen())
+					{
+						// TODO(georgii): This is just for test. Need to proper get all available resolution for a monitor and use them!
+						uint32_t Width = Vulkan->InternalWidth;
+						uint32_t Height = Vulkan->InternalHeight;
+						if (MenuState->bArrowRight || (!MenuState->bArrowRight && !MenuState->bArrowLeft))
+						{
+							if (Height == 1080)
+							{
+								Width = 1280;
+								Height = 720;
+							}
+							else
+							{
+								Assert(Height == 720);
+
+								Width = 1920;
+								Height = 1080;
+							}
+						}
+						else
+						{
+							if (Height == 1080)
+							{
+								Width = 1280;
+								Height = 720;
+							}
+							else
+							{
+								Assert(Height == 720);
+
+								Width = 1920;
+								Height = 1080;
+							}
+						}
+
+						EngineState->NewInternalWidth = Width;
+						EngineState->NewInternalHeight = Height;
+						EngineState->bSwapchainChanged = true;
+					}
 				} break;
 
 				case MenuElement_Multisampling:
@@ -706,7 +940,7 @@ void UpdateMenuSettings(SGameState* GameState, SEngineState* EngineState, const 
 					uint32_t MaxSampleCountMSAA = uint32_t(Vulkan->MaxSampleCountMSAA);
 					uint32_t SampleCountMSAA = uint32_t(Vulkan->SampleCountMSAA);
 
-					if (bArrowRight)
+					if (MenuState->bArrowRight || (!MenuState->bArrowRight && !MenuState->bArrowLeft))
 					{
 						SampleCountMSAA *= 2;
 						if (SampleCountMSAA > MaxSampleCountMSAA)
@@ -732,49 +966,172 @@ void UpdateMenuSettings(SGameState* GameState, SEngineState* EngineState, const 
 
 	if (WasDown(GameInput->Buttons[Button_Escape]))
 	{
-		GameState->MenuMode = MenuMode_Default;
-		GameState->SelectedMenuElement = MenuElement_Settings;
+		MenuState->MenuMode = MenuMode_Default;
+		MenuState->SelectedMenuElement = MenuElement_Settings;
 	}
 }
 
-void UpdateMenu(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+void UpdateMenuStartNewGame(SMenuState* MenuState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
 {
-	EMenuElement MinMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultNone : MenuElement_SettingsNone;
-	EMenuElement MaxMenuElement = (GameState->MenuMode == MenuMode_Default) ? MenuElement_DefaultCount : MenuElement_SettingsCount;
+	AddTextMenu(EngineState, "START A NEW GAME", Vec2(0.0f, 0.7f), 0.4f, Font_KarminaBold, Vec4(1.0f));
 
-	if (WasDown(GameInput->Buttons[Button_W]) || WasDown(GameInput->Buttons[Button_ArrowUp]) ||
-		WasDown(GameInput->Buttons[Button_S]) || WasDown(GameInput->Buttons[Button_ArrowDown]))
+	const float TextScale = 0.2f;
+	for (int32_t MenuElement = MenuElement_StartNewGameNone; MenuElement < MenuElement_StartNewGameCount; MenuElement++)
 	{
-		if (WasDown(GameInput->Buttons[Button_W]) || WasDown(GameInput->Buttons[Button_ArrowUp]))
-		{
-			GameState->SelectedMenuElement = EMenuElement(GameState->SelectedMenuElement - 1);
+		bool bSelected = (MenuState->SelectedMenuElement == MenuElement);
+		vec4 Color = GetMenuItemColor(MenuState, bSelected);
 
-			if (GameState->SelectedMenuElement == MinMenuElement)
+		bool bMouseInItem = false;
+		switch (MenuElement)
+		{
+			case MenuElement_StartNewGameYes:
 			{
-				GameState->SelectedMenuElement = EMenuElement(MaxMenuElement - 1);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Yes", Vec2(-0.25f, 0.35f), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos);
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_StartNewGameYes;
+				}
+			} break;
+
+			case MenuElement_StartNewGameNo:
+			{
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "No", Vec2(0.25f, 0.35f), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos);
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_StartNewGameNo;
+				}
+			} break;
+		}
+
+		if ((bSelected && MenuState->bEnterDown) || (bSelected && bMouseInItem && MenuState->bMouseLeftReleased))
+		{
+			switch (MenuElement)
+			{
+				case MenuElement_StartNewGameYes:
+				{
+					LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
+					ReloadGameLevel(EngineState);
+
+					EngineState->bMenuOpened = false;
+					PlatformDisableCursor((SGameInput*) GameInput);
+				} break;
+
+				case MenuElement_StartNewGameNo:
+				{
+					MenuState->MenuMode = MenuMode_Default;
+					MenuState->SelectedMenuElement = MenuElement_StartNewGame;
+				} break;
+			}
+		}
+	}
+
+	if (WasDown(GameInput->Buttons[Button_Escape]))
+	{
+		MenuState->MenuMode = MenuMode_Default;
+		MenuState->SelectedMenuElement = MenuElement_StartNewGame;
+	}
+}
+
+void UpdateMenu(SMenuState* MenuState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
+{
+	EMenuElement MinMenuElement = (MenuState->MenuMode == MenuMode_Default) ? MenuElement_DefaultNone : (MenuState->MenuMode == MenuMode_Settings) ? MenuElement_SettingsNone : MenuElement_StartNewGameNone;
+	EMenuElement MaxMenuElement = (MenuState->MenuMode == MenuMode_Default) ? MenuElement_DefaultCount : (MenuState->MenuMode == MenuMode_Settings) ? MenuElement_SettingsCount : MenuElement_StartNewGameCount;
+
+	bool bNext = (MenuState->MenuMode != MenuMode_StartNewGame) ? WasDown(GameInput->Buttons[Button_W]) || WasDown(GameInput->Buttons[Button_ArrowUp]) : WasDown(GameInput->Buttons[Button_A]) || WasDown(GameInput->Buttons[Button_ArrowLeft]);
+	bool bPrev = (MenuState->MenuMode != MenuMode_StartNewGame) ? WasDown(GameInput->Buttons[Button_S]) || WasDown(GameInput->Buttons[Button_ArrowDown]) : WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
+	if (bNext || bPrev)
+	{
+		if (bNext)
+		{
+			MenuState->SelectedMenuElement = EMenuElement(MenuState->SelectedMenuElement - 1);
+
+			if (MenuState->SelectedMenuElement == MinMenuElement)
+			{
+				MenuState->SelectedMenuElement = EMenuElement(MaxMenuElement - 1);
 			}
 		}
 		else
 		{
-			GameState->SelectedMenuElement = EMenuElement((GameState->SelectedMenuElement + 1) % MaxMenuElement);
+			MenuState->SelectedMenuElement = EMenuElement((MenuState->SelectedMenuElement + 1) % MaxMenuElement);
 		}
 
-		GameState->SelectedMenuElement = EMenuElement(Clamp(GameState->SelectedMenuElement, MinMenuElement + 1, MaxMenuElement - 1));
+		MenuState->SelectedMenuElement = EMenuElement(Clamp(MenuState->SelectedMenuElement, MinMenuElement + 1, MaxMenuElement - 1));
+		MenuState->SelectedTime = 0.0f;
 	}
 
-	switch (GameState->MenuMode)
+	EngineState->MenuOpenedBlend = MenuState->OpenTime / MenuState->OpenAnimationTime;
+
+	MenuState->MousePos = Vec2(float(GameInput->PlatformMouseX), float(GameInput->PlatformMouseY));
+	MenuState->ScreenDim = Vec2i(Vulkan->Width, Vulkan->Height);
+
+	if (MenuState->bJustOpened)
+	{
+		MenuState->LastMousePos = MenuState->MousePos;
+		MenuState->bJustOpened = false;
+	}
+
+	MenuState->bMousePosChanged = !IsEqual(MenuState->MousePos, MenuState->LastMousePos) || WasDown(GameInput->Buttons[Button_MouseLeft]);
+	MenuState->bEnterDown = WasDown(GameInput->Buttons[Button_Enter]) || WasDown(GameInput->Buttons[Button_Space]);
+	MenuState->bMouseLeftReleased = WasReleased(GameInput->Buttons[Button_MouseLeft]);
+
+	MenuState->bArrowLeft = WasDown(GameInput->Buttons[Button_A]) || WasDown(GameInput->Buttons[Button_ArrowLeft]);
+	MenuState->bArrowRight = WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
+	MenuState->bArrowUsed = MenuState->bArrowLeft || MenuState->bArrowRight;
+
+	switch (MenuState->MenuMode)
 	{
 		case MenuMode_Default:
 		{
-			UpdateMenuDefault(GameState, EngineState, GameInput);
+			UpdateMenuDefault(MenuState, EngineState, GameInput, Vulkan);
 		} break;
 
 		case MenuMode_Settings:
 		{
-			UpdateMenuSettings(GameState, EngineState, GameInput, (SVulkanContext*) Vulkan);
+			UpdateMenuSettings(MenuState, EngineState, GameInput, (SVulkanContext*) Vulkan);
+		} break;
+
+		case MenuMode_StartNewGame:
+		{
+			UpdateMenuStartNewGame(MenuState, EngineState, GameInput, Vulkan);
 		} break;
 	}
 	
+	MenuState->LastMousePos = MenuState->MousePos;
+
+	MenuState->SelectedTime += GameInput->dt;
+	if (MenuState->SelectedTime >= (MenuState->SelectedStayBrightTime + MenuState->SelectedAnimationTime))
+	{
+		MenuState->SelectedTime -= MenuState->SelectedStayBrightTime + MenuState->SelectedAnimationTime;
+	}
+
+	if (MenuState->bDisableStarted)
+	{
+		MenuState->OpenTime = Max(MenuState->OpenTime - GameInput->dt, 0.0f);
+	}
+	else
+	{
+		MenuState->OpenTime = Min(MenuState->OpenTime + GameInput->dt, MenuState->OpenAnimationTime);
+	}
+
+	if ((MenuState->OpenTime == 0.0f) && MenuState->bDisableStarted)
+	{
+		EngineState->bMenuOpened = false;
+		MenuState->MenuMode = MenuMode_Default;
+		MenuState->SelectedMenuElement = MenuElement_DefaultNone;
+		MenuState->bDisableStarted = false;
+
+		PlatformToggleCursor((SGameInput*) GameInput, PlatformIsCursorShowed(), PlatformIsCursorShowed());
+	}
 }
 
 void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const SVulkanContext* Vulkan)
@@ -817,6 +1174,10 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 
         GameState->DeathAnimationSpeed = 10.0f;
 
+		GameState->MenuState.OpenAnimationTime = 1.0f;
+		GameState->MenuState.SelectedStayBrightTime = 1.0f;
+		GameState->MenuState.SelectedAnimationTime = 2.0f;
+
 #if ENGINE_RELEASE
 		SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
 		if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
@@ -842,13 +1203,30 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(&bVignetteEnabled, SaveFilePointer, sizeof(bool));
 			SaveFilePointer += sizeof(bool);
 
+			int32_t AOQuality;
+			memcpy(&AOQuality, SaveFilePointer, sizeof(int32_t));
+			SaveFilePointer += sizeof(int32_t);
+
 			int32_t SampleCountMSAA;
 			memcpy(&SampleCountMSAA, SaveFilePointer, sizeof(int32_t));
 			SaveFilePointer += sizeof(int32_t);
 
-			PlatformChangeFullscreen(bFullscreen);
+			uint32_t InternalWidth;
+			memcpy(&InternalWidth, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
+			uint32_t InternalHeight;
+			memcpy(&InternalHeight, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
+			uint64_t WindowPlacementSize;
+			memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
+			SaveFilePointer += sizeof(uint64_t);
+			SaveFilePointer += WindowPlacementSize;
+
 			PlatformChangeVSync(bVSync);
 			EngineState->bVignetteEnabled = bVignetteEnabled;
+			EngineState->Renderer.AOQuality = EAOQuality(AOQuality);
 			if (Vulkan->SampleCountMSAA != SampleCountMSAA)
 			{
 				EngineState->bSampleCountMSAAChanged = true;
@@ -871,6 +1249,21 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 					EndPointer += sizeof(uint32_t);
 					memcpy(EngineState->TextsToRender, EndPointer, sizeof(EngineState->TextsToRender));
 					EndPointer += sizeof(EngineState->TextsToRender);
+
+					// NOTE(georgii): Delete saved menu text
+					for (uint32_t I = 0; I < EngineState->TextsToRenderCount;)
+					{
+						SText* Text = EngineState->TextsToRender + I;
+
+						if (Text->bMenuText)
+						{
+							*Text = EngineState->TextsToRender[--EngineState->TextsToRenderCount];
+						}
+						else
+						{
+							I++;
+						}
+					}
 
 					memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
 					EndPointer += sizeof(vec3);
@@ -908,86 +1301,95 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		GameState->bReload = false;
 	}
 
+	SMenuState* MenuState = &GameState->MenuState;
 	if (WasDown(GameInput->Buttons[Button_Escape]))
 	{
-		if (!EngineState->bMenuOpened || (GameState->MenuMode != MenuMode_Settings))
+		if (!EngineState->bMenuOpened || ((MenuState->MenuMode != MenuMode_Settings) && (MenuState->MenuMode != MenuMode_StartNewGame)))
 		{
-			EngineState->bMenuOpened = !EngineState->bMenuOpened;
-			GameState->MenuMode = MenuMode_Default;
-			GameState->SelectedMenuElement = MenuElement_DefaultNone;
+			if (EngineState->bMenuOpened && !MenuState->bDisableStarted)
+			{
+				MenuState->bDisableStarted = true;
+			}
+			else
+			{
+				EngineState->bMenuOpened = true;
+				MenuState->MenuMode = MenuMode_Default;
+				MenuState->SelectedMenuElement = MenuElement_DefaultNone;
+				MenuState->bJustOpened = true;
+				MenuState->bDisableStarted = false;			
+				
+				PlatformToggleCursor((SGameInput*) GameInput, true, PlatformIsCursorShowed());
+			}
 		}
 	}
 
 	char CurrentLevelName[ArrayCount(EngineState->LevelName)];
 	memcpy(CurrentLevelName, EngineState->LevelName, ArrayCount(CurrentLevelName));
 
-	if (!EngineState->bMenuOpened)
+	if (!EngineState->bMenuOpened && !MenuState->bDisableStarted)
 	{
 		UpdateGameMode(GameState, EngineState, GameInput, CurrentLevelName);	
 	}
 	else
 	{
-		UpdateMenu(GameState, EngineState, GameInput, Vulkan);
+		UpdateMenu(MenuState, EngineState, GameInput, Vulkan);
 	}
 	
 #if ENGINE_RELEASE
-	// NOTE(georgii): Save the game every SaveTime seconds
-	const float SaveTime = 1.0f;
-	static float TimeToSave = 0.0f;
-	// if (TimeToSave >= SaveTime) 
-	if (true)
+	if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
 	{
-		if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
+		FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
+		if (MainHubSaveFile)
 		{
-			FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
-			if (MainHubSaveFile)
-			{
-				// Save level
-				const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-				fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
-				fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
+			// Save level
+			const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
+			fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
+			fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
 
-				// Save some camera info
-				fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
-				fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
+			// Save some camera info
+			fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
+			fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
 
-				// Save text stuff
-				fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
-				fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
+			// Save text stuff
+			fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
+			fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
 
-				// Save last base level stuff
-				fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
-				fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
+			// Save last base level stuff
+			fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
+			fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
 
-				fclose(MainHubSaveFile);
-			}
+			fclose(MainHubSaveFile);
 		}
-
-		FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
-		if (GeneralSaveFile)
-		{
-			const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
-			fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
-			fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
-
-			bool bFullscreen = PlatformGetFullscreen();
-			bool bVSync = PlatformGetVSync();
-			bool bVignetteEnabled = EngineState->bVignetteEnabled;
-			int32_t SampleCountMSAA = int32_t(Vulkan->SampleCountMSAA);
-
-			fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
-			fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
-			fwrite(&bVignetteEnabled, sizeof(bool), 1, GeneralSaveFile);
-			fwrite(&SampleCountMSAA, sizeof(int32_t), 1, GeneralSaveFile);
-
-			fclose(GeneralSaveFile);
-		}
-
-		TimeToSave = 0.0f;
 	}
-	else
+
+	FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
+	if (GeneralSaveFile)
 	{
-		TimeToSave += GameInput->dt;
+		const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
+		fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
+
+		bool bFullscreen = PlatformGetFullscreen();
+		bool bVSync = PlatformGetVSync();
+		bool bVignetteEnabled = EngineState->bVignetteEnabled;
+		int32_t AOQuality = EngineState->Renderer.AOQuality;
+		int32_t SampleCountMSAA = int32_t(Vulkan->SampleCountMSAA);
+		uint32_t Width = Vulkan->InternalWidth;
+		uint32_t Height = Vulkan->InternalHeight;
+
+		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
+		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
+		fwrite(&bVignetteEnabled, sizeof(bool), 1, GeneralSaveFile);
+		fwrite(&AOQuality, sizeof(int32_t), 1, GeneralSaveFile);
+		fwrite(&SampleCountMSAA, sizeof(int32_t), 1, GeneralSaveFile);
+		fwrite(&Width, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
+
+		SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
+		fwrite(&WindowPlacement.InfoSizeInBytes, sizeof(uint64_t), 1, GeneralSaveFile);
+		fwrite(WindowPlacement.InfoPointer, WindowPlacement.InfoSizeInBytes, 1, GeneralSaveFile);
+
+		fclose(GeneralSaveFile);
 	}
 #endif
 }

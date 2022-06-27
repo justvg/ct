@@ -29,21 +29,21 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	
 	Renderer->DescriptorPool = CreateDescriptorPool(Vulkan.Device);
 	
-	Renderer->HDRTargetImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
-	Renderer->DepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, Vulkan.SampleCountMSAA);
-	Renderer->LinearDepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
-	Renderer->VelocityImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->HDRTargetImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->DepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, Vulkan.SampleCountMSAA);
+	Renderer->LinearDepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->VelocityImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
 	
-	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	
 	for (uint32_t I = 0; I < ArrayCount(Renderer->VelocityImages); I++)
 	{
-		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 	
-	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.Width, Vulkan.Height);
+	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.InternalWidth, Vulkan.InternalHeight);
 	Renderer->DepthPyramidImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, DepthPyramidInfo.Width, DepthPyramidInfo.Height, 0, DepthPyramidInfo.MipCount, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	Renderer->DepthPyramidMipCount = DepthPyramidInfo.MipCount;
 	for (uint32_t I = 0; I < Renderer->DepthPyramidMipCount; I++)
@@ -71,7 +71,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	
 	for(uint32_t I = 0; I < ArrayCount(Renderer->HistoryImages); I++)
 	{
-		Renderer->HistoryImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+		Renderer->HistoryImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 	
 	Renderer->FinalImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.SwapchainFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -101,6 +101,8 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 
 	Renderer->Fonts[Font_KarminaRegular] = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaRegular");
 	Renderer->Fonts[Font_KarminaBold] = LoadFont(Vulkan.Device, Renderer->DescriptorPool, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->StagingBuffers[0], Vulkan.MemoryAllocator, Renderer->HudRenderPass.GetTextureDescrSetLayout(), "KarminaBold");
+
+	Renderer->AOQuality = AOQuality_High;
 
 	vec2 QuadVertices[] =
 	{
@@ -158,14 +160,14 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->CubeIB, Renderer->StagingBuffers[0], CubeIndices, sizeof(CubeIndices));
 }
 
-VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float GameTime, bool bSwapchainChanged)
+VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightCount, uint32_t TotalParticleCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float GameTime, bool bSwapchainChanged, vec2 MousePos)
 {
 	// Rendering
 	BEGIN_PROFILER_BLOCK("RENDERING");
     
 	// Set viewport
-	VkViewport Viewport = { 0.0f, float(Vulkan.Height), float(Vulkan.Width), -float(Vulkan.Height), 0.0f, 1.0f };
-	VkRect2D Scissor = { {0, 0}, {Vulkan.Width, Vulkan.Height} };
+	VkViewport Viewport = { 0.0f, float(Vulkan.InternalHeight), float(Vulkan.InternalWidth), -float(Vulkan.InternalHeight), 0.0f, 1.0f };
+	VkRect2D Scissor = { {0, 0}, {Vulkan.InternalWidth, Vulkan.InternalHeight} };
 	vkCmdSetViewport(Vulkan.CommandBuffer, 0, 1, &Viewport);
 	vkCmdSetScissor(Vulkan.CommandBuffer, 0, 1, &Scissor);
     
@@ -175,7 +177,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, false, bSwapchainChanged);
     
 	// Forward render voxels visibile last frame and frustum culled in this frame
-	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Level->AmbientColor, FrameID);
+	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Level->AmbientColor, Renderer->AOQuality, FrameID);
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_LINEAR_DEPTH", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
@@ -216,15 +218,15 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, true, bSwapchainChanged);
     
 	// Render voxels visible this frame that are not already rendered
-	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, FrameID);
+	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Renderer->AOQuality, FrameID);
     
 	// Forward render particles
-	Renderer->ForwardPartRenderPass.Render(Vulkan, TotalParticleCount, Renderer->CubeVB, Renderer->CubeIB, PointLightCount, FrameID);
+	Renderer->ForwardPartRenderPass.Render(Vulkan, TotalParticleCount, Renderer->CubeVB, Renderer->CubeIB, PointLightCount, Renderer->AOQuality, FrameID);
 
 	// Forward render entities
 	if (!EngineState->bHideEntities)
 	{
-		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, EngineState->Camera, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, FrameID, EngineState->EngineMode == EngineMode_Game, MemoryArena, EngineState->bMenuOpened ? 0.0f : GameTime);
+		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, EngineState->Camera, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, Renderer->AOQuality, FrameID, EngineState->EngineMode == EngineMode_Game, MemoryArena, GameTime);
 	}
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_MSAA_TARGETS", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
@@ -312,9 +314,15 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
     
 	// Calculate bloom
 	Renderer->BloomRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BloomImage, FrameID);
+
+	// Set viewport
+	Viewport = { 0.0f, float(Vulkan.Height), float(Vulkan.Width), -float(Vulkan.Height), 0.0f, 1.0f };
+	Scissor = { {0, 0}, {Vulkan.Width, Vulkan.Height} };
+	vkCmdSetViewport(Vulkan.CommandBuffer, 0, 1, &Viewport);
+	vkCmdSetScissor(Vulkan.CommandBuffer, 0, 1, &Scissor);
     
 	// Tone mapping
-	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID, EngineState->bMenuOpened, EngineState->bVignetteEnabled);
+	Renderer->ToneMappingRenderPass.Render(Vulkan, Renderer->QuadVB, FrameID, EngineState->bMenuOpened, EngineState->MenuOpenedBlend, EngineState->bVignetteEnabled);
     
 	// HUD
 	SHUDProjectionBuffer HUDProjectionData = { Orthographic(-0.5f*Vulkan.Width, 0.5f*Vulkan.Width, -0.5f*Vulkan.Height, 0.5f*Vulkan.Height, -1.0f, 1.0f)  };
@@ -322,9 +330,16 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
     
 	Renderer->HudRenderPass.BeginRender(Vulkan, Renderer->QuadVB);
 	
-	if (EngineState->EngineMode == EngineMode_Game)
+	if (!PlatformIsCursorShowed())
 	{
-		Renderer->HudRenderPass.Render(Vulkan, Renderer->AimTextureDescrSet, Vec2(0.0f, 0.0f), Vec2i(Renderer->AimTexture.Width, Renderer->AimTexture.Height));
+		if (!PlatformIsCursorEnabled())
+		{
+			Renderer->HudRenderPass.Render(Vulkan, Renderer->AimTextureDescrSet, Vec2(0.0f, 0.0f), Vec2i(Renderer->AimTexture.Width, Renderer->AimTexture.Height));
+		}
+		else
+		{
+			Renderer->HudRenderPass.Render(Vulkan, Renderer->AimTextureDescrSet, MousePos, Vec2i(Renderer->AimTexture.Width, Renderer->AimTexture.Height));
+		}
 	}
 
 	for (uint32_t I = 0; I < EngineState->TextsToRenderCount; I++)
@@ -351,7 +366,6 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 			else
 			{
 				Assert(Text.Alignment == TextAlignment_Right);
-
 				ScreenPosition -= Vec2(TextSize.x, 0.5f * TextSize.y);
 			}
 
@@ -370,7 +384,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 			}
 			else
 			{
-				Renderer->HudRenderPass.RenderString(Vulkan, Font, ScreenPosition, TextScale, Text.String, Text.Color);
+				Renderer->HudRenderPass.RenderString(Vulkan, Font, ScreenPosition, TextScale, Text.String, Text.Color, Text.BlendFactor);
 			}
 		}
 	}
@@ -432,21 +446,21 @@ void RendererHandleChanges(SRenderer* Renderer, const SVulkanContext& Vulkan, bo
 	
 	DestroyImage(Vulkan.Device, Vulkan.MemoryAllocator, Renderer->FinalImage);
 	
-	Renderer->HDRTargetImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
-	Renderer->DepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, Vulkan.SampleCountMSAA);
-	Renderer->LinearDepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
-	Renderer->VelocityImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->HDRTargetImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->DepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, Vulkan.SampleCountMSAA);
+	Renderer->LinearDepthImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
+	Renderer->VelocityImageMSAA = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, Vulkan.SampleCountMSAA);
 	
-	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	Renderer->HDRTargetImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	Renderer->DepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.DepthFormat, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+	Renderer->LinearDepthImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	
 	for (uint32_t I = 0; I < ArrayCount(Renderer->VelocityImages); I++)
 	{
-		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+		Renderer->VelocityImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 	
-	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.Width, Vulkan.Height);
+	SDepthPyramidInfoResult DepthPyramidInfo = GetDepthPyramidInfo(Vulkan.InternalWidth, Vulkan.InternalHeight);
 	Renderer->DepthPyramidImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R32_SFLOAT, DepthPyramidInfo.Width, DepthPyramidInfo.Height, 0, DepthPyramidInfo.MipCount, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	Renderer->DepthPyramidMipCount = DepthPyramidInfo.MipCount;
 	for (uint32_t I = 0; I < Renderer->DepthPyramidMipCount; I++)
@@ -462,7 +476,7 @@ void RendererHandleChanges(SRenderer* Renderer, const SVulkanContext& Vulkan, bo
 	
 	for(uint32_t I = 0; I < ArrayCount(Renderer->HistoryImages); I++)
 	{
-		Renderer->HistoryImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+		Renderer->HistoryImages[I] = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, VK_FORMAT_R16G16B16A16_SFLOAT, Vulkan.InternalWidth, Vulkan.InternalHeight, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 	
 	Renderer->FinalImage = CreateImage(Vulkan.Device, Vulkan.MemoryAllocator, Vulkan.SwapchainFormat, Vulkan.Width, Vulkan.Height, 0, 1, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);

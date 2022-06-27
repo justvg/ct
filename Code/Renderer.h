@@ -107,4 +107,6 @@ struct SRenderer
 
 	VkDescriptorSet AimTextureDescrSet;
 	SImage AimTexture;
+
+	EAOQuality AOQuality;
 };

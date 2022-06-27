@@ -50,7 +50,7 @@ STaaRenderPass STaaRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptor
     VkFramebuffer Framebuffers[2] = {};
     for (uint32_t I = 0; I < ArrayCount(Framebuffers); I++)
     {
-        Framebuffers[I] = CreateFramebuffer(Vulkan.Device, RenderPass, &HistoryImages[I].View, 1, Vulkan.Width, Vulkan.Height);
+        Framebuffers[I] = CreateFramebuffer(Vulkan.Device, RenderPass, &HistoryImages[I].View, 1, HistoryImages[0].Width, HistoryImages[0].Height);
     }
 
     VkShaderModule VShader = LoadShader(Vulkan.Device, "Shaders\\Fullscreen.vert.spv");
@@ -88,8 +88,8 @@ void STaaRenderPass::Render(const SVulkanContext& Vulkan, const SImage* HistoryI
 	VkRenderPassBeginInfo RenderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	RenderPassBeginInfo.renderPass = RenderPass;
 	RenderPassBeginInfo.framebuffer = Framebuffers[TargetIndex];
-	RenderPassBeginInfo.renderArea.extent.width = Vulkan.Width;
-	RenderPassBeginInfo.renderArea.extent.height = Vulkan.Height;
+	RenderPassBeginInfo.renderArea.extent.width = Vulkan.InternalWidth;
+	RenderPassBeginInfo.renderArea.extent.height = Vulkan.InternalHeight;
 	vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
@@ -122,7 +122,7 @@ void STaaRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler L
     for (uint32_t I = 0; I < ArrayCount(Framebuffers); I++)
     {
 		vkDestroyFramebuffer(Vulkan.Device, Framebuffers[I], 0);
-        Framebuffers[I] = CreateFramebuffer(Vulkan.Device, RenderPass, &HistoryImages[I].View, 1, Vulkan.Width, Vulkan.Height);
+        Framebuffers[I] = CreateFramebuffer(Vulkan.Device, RenderPass, &HistoryImages[I].View, 1, HistoryImages[I].Width, HistoryImages[I].Height);
     }
 }
 

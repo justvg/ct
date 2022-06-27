@@ -253,8 +253,8 @@ void SExposureRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& Qu
 	END_GPU_PROFILER_BLOCK("CALCULATE_EXPOSURE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	// Set viewport back to fullres
-	Viewport = { 0.0f, float(Vulkan.Height), float(Vulkan.Width), -float(Vulkan.Height), 0.0f, 1.0f };
-	Scissor = { {0, 0}, {Vulkan.Width, Vulkan.Height} };
+	Viewport = { 0.0f, float(Vulkan.InternalHeight), float(Vulkan.InternalWidth), -float(Vulkan.InternalHeight), 0.0f, 1.0f };
+	Scissor = { {0, 0}, {Vulkan.InternalWidth, Vulkan.InternalHeight} };
 	vkCmdSetViewport(Vulkan.CommandBuffer, 0, 1, &Viewport);
 	vkCmdSetScissor(Vulkan.CommandBuffer, 0, 1, &Scissor);
 
