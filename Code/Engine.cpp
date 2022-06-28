@@ -229,6 +229,12 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 
 		bSwapchainChanged = true;
 	}
+
+	if (PlatformGetFullscreen())
+	{
+		EngineState->LastFullscreenInternalWidth = Vulkan.InternalWidth;
+		EngineState->LastFullscreenInternalHeight = Vulkan.InternalHeight;
+	}
 	
 	if (EngineState->bReloadLevel || EngineState->bReloadLevelEditor || EngineState->bForceUpdateVoxels)
 	{
@@ -305,13 +311,23 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	LightBufferGPU->AmbientColor = Vec4(Level->AmbientColor, 0.0f);
 	LightBufferGPU->AmbientConstant = Vec4(Level->AmbientConstant, 0.0f);
     
+	const SCameraBuffer& CameraBufferData = EngineState->Renderer.CameraBufferData;
 	SPointLight* PointLightsGPU = (SPointLight*) EngineState->Renderer.PointLightsBuffers[Vulkan.FrameInFlight].Data;
+	uint32_t PointLightCount = 0;
 	for (uint32_t I = 0; I < Level->PointLightCount; I++)
 	{
-		PointLightsGPU[I] = Level->PointLights[I];
+		bool bInsideFrustum = true;
+		for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
+		{
+			bInsideFrustum = Dot(Vec4(Level->PointLights[I].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -Level->PointLights[I].Radius;
+		}
+
+		if (bInsideFrustum)
+		{
+			PointLightsGPU[PointLightCount++] = Level->PointLights[I];
+		}
 	}
     
-	uint32_t PointLightCount = Level->PointLightCount;
 	for (uint32_t I = 0; I < Level->EntityCount; I++)
 	{
 		const SEntity* Entity = Level->Entities + I;
@@ -331,7 +347,19 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 					PointLightsGPU[PointLightCount].Color.rgb = 8.0f * Entity->Color;
 				}
 				
-				PointLightCount++;
+				if (LengthSq(PointLightsGPU[PointLightCount].Color.rgb) > 0.0f)
+				{
+					bool bInsideFrustum = true;
+					for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
+					{
+						bInsideFrustum = Dot(Vec4(PointLightsGPU[PointLightCount].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -PointLightsGPU[PointLightCount].Radius;
+					}
+
+					if (bInsideFrustum)
+					{
+						PointLightCount++;
+					}
+				}
 			}
 		}
 	}

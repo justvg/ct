@@ -141,7 +141,8 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			
 			if ((TestEntity->Type != Entity_Hero) && (TestEntity->Type != Entity_ColorField))
 			{
-				Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, TestEntity->Dim, EulerToQuat(TestEntity->Orientation.xyz));
+				const SMesh& TestMesh = EngineState->Geometry.Meshes[TestEntity->MeshIndex];
+				Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, Hadamard(TestEntity->Dim, TestMesh.Dim), EulerToQuat(TestEntity->Orientation.xyz));
 				
 				float tTest;
 				if (IntersectRectRay(TestEntityAABB, RayStart, RayDir, tTest))
@@ -526,7 +527,9 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 				else
 				{
 					Rect HeroAABB = RectCenterDim(Level->Entities[0].Pos, Level->Entities[0].Dim);
-					Rect GatesAABB = RectCenterDimOrientation(Entity->Pos, Entity->Dim, EulerToQuat(Entity->Orientation.xyz));
+
+					const SMesh& GatesMesh = EngineState->Geometry.Meshes[Entity->MeshIndex];
+					Rect GatesAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, GatesMesh.Dim), EulerToQuat(Entity->Orientation.xyz));
 					
 					if (!IntersectRects(HeroAABB, GatesAABB))
 					{
@@ -809,7 +812,7 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 				const float YPos = -0.12f;
 
 				char ResolutionText[32] = {};
-				snprintf(ResolutionText, sizeof(ResolutionText), "%d", Vulkan->InternalHeight);
+				snprintf(ResolutionText, sizeof(ResolutionText), "%d", EngineState->LastFullscreenInternalHeight);
 	
 				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Resolution:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
 				bMouseInItem = MenuItemDefault(EngineState, MenuState, ResolutionText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
@@ -856,6 +859,13 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 				case MenuElement_Fullscreen:
 				{
 					PlatformChangeFullscreen(!PlatformGetFullscreen());
+
+					if (PlatformGetFullscreen())
+					{
+						EngineState->NewInternalWidth = EngineState->LastFullscreenInternalWidth;
+						EngineState->NewInternalHeight = EngineState->LastFullscreenInternalHeight;
+						EngineState->bSwapchainChanged = true;
+					}
 				} break;
 
 				case MenuElement_VSync:
@@ -1232,6 +1242,8 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 				EngineState->bSampleCountMSAAChanged = true;
 				EngineState->NewSampleCountMSAA = SampleCountMSAA;
 			}
+			EngineState->LastFullscreenInternalWidth = InternalWidth;
+			EngineState->LastFullscreenInternalHeight = InternalHeight;
 
 			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
 			{
@@ -1374,8 +1386,8 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		bool bVignetteEnabled = EngineState->bVignetteEnabled;
 		int32_t AOQuality = EngineState->Renderer.AOQuality;
 		int32_t SampleCountMSAA = int32_t(Vulkan->SampleCountMSAA);
-		uint32_t Width = Vulkan->InternalWidth;
-		uint32_t Height = Vulkan->InternalHeight;
+		uint32_t Width = EngineState->LastFullscreenInternalWidth;
+		uint32_t Height = EngineState->LastFullscreenInternalHeight;
 
 		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);

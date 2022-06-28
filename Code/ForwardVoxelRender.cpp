@@ -120,8 +120,15 @@ void SForwardVoxelRenderPass::RenderEarly(const SVulkanContext& Vulkan, const SB
 	VkDeviceSize Offset = 0;
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-				
-	Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+
+	if (Vulkan.vkCmdDrawIndexedIndirectCount)
+	{
+		Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+	}
+	else
+	{
+		vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+	}
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);
 
@@ -149,8 +156,16 @@ void SForwardVoxelRenderPass::RenderLate(const SVulkanContext& Vulkan, const SBu
 	VkDeviceSize Offset = 0;
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-				
-	Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+
+	if (Vulkan.vkCmdDrawIndexedIndirectCount)
+	{
+		Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+	}		
+	else
+	{
+		vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+	}
+	
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);
 

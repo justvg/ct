@@ -121,10 +121,17 @@ void SHUDRenderPass::RenderString(const SVulkanContext& Vulkan, const SFont* Fon
     
     const uint32_t Length = StringLength(String);
     
+	const char* PrevC = 0;
 	for (const char *C = String; *C; C++)
 	{
 		Assert(*C < ArrayCount(Font->Glyphs));
 		const SGlyph& Glyph = Font->Glyphs[*C];
+
+		if (PrevC)
+		{
+			int32_t Kerning = Font->Kerning[*C][*PrevC];
+			BaseLinePos.x += FontScale.x * Kerning;
+		}
         
 		if (*C != ' ')
 		{
@@ -145,6 +152,7 @@ void SHUDRenderPass::RenderString(const SVulkanContext& Vulkan, const SFont* Fon
 		}
         
 		BaseLinePos.x += FontScale.x * Glyph.Advance;
+		PrevC = C;
 	}
 }
 
@@ -152,12 +160,19 @@ void SHUDRenderPass::RenderStringWithAppearance(const SVulkanContext& Vulkan, co
 {
     vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 1, 1, &Font->BitmapFontDescrSet, 0, 0);
     
+	char PrevC = 0;
     const uint32_t Length = StringLength(String);
 	for (uint32_t I = 0; I < Length; I++)
     {
 		const char C = String[I];
         Assert(C < ArrayCount(Font->Glyphs));
         const SGlyph& Glyph = Font->Glyphs[C];
+
+		if (PrevC)
+		{
+			int32_t Kerning = Font->Kerning[C][PrevC];
+			BaseLinePos.x += FontScale.x * Kerning;
+		}
 
 		float BlendFactor = Clamp(Length * AppearanceFactor - I, 0.0f, 1.0f);
 	
@@ -182,6 +197,7 @@ void SHUDRenderPass::RenderStringWithAppearance(const SVulkanContext& Vulkan, co
 			}
 		}
         
+		PrevC = C;
         BaseLinePos.x += FontScale.x * Glyph.Advance;
     }
 }

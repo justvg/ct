@@ -722,7 +722,9 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				for (uint32_t I = 0; I < Level->EntityCount; I++)
 				{
 					SEntity* Entity = Level->Entities + I;
-					Rect EntityAABB = RectCenterDimOrientation(Entity->Pos, Entity->Dim, EulerToQuat(Entity->Orientation.xyz));
+
+					const SMesh& Mesh = EngineState->Geometry.Meshes[Entity->MeshIndex];
+					Rect EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), EulerToQuat(Entity->Orientation.xyz));
 
 					if ((Entity->Type == Entity_MessageToggler) || (Entity->Type == Entity_Checkpoint))
 					{

@@ -981,7 +981,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				{
 					Vulkan.vkCmdDrawIndexedIndirectCountAMD = (PFN_vkCmdDrawIndexedIndirectCountAMD) vkGetInstanceProcAddr(Instance, "vkCmdDrawIndexedIndirectCountAMD");
 				}
-				Assert(Vulkan.vkCmdDrawIndexedIndirectCount);
 
 				ShowWindow(Window, SW_SHOW);
 

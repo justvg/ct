@@ -198,135 +198,220 @@ SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool C
 	SReadEntireFileResult FontInfoFile = ReadEntireTextFile(FontInfoPath);
 	Assert(FontInfoFile.Memory);
 
+	bool bKerningStarted = false;
 	const char *CurrentLine = (const char*) FontInfoFile.Memory;
 	while (*CurrentLine)
 	{
-		// Read character
-		char Character = CurrentLine[1];
-		Assert(Character < ArrayCount(Font.Glyphs));
-
-		// Read character rect
-		const char *Iter = CurrentLine + 3;
-		while (*Iter != '\"')
+		// Read first symbol
+		char FirstSymbol = CurrentLine[0];
+		
+		// Test if are at kerning info
+		bKerningStarted = bKerningStarted || (FirstSymbol == 'K');
+		
+		if (!bKerningStarted)
 		{
+			// Read character
+			char Character = CurrentLine[1];
+			Assert(Character < ArrayCount(Font.Glyphs));
+
+			// Read character rect
+			const char *Iter = CurrentLine + 3;
+			while (*Iter != '\"')
+			{
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* XPtr = Iter;
-		int32_t XLength = 0;
-		while (*Iter != ' ')
-		{
-			XLength++;
+			const char* XPtr = Iter;
+			int32_t XLength = 0;
+			while (*Iter != ' ')
+			{
+				XLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* YPtr = Iter;
-		int32_t YLength = 0;
-		while (*Iter != ' ')
-		{
-			YLength++;
+			const char* YPtr = Iter;
+			int32_t YLength = 0;
+			while (*Iter != ' ')
+			{
+				YLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* WidthPtr = Iter;
-		int32_t WidthLength = 0;
-		while (*Iter != ' ')
-		{
-			WidthLength++;
+			const char* WidthPtr = Iter;
+			int32_t WidthLength = 0;
+			while (*Iter != ' ')
+			{
+				WidthLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* HeightPtr = Iter;
-		int32_t HeightLength = 0;
-		while (*Iter != '\"')
-		{
-			HeightLength++;
+			const char* HeightPtr = Iter;
+			int32_t HeightLength = 0;
+			while (*Iter != '\"')
+			{
+				HeightLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		// Read character advance
-		while (*Iter != '\"')
-		{
+			// Read character advance
+			while (*Iter != '\"')
+			{
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* AdvancePtr = Iter;
-		int32_t AdvanceLength = 0;
-		while (*Iter != '\"')
-		{
-			AdvanceLength++;
+			const char* AdvancePtr = Iter;
+			int32_t AdvanceLength = 0;
+			while (*Iter != '\"')
+			{
+				AdvanceLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		// Read character offset
-		while (*Iter != '\"')
-		{
+			// Read character offset
+			while (*Iter != '\"')
+			{
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* OffsetXPtr = Iter;
-		int32_t OffsetXLength = 0;
-		while (*Iter != ' ')
-		{
-			OffsetXLength++;
+			const char* OffsetXPtr = Iter;
+			int32_t OffsetXLength = 0;
+			while (*Iter != ' ')
+			{
+				OffsetXLength++;
+				Iter++;
+			}
 			Iter++;
-		}
-		Iter++;
 
-		const char* OffsetYPtr = Iter;
-		int32_t OffsetYLength = 0;
-		while (*Iter != '\"')
-		{
-			OffsetYLength++;
-			Iter++;
-		}
+			const char* OffsetYPtr = Iter;
+			int32_t OffsetYLength = 0;
+			while (*Iter != '\"')
+			{
+				OffsetYLength++;
+				Iter++;
+			}
 
-		// End line
-		while ((*Iter != '\n') && (*Iter != 0))
-		{
-			Iter++;
-		}
+			// End line
+			while ((*Iter != '\n') && (*Iter != 0))
+			{
+				Iter++;
+			}
 
-		if (*Iter == '\n')
-		{
-			CurrentLine = Iter + 1;
+			if (*Iter == '\n')
+			{
+				CurrentLine = Iter + 1;
+			}
+			else
+			{
+				CurrentLine = Iter;
+			}
+
+			int32_t GlyphX = StrToInt32(XPtr, XLength);
+			int32_t GlyphY = StrToInt32(YPtr, YLength);
+			int32_t GlyphWidth = StrToInt32(WidthPtr, WidthLength);
+			int32_t GlyphHeight = StrToInt32(HeightPtr, HeightLength);
+
+			int32_t GlyphAdvance = StrToInt32(AdvancePtr, AdvanceLength);
+			
+			int32_t GlyphOffsetX = StrToInt32(OffsetXPtr, OffsetXLength);
+			int32_t GlyphOffsetY = StrToInt32(OffsetYPtr, OffsetYLength);
+
+			Font.Glyphs[Character].Width = GlyphWidth;
+			Font.Glyphs[Character].Height = GlyphHeight;
+			Font.Glyphs[Character].Advance = GlyphAdvance;
+			Font.Glyphs[Character].OffsetX = GlyphOffsetX;
+			Font.Glyphs[Character].OffsetY = GlyphOffsetY;
+			Font.Glyphs[Character].UVs.x = GlyphX / float(Font.BitmapFont.Width);
+			Font.Glyphs[Character].UVs.y = GlyphY / float(Font.BitmapFont.Height);
+			Font.Glyphs[Character].UVs.z = (GlyphX + GlyphWidth) / float(Font.BitmapFont.Width);
+			Font.Glyphs[Character].UVs.w = (GlyphY + GlyphHeight) / float(Font.BitmapFont.Height);
+
+			if (GlyphHeight > Font.MaxHeight)
+			{
+				Font.MaxHeight = GlyphHeight;
+			}
 		}
 		else
 		{
-			CurrentLine = Iter;
-		}
+			const char *Iter = CurrentLine;
 
-		int32_t GlyphX = StrToInt32(XPtr, XLength);
-		int32_t GlyphY = StrToInt32(YPtr, YLength);
-		int32_t GlyphWidth = StrToInt32(WidthPtr, WidthLength);
-		int32_t GlyphHeight = StrToInt32(HeightPtr, HeightLength);
+			// Skip KERNING line
+			if (FirstSymbol == 'K')
+			{
+				// End line
+				while ((*Iter != '\n') && (*Iter != 0))
+				{
+					Iter++;
+				}
 
-		int32_t GlyphAdvance = StrToInt32(AdvancePtr, AdvanceLength);
-		
-		int32_t GlyphOffsetX = StrToInt32(OffsetXPtr, OffsetXLength);
-		int32_t GlyphOffsetY = StrToInt32(OffsetYPtr, OffsetYLength);
+				if (*Iter == '\n')
+				{
+					CurrentLine = Iter + 1;
+				}
+				else
+				{
+					CurrentLine = Iter;
+				}
+			}
+			else
+			{
+				// Read character
+				char Character = CurrentLine[1];
+				Assert(Character < ArrayCount(Font.Glyphs));
 
-		Font.Glyphs[Character].Width = GlyphWidth;
-		Font.Glyphs[Character].Height = GlyphHeight;
-		Font.Glyphs[Character].Advance = GlyphAdvance;
-		Font.Glyphs[Character].OffsetX = GlyphOffsetX;
-		Font.Glyphs[Character].OffsetY = GlyphOffsetY;
-		Font.Glyphs[Character].UVs.x = GlyphX / float(Font.BitmapFont.Width);
-		Font.Glyphs[Character].UVs.y = GlyphY / float(Font.BitmapFont.Height);
-		Font.Glyphs[Character].UVs.z = (GlyphX + GlyphWidth) / float(Font.BitmapFont.Width);
-		Font.Glyphs[Character].UVs.w = (GlyphY + GlyphHeight) / float(Font.BitmapFont.Height);
+				// Start reading kerning
+				Iter = CurrentLine + 3;
 
-		if (GlyphHeight > Font.MaxHeight)
-		{
-			Font.MaxHeight = GlyphHeight;
+				while ((*Iter != '\r') && (*Iter != '\n') && (*Iter != 0))
+				{
+					while (*Iter != '\"')
+					{
+						Iter++;
+					}
+					Iter++;
+
+					char KerningChar = *Iter;
+					Assert(KerningChar < ArrayCount(Font.Glyphs));
+
+					Iter++;
+					Assert(*Iter == '\"');
+					Iter++;
+					Iter++;
+					Iter++;
+
+					const char* AdvancePtr = Iter;
+					int32_t AdvanceLength = 0;
+					while (*Iter != '\"')
+					{
+						AdvanceLength++;
+						Iter++;
+					}
+					Iter++;
+
+					int32_t Advance = StrToInt32(AdvancePtr, AdvanceLength);
+					Font.Kerning[Character][KerningChar] = Advance;
+				}
+
+				if (*Iter == '\r')
+				{
+					CurrentLine = Iter + 2;
+				}
+				else if (*Iter == '\n')
+				{
+					CurrentLine = Iter + 1;
+				}
+				else
+				{
+					CurrentLine = Iter;
+				}
+			}
 		}
 	}
 
@@ -342,10 +427,17 @@ vec2 GetTextSize(const SFont* Font, vec2 FontScale, const char* String)
 {
 	vec2 Size = Vec2(0.0f, FontScale.y * Font->MaxHeight);
 
+	const char* PrevC = 0;
 	for (const char *C = String; *C; C++)
 	{
 		Assert(*C < ArrayCount(Font->Glyphs));
 		const SGlyph& Glyph = Font->Glyphs[*C];
+
+		if (PrevC)
+		{
+			int32_t Kerning = Font->Kerning[*C][*PrevC];
+			Size.x += FontScale.x * Kerning;
+		}
         
 		Size.x += FontScale.x * Glyph.Advance;
 	}

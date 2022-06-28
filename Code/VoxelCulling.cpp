@@ -2,7 +2,7 @@ struct SVoxelCullingComputePass
 {
 public:
     static SVoxelCullingComputePass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, const SBuffer& VisibilityBuffer, VkSampler DepthSampler, const SImage& DepthPyramidImage);
-    void Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged);
+    void Dispatch(const SVulkanContext& Vulkan, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged);
     void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler DepthSampler, const SImage& DepthPyramidImage);
 
 private:
@@ -63,7 +63,7 @@ SVoxelCullingComputePass SVoxelCullingComputePass::Create(const SVulkanContext& 
     return CullingPass;
 }
 
-void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged)
+void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, const SImage& DepthPyramidImage, uint32_t ObjectsCount, uint32_t FrameID, bool bLate, bool bSwapchainChanged)
 {
     if (!bLate)
     {
@@ -73,6 +73,18 @@ void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuf
     {
     	BEGIN_GPU_PROFILER_BLOCK("CULLING_VOXEL_LATE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     }
+
+	// NOTE(georgii): If there is no vkCmdDrawIndexedIndirectCount extensions, we should clear indirect draw buffer
+	if (!Vulkan.vkCmdDrawIndexedIndirectCount)
+	{
+		VkBufferMemoryBarrier StartFillBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, IndirectBuffer, IndirectBuffer.Size);
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 1, &StartFillBufferBarrier, 0, 0);
+
+		vkCmdFillBuffer(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, IndirectBuffer.Size, 0);
+
+		VkBufferMemoryBarrier FillBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT, IndirectBuffer, IndirectBuffer.Size);
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, 0, 1, &FillBufferBarrier, 0, 0);
+	}
 
     VkBufferMemoryBarrier StartFillBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_INDIRECT_COMMAND_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, CountBuffer, sizeof(uint32_t));
     vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 1, &StartFillBufferBarrier, 0, 0);
@@ -96,6 +108,13 @@ void SVoxelCullingComputePass::Dispatch(const SVulkanContext& Vulkan, const SBuf
     vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(SVoxelCullingPushConstants), &PushConstants);
 
     vkCmdDispatch(Vulkan.CommandBuffer, (ObjectsCount + 31) / 32, 1, 1);
+
+	// NOTE(georgii): If there is no vkCmdDrawIndexedIndirectCount extensions, we should clear indirect draw buffer
+	if (!Vulkan.vkCmdDrawIndexedIndirectCount)
+	{
+		VkBufferMemoryBarrier CullBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, IndirectBuffer, IndirectBuffer.Size);
+    	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, 0, 1, &CullBufferBarrier, 0, 0);	
+	}
 
     VkBufferMemoryBarrier CullBufferBarrier = CreateBufferMemoryBarrier(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT, CountBuffer, sizeof(uint32_t));
     vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, 0, 1, &CullBufferBarrier, 0, 0);

@@ -47,5 +47,6 @@ struct SFont
 	VkDescriptorSet BitmapFontDescrSet;
 
 	SGlyph Glyphs[128];
+	int32_t Kerning[ArrayCount(Glyphs)][ArrayCount(Glyphs)];
 	int32_t MaxHeight;
 };

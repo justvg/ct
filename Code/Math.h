@@ -1399,12 +1399,11 @@ inline vec3 GetDim(Rect Rectangle)
     return Result;
 }
 
-Rect RectCenterDimOrientation(vec3 Center, vec3 Dim, quat Quaternion)
+void PointsCenterDimOrientation(vec3* Points, vec3 Center, vec3 Dim, quat Quaternion)
 {
     vec3 HalfDim = 0.5f * Dim;
 
-    vec3 Points[8];
-    Points[0] = Center + RotateByQuaternion(Vec3(-HalfDim.x, -HalfDim.y, -HalfDim.z), Quaternion);
+	Points[0] = Center + RotateByQuaternion(Vec3(-HalfDim.x, -HalfDim.y, -HalfDim.z), Quaternion);
     Points[1] = Center + RotateByQuaternion(Vec3(HalfDim.x, -HalfDim.y, -HalfDim.z), Quaternion);
     Points[2] = Center + RotateByQuaternion(Vec3(-HalfDim.x, -HalfDim.y, HalfDim.z), Quaternion);
     Points[3] = Center + RotateByQuaternion(Vec3(HalfDim.x, -HalfDim.y, HalfDim.z), Quaternion);
@@ -1412,6 +1411,12 @@ Rect RectCenterDimOrientation(vec3 Center, vec3 Dim, quat Quaternion)
     Points[5] = Center + RotateByQuaternion(Vec3(HalfDim.x, HalfDim.y, -HalfDim.z), Quaternion);
     Points[6] = Center + RotateByQuaternion(Vec3(-HalfDim.x, HalfDim.y, HalfDim.z), Quaternion);
     Points[7] = Center + RotateByQuaternion(Vec3(HalfDim.x, HalfDim.y, HalfDim.z), Quaternion);
+}
+
+Rect RectCenterDimOrientation(vec3 Center, vec3 Dim, quat Quaternion)
+{
+    vec3 Points[8];
+	PointsCenterDimOrientation(Points, Center, Dim, Quaternion);
 
     Rect Result = { Vec3(FloatMax), Vec3(-FloatMax) };
     for (uint32_t I = 0; I < ArrayCount(Points); I++)

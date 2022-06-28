@@ -449,7 +449,9 @@ void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entit
 				float t = 1.0f;
 				vec3 Normal = Vec3(0.0f);
 				SEntity* HitEntity = 0;
-				Rect EntityAABB = RectCenterDimOrientation(Entity->Pos, Entity->Dim, (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
+
+				const SMesh& Mesh = EngineState->Geometry.Meshes[Entity->MeshIndex];
+				Rect EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
 
 				if (bVoxelsCollision)
 				{
@@ -484,14 +486,14 @@ void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entit
 									{
 										Entity->Pos += tTest*NormalTest;
 										DesiredPos += tTest*NormalTest;
-										EntityAABB = RectCenterDim(Entity->Pos, Entity->Dim);
+										EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
 
 										float Step = 2.0f;
 										while (IntersectMovingRects(EntityAABB, VoxelAABB, DeltaPos, tTest, NormalTest) == Intersect_AtStart)
 										{
 											Entity->Pos += Step * tTest*NormalTest;
 											DesiredPos += Step * tTest*NormalTest;
-											EntityAABB = RectCenterDim(Entity->Pos, Entity->Dim);
+											EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
 
 											Step *= 2.0f;
 										}
@@ -526,7 +528,8 @@ void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entit
 					SEntity* TestEntity = Level->Entities + J;
 					if ((Entity != TestEntity) && !TestEntity->bRemoved && CanCollide(Entity, TestEntity))
 					{
-						Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, TestEntity->Dim, (TestEntity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(TestEntity->Orientation.xyz));
+						const SMesh& TestMesh = EngineState->Geometry.Meshes[TestEntity->MeshIndex];
+						Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, Hadamard(TestEntity->Dim, TestMesh.Dim), (TestEntity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(TestEntity->Orientation.xyz));
 
 						float tTest = 1.0f;
 						vec3 NormalTest = Vec3(0.0f);
@@ -535,14 +538,14 @@ void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entit
 						{
 							Entity->Pos += tTest*NormalTest;
 							DesiredPos += tTest*NormalTest;
-							EntityAABB = RectCenterDim(Entity->Pos, Entity->Dim);
+							EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
 
 							float Step = 2.0f;
 							while (IntersectMovingRects(EntityAABB, TestEntityAABB, DeltaPos, tTest, NormalTest) == Intersect_AtStart)
 							{
 								Entity->Pos += Step * tTest*NormalTest;
 								DesiredPos += Step * tTest*NormalTest;
-								EntityAABB = RectCenterDim(Entity->Pos, Entity->Dim);
+								EntityAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, Mesh.Dim), (Entity->Type == Entity_Hero) ? Quat(0, 0, 0, 1) : EulerToQuat(Entity->Orientation.xyz));
 
 								Step *= 2.0f;
 							}

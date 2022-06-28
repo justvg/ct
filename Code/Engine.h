@@ -163,6 +163,9 @@ struct SEngineState
 	uint32_t NewInternalWidth;
 	uint32_t NewInternalHeight;
 
+	uint32_t LastFullscreenInternalWidth;
+	uint32_t LastFullscreenInternalHeight;
+
 	bool bSampleCountMSAAChanged;
 	uint32_t NewSampleCountMSAA;
 

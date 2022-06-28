@@ -2,7 +2,7 @@ struct SForwardRenderPass
 {
 public:
     static SForwardRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time);
+    void Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const vec4 *Frustum, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
 
@@ -139,13 +139,42 @@ SForwardRenderPass SForwardRenderPass::Create(const SVulkanContext& Vulkan, VkDe
     return ForwardRenderPass;
 }
 
-void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time)
+void SForwardRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities, uint32_t EntityCount, const SCamera& Camera, const vec4* Frustum, const SGeometry& Geometry, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID, bool bGameMode, STempMemoryArena* MemoryArena, float Time)
 {
 	BEGIN_GPU_PROFILER_BLOCK("RENDER_ENTITIES", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	SEntity* RenderEntities = (SEntity*) PushMemory(MemoryArena->Arena, sizeof(SEntity) * EntityCount);
-	memcpy(RenderEntities, Entities, sizeof(SEntity) * EntityCount);
+	// memcpy(RenderEntities, Entities, sizeof(SEntity) * EntityCount);
 
+	// Frustum culling
+	uint32_t EntityCountAfterCulling = 0;
+	for (uint32_t I = 0; I < EntityCount; I++)
+	{
+		const SEntity& Entity = Entities[I];
+		const SMesh& Mesh = Geometry.Meshes[Entity.MeshIndex];
+
+		vec3 Points[8];
+		PointsCenterDimOrientation(Points, Entity.Pos, Hadamard(Entity.Dim, Mesh.Dim), EulerToQuat(Entity.Orientation.xyz));
+
+		bool bInsideFrustum = true;
+		for (uint I = 0; (I < 6) && bInsideFrustum; I++)
+		{
+			bool bInsidePlane = false;
+			for (uint J = 0; J < 8; J++)
+			{
+				bInsidePlane = bInsidePlane || (Dot(Vec4(Points[J], -1.0f), Frustum[I]) >= 0.0f);
+			}
+			bInsideFrustum = bInsideFrustum && bInsidePlane;
+		}
+
+		if (bInsideFrustum || (Entity.Type == Entity_Hero))
+		{
+			RenderEntities[EntityCountAfterCulling++] = Entity;
+		}
+	}
+	EntityCount = EntityCountAfterCulling;
+
+	// Calculate distance to camera for sorting
 	for (uint32_t I = 0; I < EntityCount; I++)
 	{
 		RenderEntities[I].DistanceToCam = Length(RenderEntities[I].Pos - Camera.Pos); 

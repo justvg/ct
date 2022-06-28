@@ -11,7 +11,14 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->VoxelDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::VoxelDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->VoxelVisibilityBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::VoxelVisibilities), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->ParticleDrawBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SEngineState::ParticleDraws), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	Renderer->IndirectBuffer = CreateBuffer(Vulkan.MemoryAllocator, Megabytes(64), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	if (!Vulkan.vkCmdDrawIndexedIndirectCount)
+	{
+		Renderer->IndirectBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(VkDrawIndexedIndirectCommand) * ArrayCount(SEngineState::VoxelDraws), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	}
+	else
+	{
+		Renderer->IndirectBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(VkDrawIndexedIndirectCommand) * ArrayCount(SEngineState::VoxelDraws), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	}
 	Renderer->CountBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->VoxelsBuffer = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SVoxels), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	Renderer->QuadVB = CreateBuffer(Vulkan.MemoryAllocator, 6*sizeof(vec2), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
@@ -174,7 +181,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	BEGIN_GPU_PROFILER_BLOCK("RENDER", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
     
 	// Frustum cull voxels visible last frame
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, false, bSwapchainChanged);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->IndirectBuffer, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, false, bSwapchainChanged);
     
 	// Forward render voxels visibile last frame and frustum culled in this frame
 	Renderer->ForwardVoxRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Level->AmbientColor, Renderer->AOQuality, FrameID);
@@ -215,7 +222,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->DownscaleComputePass.Dispatch(Vulkan, Renderer->LinearDepthImage, Renderer->DepthPyramidImage, Renderer->DepthPyramidMipCount);
     
 	// Frustum and occlusion cull all voxels
-	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, true, bSwapchainChanged);
+	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->IndirectBuffer, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, true, bSwapchainChanged);
     
 	// Render voxels visible this frame that are not already rendered
 	Renderer->ForwardVoxRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), PointLightCount, Renderer->AOQuality, FrameID);
@@ -226,7 +233,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	// Forward render entities
 	if (!EngineState->bHideEntities)
 	{
-		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, EngineState->Camera, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, Renderer->AOQuality, FrameID, EngineState->EngineMode == EngineMode_Game, MemoryArena, GameTime);
+		Renderer->ForwardRenderPass.Render(Vulkan, Level->Entities, Level->EntityCount, EngineState->Camera, Renderer->CameraBufferData.Frustums, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, PointLightCount, Renderer->AOQuality, FrameID, EngineState->EngineMode == EngineMode_Game, MemoryArena, GameTime);
 	}
     
 	BEGIN_GPU_PROFILER_BLOCK("RESOLVE_MSAA_TARGETS", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
