@@ -171,8 +171,8 @@ void SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
 		    SGpuProfilerBlock &Block = SortedBlocks[I];
             Assert(Block.QueryStartIndex[LastFrameInFlight] < Block.QueryEndIndex[LastFrameInFlight]);
 
-            double BeginTime = double(TimestampResults[Block.QueryStartIndex[LastFrameInFlight]]) * TimestampPeriod * 1e-6;
-            double EndTime = double(TimestampResults[Block.QueryEndIndex[LastFrameInFlight]]) * TimestampPeriod * 1e-6;
+            double BeginTime = double(TimestampResults[Block.QueryStartIndex[LastFrameInFlight]]) * (TimestampPeriod * 1e-6);
+            double EndTime = double(TimestampResults[Block.QueryEndIndex[LastFrameInFlight]]) * (TimestampPeriod * 1e-6);
             double Time = EndTime - BeginTime;
 
 		    char Output[128];

@@ -165,8 +165,6 @@ void main()
 		vec3 CurrentLB = texture(CurrentTexture, CurrentTexCoords + vec2(-TexelSize.x, -TexelSize.y)).rgb;
 		vec3 CurrentRB = texture(CurrentTexture, CurrentTexCoords + vec2(TexelSize.x, -TexelSize.y)).rgb;
 
-		vec3 CurrentColorBlurred = (Current + CurrentLT + CurrentRT + CurrentLB + CurrentRB) * 0.2;
-		
 		vec3 CurrentMin = min(Current, min(CurrentLT, min(CurrentRT, min(CurrentLB, CurrentRB))));
 		vec3 CurrentMax = max(Current, max(CurrentLT, max(CurrentRT, max(CurrentLB, CurrentRB))));
 
@@ -189,7 +187,6 @@ void main()
 	{
 		FragColor = vec4(texture(CurrentTexture, CurrentTexCoords).rgb, 1.0);
 	}
-
 #else
 
 	const vec2 TextureSize = textureSize(CurrentTexture, 0).xy;

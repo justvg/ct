@@ -38,7 +38,7 @@ struct SDebugDraw
 		struct SSphere
 		{
 			vec3 Center;
-			float Radius;
+			vec3 Dim;
 			vec3 Color;
 		};
 		SSphere Sphere;
@@ -74,6 +74,7 @@ public:
 	void DrawDebugPoint(vec3 Pos, float Size, vec3 Color);
 	void DrawDebugBox(vec3 Center, vec3 Extent, vec3 Color, vec4 Rotation = Vec4(0.0f), vec3 Offset = Vec3(0.0f), bool bSolid = false);
 	void DrawDebugSphere(vec3 Center, float Radius, vec3 Color);
+	void DrawDebugSphere(vec3 Center, vec3 Dim, vec3 Color);
 	void DrawDebugCircle(vec3 Center, float Radius, vec3 Color);
 	void DrawDebugArrow(vec3 Pos, vec3 Size, vec3 Color, vec4 Rotation = Vec4(0.0f));
 
@@ -289,7 +290,7 @@ void SDebugRenderPass::Render(const SVulkanContext& Vulkan)
 				IndexCount = SphereIndexCount;
 				VertexBuffer = SphereVertexBuffer;
 				IndexBuffer = SphereIndexBuffer;
-				Model = Translation(DebugDraw.Sphere.Center) * Scaling(DebugDraw.Sphere.Radius);
+				Model = Translation(DebugDraw.Sphere.Center) * Scaling(DebugDraw.Sphere.Dim);
 				Color = Vec4(DebugDraw.Sphere.Color, 1.0f);
 
 				if (!bWireframePipelineBound)
@@ -401,7 +402,21 @@ void SDebugRenderPass::DrawDebugSphere(vec3 Center, float Radius, vec3 Color)
 	SDebugDraw DebugDraw;
 	DebugDraw.Type = DebugDraw_Sphere;
 	DebugDraw.Sphere.Center = Center;
-	DebugDraw.Sphere.Radius = Radius;
+	DebugDraw.Sphere.Dim = Vec3(Radius);
+	DebugDraw.Sphere.Color = Color;
+
+	DebugDraws[DebugDrawCount++] = DebugDraw;
+#endif
+}
+
+void SDebugRenderPass::DrawDebugSphere(vec3 Center, vec3 Dim, vec3 Color)
+{
+#ifndef ENGINE_RELEASE
+	Assert(DebugDrawCount < DebugDrawMaxCount);
+	SDebugDraw DebugDraw;
+	DebugDraw.Type = DebugDraw_Sphere;
+	DebugDraw.Sphere.Center = Center;
+	DebugDraw.Sphere.Dim = 0.5f * Dim;
 	DebugDraw.Sphere.Color = Color;
 
 	DebugDraws[DebugDrawCount++] = DebugDraw;

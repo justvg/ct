@@ -5,9 +5,9 @@ struct SExposureRenderPass
 	static const uint32_t BrightnessImageMipCount = 9;
 
 public:
-    static SExposureRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, VkSampler LinearEdgeSamplerMips, const SImage& BrightnessImage, const VkImageView* BrightnessImageMipViews, VkSampler PointEdgeSampler, const SImage* ExposureImages);
+    static SExposureRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& DiffuseImage, VkSampler LinearEdgeSamplerMips, const SImage& BrightnessImage, const VkImageView* BrightnessImageMipViews, VkSampler PointEdgeSampler, const SImage* ExposureImages);
     void Render(const SVulkanContext& Vulkan, const SBuffer& QuadVertexBuffer, const SImage& BrightnessImage, const SImage* ExposureImages, uint32_t FrameID);
-	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage);
+	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& DiffuseImage);
 
 private:
 	// Brightness stuff
@@ -55,7 +55,7 @@ struct SMipgenPushConstants
 	vec2 ImageSize;
 };
 
-SExposureRenderPass SExposureRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage, VkSampler LinearEdgeSamplerMips, const SImage& BrightnessImage, const VkImageView* BrightnessImageMipViews, VkSampler PointEdgeSampler, const SImage* ExposureImages)
+SExposureRenderPass SExposureRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, VkSampler LinearEdgeSampler, const SImage& DiffuseImage, VkSampler LinearEdgeSamplerMips, const SImage& BrightnessImage, const VkImageView* BrightnessImageMipViews, VkSampler PointEdgeSampler, const SImage* ExposureImages)
 {
 	// Brightness stuff
     VkDescriptorSetLayoutBinding InputBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -64,7 +64,7 @@ SExposureRenderPass SExposureRenderPass::Create(const SVulkanContext& Vulkan, Vk
     VkDescriptorSetLayout BrightnessDescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(BrightDescrSetLayoutBindings), BrightDescrSetLayoutBindings);
 
     VkDescriptorSet BrightnessDescrSet = CreateDescriptorSet(Vulkan.Device, DescrPool, BrightnessDescrSetLayout);
-    UpdateDescriptorSetImage(Vulkan.Device, BrightnessDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HDRTargetImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    UpdateDescriptorSetImage(Vulkan.Device, BrightnessDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, DiffuseImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     VkRenderPass BrightnessRenderPass = CreateRenderPass(Vulkan.Device, BrightnessImage.Format);
 
@@ -261,9 +261,9 @@ void SExposureRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& Qu
 	END_GPU_PROFILER_BLOCK("EXPOSURE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }
 
-void SExposureRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& HDRTargetImage)
+void SExposureRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler LinearEdgeSampler, const SImage& DiffuseImage)
 {
-    UpdateDescriptorSetImage(Vulkan.Device, BrightnessDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, HDRTargetImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    UpdateDescriptorSetImage(Vulkan.Device, BrightnessDescrSet, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, DiffuseImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 VkRenderPass SExposureRenderPass::CreateRenderPass(VkDevice Device, VkFormat ColorFormat)

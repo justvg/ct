@@ -900,13 +900,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				uint32_t GraphicsFamilyIndex = GetGraphicsFamilyIndex(PhysicalDevice);
 				Assert(GraphicsFamilyIndex != VK_QUEUE_FAMILY_IGNORED);
 
-				VkSampleCountFlagBits MaxSampleCountMSAA = VkSampleCountFlagBits(Max(GetMaxUsableSamplerCount(PhysicalDeviceProps), uint32_t(VK_SAMPLE_COUNT_8_BIT)));
-				VkSampleCountFlagBits SampleCountMSAA = MaxSampleCountMSAA;
-				if (SampleCountMSAA >= VK_SAMPLE_COUNT_4_BIT)
-				{
-					SampleCountMSAA = VK_SAMPLE_COUNT_4_BIT;
-				}
-
 				bool bIndirectCountKHR = false;
 				bool bIndirectCountAMD = false;
 				bool bMinMaxSampler = false;
@@ -951,8 +944,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				Vulkan.GraphicsQueue = GraphicsQueue;
 				Vulkan.SwapchainFormat = SwapchainFormat;
 				Vulkan.DepthFormat = DepthFormat;
-				Vulkan.MaxSampleCountMSAA = MaxSampleCountMSAA;
-				Vulkan.SampleCountMSAA = SampleCountMSAA;
 				Vulkan.InternalWidth = Swapchain.Width;
 				Vulkan.InternalHeight = Swapchain.Height;
 				Vulkan.Width = Swapchain.Width; 
@@ -1193,7 +1184,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					if (FrameID > (FramesInFlight - 2))
 					{
-						// OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
+						OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
 					}
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();

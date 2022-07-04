@@ -18,7 +18,6 @@ enum EMenuElement
 	MenuElement_Vignetting,
 	MenuElement_AOQuality,
 	MenuElement_Resolution,
-	MenuElement_Multisampling,
 
 	MenuElement_SettingsCount,
 

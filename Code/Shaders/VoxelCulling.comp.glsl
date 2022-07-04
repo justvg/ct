@@ -39,6 +39,7 @@ layout (set = 0, binding = 0) uniform CameraBuffer
 	vec4 CameraPosition; 
     vec4 Viewport; // Width, Height, Near, Far
 	vec4 Frustum[6];
+    vec4 FrustumCorners[6];
 };
 
 layout (set = 0, binding = 1) readonly buffer Draws

@@ -178,6 +178,72 @@ void CreateQuadMesh(SGeometry& Geometry)
 	AddVerticesToGeometry(Geometry, ArrayCount(Vertices), Vertices, ArrayCount(Indices), Indices);
 }
 
+void CreateSphereMesh(SGeometry& Geometry)
+{
+	const uint32_t StackCount = 16;
+	const uint32_t SectorCount = 16;
+
+	const uint32_t VertexCount = (StackCount - 1) * SectorCount + 2;
+	const uint32_t IndexCount = 2 * 3 * SectorCount + (StackCount - 2) * SectorCount * 6;
+	SVertex Vertices[VertexCount];
+	uint32_t Indices[IndexCount];
+
+	uint32_t VertexIndex = 0;
+	Vertices[VertexIndex].Pos = 0.5f * Vec3(0.0f, 1.0f, 0.0f);
+	Vertices[VertexIndex++].Normal = Vec3(0.0f, 1.0f, 0.0f);
+	for (uint32_t Stack = 1; Stack < StackCount; Stack++)
+	{
+		const float Phi = 180.0f * (float(Stack) / StackCount);
+		for (uint32_t Sector = 0; Sector < SectorCount; Sector++)
+		{
+			const float Theta = 360.0f * (float(Sector) / SectorCount);
+
+			float X = Sin(Radians(Phi)) * Sin(Radians(Theta));
+			float Y = Cos(Radians(Phi));
+			float Z = -Sin(Radians(Phi)) * Cos(Radians(Theta));
+			Vertices[VertexIndex].Pos = 0.5f * Vec3(X, Y, Z);
+			Vertices[VertexIndex++].Normal = Normalize(Vertices[VertexIndex].Pos);
+		}
+	}
+	Vertices[VertexIndex].Pos = 0.5f * Vec3(0.0f, -1.0f, 0.0f);
+	Vertices[VertexIndex++].Normal = Vec3(0.0f, -1.0f, 0.0f);
+
+	uint32_t IndexIndex = 0;
+	for (uint32_t I = 0; I < SectorCount; I++)
+	{
+		Indices[IndexIndex++] = 0;
+		Indices[IndexIndex++] = ((I + 2) == (SectorCount + 1)) ? (I + 2) % SectorCount : I + 2;
+		Indices[IndexIndex++] = I + 1;
+	}
+
+	for (uint32_t Stack = 1; Stack < StackCount - 1; Stack++)
+	{
+		for (uint32_t Sector = 0; Sector < SectorCount; Sector++)
+		{
+			uint32_t A = (Stack - 1) * SectorCount + 1 + Sector;
+			uint32_t B = (A % SectorCount + SectorCount * (Stack - 1)) + 1;
+			uint32_t C = Stack * SectorCount + 1 + Sector;
+			uint32_t D = (C  % SectorCount + SectorCount * Stack) + 1;
+
+			Indices[IndexIndex++] = A;
+			Indices[IndexIndex++] = B;
+			Indices[IndexIndex++] = D;
+			Indices[IndexIndex++] = A;
+			Indices[IndexIndex++] = D;
+			Indices[IndexIndex++] = C;
+		}
+	}
+
+	for (uint32_t I = VertexCount - SectorCount - 1; I < VertexCount - 1; I++)
+	{
+		Indices[IndexIndex++] = I;
+		Indices[IndexIndex++] = ((I + 1) == (VertexCount - 1)) ? VertexCount - SectorCount - 1 : I + 1;
+		Indices[IndexIndex++] = VertexCount - 1;
+	}
+
+	AddVerticesToGeometry(Geometry, ArrayCount(Vertices), Vertices, ArrayCount(Indices), Indices);
+}
+
 SFont LoadFont(VkDevice Device, VkDescriptorPool DescriptorPool, VkCommandPool CommandPool, VkCommandBuffer CommandBuffer, VkQueue Queue, const SBuffer& StagingBuffer, VmaAllocator MemoryAllocator, VkDescriptorSetLayout DescrSetLayout, const char* FontName)
 {
 	SFont Font = {};

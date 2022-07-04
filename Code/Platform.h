@@ -225,8 +225,6 @@ struct SVulkanContext
 
 	VkFormat SwapchainFormat;
 	VkFormat DepthFormat;
-	VkSampleCountFlagBits MaxSampleCountMSAA;
-	VkSampleCountFlagBits SampleCountMSAA;
 
 	bool bSwapchainChanged;
 	uint32_t InternalWidth, InternalHeight;

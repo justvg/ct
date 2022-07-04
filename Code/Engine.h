@@ -6,7 +6,6 @@ typedef uint32_t uint;
 #include "shaders\\VoxelDimension.h"
 #include "Assets.h"
 #include "FileFormats.h"
-#include "Particles.h"
 #include "Audio.h"
 #include "Entity.h"
 
@@ -46,10 +45,12 @@ enum EAOQuality
 };
 
 #include "VoxelCulling.cpp"
-#include "ForwardVoxelRender.cpp"
-#include "ForwardRender.cpp"
-#include "ForwardParticleRender.cpp"
+#include "GBufferVoxelRender.cpp"
+#include "GBufferRender.cpp"
 #include "Downscale.cpp"
+#include "DiffuseLightingRender.cpp"
+#include "TransparentRender.cpp"
+#include "SpecularLightingRender.cpp"
 #include "Exposure.cpp"
 #include "PostProcessingBloom.cpp"
 #include "PostProcessingTAA.cpp"
@@ -60,7 +61,8 @@ enum EAOQuality
 
 struct SVoxels
 {
-	uint32_t ColorActive[LevelDimZ][LevelDimY][LevelDimX];
+	// NOTE(georgii): 24 most significant bits - color, next 4 bits - reflectivity, next 3 bits - roughness, the least significant bit - active or not
+	uint32_t ColorMatActive[LevelDimZ][LevelDimY][LevelDimX];
 };
 
 struct SLevel
@@ -69,9 +71,6 @@ struct SLevel
 
 	uint32_t EntityCount;
 	SEntity Entities[128];
-
-	uint32_t ParticleEmitterCount;
-	SParticleEmitter ParticleEmitters[1];
 
 	uint32_t PointLightCount;
 	SPointLight PointLights[128];
@@ -86,6 +85,8 @@ struct SVoxelToAdd
 {
 	uint32_t ID;
 	uint8_t Red, Green, Blue;
+	uint8_t Reflectivity;
+	uint8_t Roughness;
 };
 
 struct SVoxelChangeColor
@@ -94,19 +95,22 @@ struct SVoxelChangeColor
 	uint8_t Red, Green, Blue;
 };
 
+struct SVoxelChangeReflectivity
+{
+	uint32_t ID;
+	uint8_t Reflectivity;
+};
+
+struct SVoxelChangeRoughness
+{
+	uint32_t ID;
+	uint8_t Roughness;
+};
+
 struct SVoxelDraw
 {
 	vec3 Pos;
 	uint32_t FirstInstance;
-};
-
-struct SParticleDraw
-{
-	vec3 Pos;
-    float Scale;
-
-    vec3 Color;
-    float _Padding1;
 };
 
 enum ETextAlignment
@@ -166,14 +170,8 @@ struct SEngineState
 	uint32_t LastFullscreenInternalWidth;
 	uint32_t LastFullscreenInternalHeight;
 
-	bool bSampleCountMSAAChanged;
-	uint32_t NewSampleCountMSAA;
-
 	SVoxelDraw VoxelDraws[LevelDimZ*LevelDimY*LevelDimX];
 	uint32_t VoxelVisibilities[LevelDimZ*LevelDimY*LevelDimX];
-
-	uint32_t ParticlesDrawCount;
-	SParticleDraw ParticleDraws[1024];
 
 	SCamera Camera;
 
@@ -189,6 +187,12 @@ struct SEngineState
 
 	uint32_t VoxelsToChangeColorCount;
 	SVoxelChangeColor VoxelsToChangeColor[LevelDimZ*LevelDimY*LevelDimX];
+
+	uint32_t VoxelsToChangeReflectivityCount;
+	SVoxelChangeReflectivity VoxelsToChangeReflectivity[LevelDimZ*LevelDimY*LevelDimX];
+
+	uint32_t VoxelsToChangeRoughnessCount;
+	SVoxelChangeRoughness VoxelsToChangeRoughness[LevelDimZ*LevelDimY*LevelDimX];
 
 	bool bReloadLevel;
 	bool bReloadGame;
@@ -213,6 +217,7 @@ struct SEngineState
 	// Debug and editor stuff
 	bool bFlyMode;
 	bool bHideEntities;
+	bool bHideVoxels;
 	bool bReloadLevelEditor;
 
 	SLevel LevelGameStartState;
@@ -283,38 +288,70 @@ inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos,
 
 inline bool IsVoxelActive(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
 {
-	bool bResult = Voxels.ColorActive[Z][Y][X] & 1;
+	bool bResult = Voxels.ColorMatActive[Z][Y][X] & 1;
 	return bResult;
 }
 
 inline void SetVoxelActive(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, bool bActive)
 {
-	Voxels.ColorActive[Z][Y][X] &= 0xFFFFFFFE;
-	Voxels.ColorActive[Z][Y][X] |= uint32_t(bActive);
+	Voxels.ColorMatActive[Z][Y][X] &= 0xFFFFFFFE;
+	Voxels.ColorMatActive[Z][Y][X] |= uint32_t(bActive);
 }
 
 inline void SetVoxelColor(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red, uint8_t Green, uint8_t Blue)
 {
 	uint32_t Color = (uint32_t(Red) << 24) | (uint32_t(Green) << 16) | (uint32_t(Blue) << 8);
-	Voxels.ColorActive[Z][Y][X] &= 0x000000FF;
-	Voxels.ColorActive[Z][Y][X] |= Color;
+	Voxels.ColorMatActive[Z][Y][X] &= 0x000000FF;
+	Voxels.ColorMatActive[Z][Y][X] |= Color;
 }
 
 inline vec3 GetVoxelColorVec3(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
 {
-	float Red = (Voxels.ColorActive[Z][Y][X] >> 24) / 255.0f;
-	float Green = ((Voxels.ColorActive[Z][Y][X] >> 16) & 0xFF) / 255.0f;
-	float Blue = ((Voxels.ColorActive[Z][Y][X] >> 8) & 0xFF) / 255.0f;
+	float Red = (Voxels.ColorMatActive[Z][Y][X] >> 24) / 255.0f;
+	float Green = ((Voxels.ColorMatActive[Z][Y][X] >> 16) & 0xFF) / 255.0f;
+	float Blue = ((Voxels.ColorMatActive[Z][Y][X] >> 8) & 0xFF) / 255.0f;
 
 	return Vec3(Red, Green, Blue);
 }
 
-void AddVoxelToLevel(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red = 77, uint8_t Green = 77, uint8_t Blue = 77)
+inline void SetVoxelReflectivity(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Reflectivity)
+{
+	Assert(Reflectivity <= 15);
+
+	Reflectivity = Reflectivity << 4;
+	Voxels.ColorMatActive[Z][Y][X] &= 0xFFFFFF0F;
+	Voxels.ColorMatActive[Z][Y][X] |= Reflectivity;
+}
+
+inline uint8_t GetVoxelReflectivity(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
+{
+	uint8_t Reflectivity = (Voxels.ColorMatActive[Z][Y][X] & 0xF0) >> 4;
+	
+	return Reflectivity;
+}
+
+inline void SetVoxelRoughness(SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Roughness)
+{
+	Assert(Roughness <= 7);
+
+	Roughness = Roughness << 1;
+	Voxels.ColorMatActive[Z][Y][X] &= 0xFFFFFFF1;
+	Voxels.ColorMatActive[Z][Y][X] |= Roughness;
+}
+
+inline uint8_t GetVoxelRoughness(const SVoxels& Voxels, uint32_t X, uint32_t Y, uint32_t Z)
+{
+	uint8_t Roughness = (Voxels.ColorMatActive[Z][Y][X] & 0xE) >> 1;
+	
+	return Roughness;
+}
+
+void AddVoxelToLevel(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red = 77, uint8_t Green = 77, uint8_t Blue = 77, uint8_t Reflectivity = 0, uint8_t Roughness = 7)
 {
 	Assert(EngineState->VoxelsToAddCount < ArrayCount(EngineState->VoxelsToAdd));
 
 	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
-	SVoxelToAdd VoxelToAdd = { ID, Red, Green, Blue };
+	SVoxelToAdd VoxelToAdd = { ID, Red, Green, Blue, Reflectivity, Roughness };
 	EngineState->VoxelsToAdd[EngineState->VoxelsToAddCount++] = VoxelToAdd;
 }
 
@@ -333,6 +370,24 @@ void MarkVoxelForChangingColor(SEngineState* EngineState, uint32_t X, uint32_t Y
 	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
 	SVoxelChangeColor VoxelChangeColor = { ID, Red, Green, Blue };
 	EngineState->VoxelsToChangeColor[EngineState->VoxelsToChangeColorCount++] = VoxelChangeColor;
+}
+
+void MarkVoxelForChangingReflectivity(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Reflectivity)
+{
+	Assert(EngineState->VoxelsToChangeReflectivityCount < ArrayCount(EngineState->VoxelsToChangeReflectivity));
+
+	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
+	SVoxelChangeReflectivity VoxelChangeReflectivity = { ID, Reflectivity };
+	EngineState->VoxelsToChangeReflectivity[EngineState->VoxelsToChangeReflectivityCount++] = VoxelChangeReflectivity;
+}
+
+void MarkVoxelForChangingRoughness(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Roughness)
+{
+	Assert(EngineState->VoxelsToChangeRoughnessCount < ArrayCount(EngineState->VoxelsToChangeRoughness));
+
+	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
+	SVoxelChangeRoughness VoxelChangeRoughness = { ID, Roughness };
+	EngineState->VoxelsToChangeRoughness[EngineState->VoxelsToChangeRoughnessCount++] = VoxelChangeRoughness;
 }
 
 SPointLight* AddPointLight(SLevel& Level, vec3 Pos, float Radius, vec4 Color)
@@ -616,17 +671,6 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 
 			AlignAddress(&LevelMemory, GetAlignmentOf(SEntity));
 			LevelMemory += sizeof(SEntity) * (ArrayCount(Level->Entities) - Level->EntityCount);
-
-			// Load particle emitters
-			AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-			memcpy(&Level->ParticleEmitterCount, LevelMemory, sizeof(uint32_t));
-			LevelMemory += sizeof(uint32_t);
-
-			Assert(Level->ParticleEmitterCount < ArrayCount(Level->ParticleEmitters));
-
-			AlignAddress(&LevelMemory, GetAlignmentOf(SParticleEmitter));
-			memcpy(Level->ParticleEmitters, LevelMemory, sizeof(Level->ParticleEmitters));
-			LevelMemory += sizeof(Level->ParticleEmitters);
 
 			// Load point lights
 			AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));

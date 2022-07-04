@@ -65,10 +65,10 @@ void SDownscaleComputePass::Dispatch(const SVulkanContext& Vulkan, const SImage&
 
     VkImageMemoryBarrier DownscaleDepthBarriers[] =
 	{
-		CreateImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, LinearDepthImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
+		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, LinearDepthImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
 		CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, DepthPyramidImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
 	};
-	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(DownscaleDepthBarriers), DownscaleDepthBarriers);
+	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(DownscaleDepthBarriers), DownscaleDepthBarriers);
 
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, Pipeline);
 	for (uint32_t I = 0; I < MipCount; I++)
@@ -85,9 +85,6 @@ void SDownscaleComputePass::Dispatch(const SVulkanContext& Vulkan, const SImage&
 		VkImageMemoryBarrier MipDownscaleDepthBarrier = CreateImageMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DepthPyramidImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, I, 1);
 		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &MipDownscaleDepthBarrier);
 	}
-
-    VkImageMemoryBarrier LinearDepthBarrier = CreateImageMemoryBarrier(VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, LinearDepthImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
-	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &LinearDepthBarrier);
 
 	END_GPU_PROFILER_BLOCK("DOWNSCALE_DEPTH", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }

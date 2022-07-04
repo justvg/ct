@@ -2,7 +2,6 @@
 #include "Game.h"
 #include "Audio.cpp"
 #include "Assets.cpp"
-#include "Particles.cpp"
 #include "Entity.cpp"
 #include "Game.cpp"
 #include "Editor.cpp"
@@ -11,7 +10,7 @@
 void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLevel* Level)
 {
 	SRenderer* Renderer = &EngineState->Renderer;
-	if (EngineState->VoxelsToDeleteCount || EngineState->VoxelsToChangeColorCount || EngineState->VoxelsToAddCount)
+	if (EngineState->VoxelsToDeleteCount || EngineState->VoxelsToChangeColorCount || EngineState->VoxelsToChangeReflectivityCount || EngineState->VoxelsToChangeRoughnessCount || EngineState->VoxelsToAddCount)
 	{
 #ifndef ENGINE_RELEASE
 		if (EngineState->EngineMode == EngineMode_Editor)
@@ -42,10 +41,12 @@ void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLeve
             
 			// Remove game voxel
 			SetVoxelColor(Level->Voxels, X, Y, Z, 0, 0, 0);
+			SetVoxelReflectivity(Level->Voxels, X, Y, Z, 0);
+			SetVoxelRoughness(Level->Voxels, X, Y, Z, 0);
 			SetVoxelActive(Level->Voxels, X, Y, Z, false);
             
 			// Remove render voxel
-			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorActive[Z][Y][X], sizeof(uint32_t));
+			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorMatActive[Z][Y][X], sizeof(uint32_t));
 			Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += sizeof(uint32_t);
             
 			EngineState->VoxelDraws[ID].FirstInstance = UINT32_MAX;
@@ -73,10 +74,46 @@ void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLeve
 			SetVoxelColor(Level->Voxels, X, Y, Z, Red, Green, Blue);
             
 			// Update render voxel 
-			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorActive[Z][Y][X], sizeof(uint32_t));
+			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorMatActive[Z][Y][X], sizeof(uint32_t));
 			Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += sizeof(uint32_t);
 		}
 		EngineState->VoxelsToChangeColorCount = 0;
+
+		for (uint32_t I = 0; I < EngineState->VoxelsToChangeReflectivityCount; I++)
+		{
+			uint32_t ID = EngineState->VoxelsToChangeReflectivity[I].ID;
+			uint32_t X = ID % LevelDimX;
+			uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
+			uint32_t Z = ID / (LevelDimY*LevelDimX);
+            
+			uint8_t Reflectivity = EngineState->VoxelsToChangeReflectivity[I].Reflectivity;
+            
+			// Change game voxel color
+			SetVoxelReflectivity(Level->Voxels, X, Y, Z, Reflectivity);
+            
+			// Update render voxel 
+			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorMatActive[Z][Y][X], sizeof(uint32_t));
+			Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += sizeof(uint32_t);
+		}
+		EngineState->VoxelsToChangeReflectivityCount = 0;
+
+		for (uint32_t I = 0; I < EngineState->VoxelsToChangeRoughnessCount; I++)
+		{
+			uint32_t ID = EngineState->VoxelsToChangeRoughness[I].ID;
+			uint32_t X = ID % LevelDimX;
+			uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
+			uint32_t Z = ID / (LevelDimY*LevelDimX);
+            
+			uint8_t Roughness = EngineState->VoxelsToChangeRoughness[I].Roughness;
+            
+			// Change game voxel color
+			SetVoxelRoughness(Level->Voxels, X, Y, Z, Roughness);
+            
+			// Update render voxel 
+			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorMatActive[Z][Y][X], sizeof(uint32_t));
+			Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += sizeof(uint32_t);
+		}
+		EngineState->VoxelsToChangeRoughnessCount = 0;
         
 		for (uint32_t I = 0; I < EngineState->VoxelsToAddCount; I++)
 		{
@@ -88,11 +125,16 @@ void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLeve
 			uint8_t Red = EngineState->VoxelsToAdd[I].Red;
 			uint8_t Green = EngineState->VoxelsToAdd[I].Green;
 			uint8_t Blue = EngineState->VoxelsToAdd[I].Blue;
+			
+			uint8_t Reflectivity = EngineState->VoxelsToAdd[I].Reflectivity;
+			uint8_t Roughness = EngineState->VoxelsToAdd[I].Roughness;
             
 			SetVoxelActive(Level->Voxels, X, Y, Z, true);
 			SetVoxelColor(Level->Voxels, X, Y, Z, Red, Green, Blue);
+			SetVoxelReflectivity(Level->Voxels, X, Y, Z, Reflectivity);
+			SetVoxelRoughness(Level->Voxels, X, Y, Z, Roughness);
             
-			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorActive[Z][Y][X], sizeof(uint32_t));
+			UpdateBuffer(Vulkan.CommandBuffer, Renderer->VoxelsBuffer, ID*sizeof(uint32_t), Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], &Level->Voxels.ColorMatActive[Z][Y][X], sizeof(uint32_t));
 			Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += sizeof(uint32_t);
             
 			EngineState->VoxelDraws[ID].FirstInstance = ID;
@@ -117,45 +159,6 @@ void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLeve
 	}
 }
 
-uint32_t UpdateParticles(SEngineState* EngineState, const SVulkanContext& Vulkan, SLevel* Level, float dt)
-{
-	SRenderer* Renderer = &EngineState->Renderer;
-
-	uint32_t TotalParticleCount = SimulateParticles(Level->ParticleEmitters, Level->ParticleEmitterCount, dt);
-	if (TotalParticleCount > 0)
-	{
-		EngineState->ParticlesDrawCount = TotalParticleCount;
-        
-		uint32_t ParticleDrawIndex = 0;
-		for (uint32_t I = 0; I < Level->ParticleEmitterCount; I++)
-		{
-			SParticleEmitter* Emitter = &Level->ParticleEmitters[I];
-            
-			for (uint32_t J = 0; J < Emitter->ParticleCount; J++)
-			{
-				SParticle* Particle = &Emitter->Particles[J];
-				SParticleDraw* Draw = &EngineState->ParticleDraws[ParticleDrawIndex++];
-                
-				Draw->Pos = Particle->Pos;
-				Draw->Scale = Particle->Scale;
-				Draw->Color = Particle->Color;
-			}
-		}
-		Assert(ParticleDrawIndex == TotalParticleCount);
-        
-		VkBufferMemoryBarrier ParticleBufferBeginBarrier = CreateBufferMemoryBarrier(VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, Renderer->ParticleDrawBuffer, Renderer->ParticleDrawBuffer.Size);
-		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 1, &ParticleBufferBeginBarrier, 0, 0);
-        
-		UpdateBuffer(Vulkan.CommandBuffer, Renderer->ParticleDrawBuffer, 0, Renderer->StagingBuffers[Vulkan.FrameInFlight], Renderer->StagingBufferOffsets[Vulkan.FrameInFlight], EngineState->ParticleDraws, EngineState->ParticlesDrawCount*sizeof(SParticleDraw));
-		Renderer->StagingBufferOffsets[Vulkan.FrameInFlight] += EngineState->ParticlesDrawCount*sizeof(SParticleDraw);
-        
-		VkBufferMemoryBarrier ParticleBufferEndBarrier = CreateBufferMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, Renderer->ParticleDrawBuffer, Renderer->ParticleDrawBuffer.Size);
-		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, 0, 1, &ParticleBufferEndBarrier, 0, 0);
-	}
-    
-	return TotalParticleCount;
-}
-
 VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, const SGameInput& GameInput, const SGameSoundBuffer& SoundBuffer)
 {
 	Assert((sizeof(SEngineState) + sizeof(SGameState)) <= GameMemory->StorageSize);
@@ -169,6 +172,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		CreateVoxelMesh(EngineState->Geometry);
 		AddGLTFMesh(EngineState->Geometry, "Models\\cube.gltf");
 		CreateQuadMesh(EngineState->Geometry);
+		CreateSphereMesh(EngineState->Geometry);
         
 		InitializeRenderer(&EngineState->Renderer, Vulkan, &EngineState->Geometry);
             
@@ -210,22 +214,16 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
     }
     
 	bool bSwapchainChanged = false;
-	if (Vulkan.bSwapchainChanged || EngineState->bSwapchainChanged || EngineState->bSampleCountMSAAChanged)
+	if (Vulkan.bSwapchainChanged || EngineState->bSwapchainChanged)
 	{
-		if (EngineState->bSampleCountMSAAChanged)
-		{
-			((SVulkanContext&) Vulkan).SampleCountMSAA = VkSampleCountFlagBits(EngineState->NewSampleCountMSAA);
-		}
-
 		if (EngineState->bSwapchainChanged)
 		{
 			Vulkan.InternalWidth = EngineState->NewInternalWidth;
 			Vulkan.InternalHeight = EngineState->NewInternalHeight;
 		}
 
-		RendererHandleChanges(&EngineState->Renderer, Vulkan, EngineState->bSampleCountMSAAChanged);
+		RendererHandleChanges(&EngineState->Renderer, Vulkan);
 		EngineState->bSwapchainChanged = false;
-		EngineState->bSampleCountMSAAChanged = false;
 
 		bSwapchainChanged = true;
 	}
@@ -269,7 +267,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		SRenderer* Renderer = &EngineState->Renderer;
 		UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->VoxelDrawBuffer, Renderer->StagingBuffers[0], EngineState->VoxelDraws, sizeof(EngineState->VoxelDraws));
 		UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->VoxelVisibilityBuffer, Renderer->StagingBuffers[0], EngineState->VoxelVisibilities, sizeof(EngineState->VoxelVisibilities));
-		UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->VoxelsBuffer, Renderer->StagingBuffers[0], EngineState->Level.Voxels.ColorActive, sizeof(EngineState->Level.Voxels));
+		UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->VoxelsBuffer, Renderer->StagingBuffers[0], EngineState->Level.Voxels.ColorMatActive, sizeof(EngineState->Level.Voxels));
 		
 		GameState->bReload = EngineState->bReloadGame;
 
@@ -316,16 +314,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	uint32_t PointLightCount = 0;
 	for (uint32_t I = 0; I < Level->PointLightCount; I++)
 	{
-		bool bInsideFrustum = true;
-		for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
-		{
-			bInsideFrustum = Dot(Vec4(Level->PointLights[I].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -Level->PointLights[I].Radius;
-		}
-
-		if (bInsideFrustum)
-		{
-			PointLightsGPU[PointLightCount++] = Level->PointLights[I];
-		}
+		PointLightsGPU[PointLightCount++] = Level->PointLights[I];
 	}
     
 	for (uint32_t I = 0; I < Level->EntityCount; I++)
@@ -334,7 +323,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
         
 		if (Entity->Type != Entity_MessageToggler)
 		{
-			if (((LengthSq(Entity->PointLight.Color.rgb) > 0.0f) && (Entity->PointLight.Radius > 0.0f)))
+			if (Entity->PointLight.Radius > 0.0f)
 			{
 				Assert(PointLightCount < ArrayCount(Level->PointLights));
 				
@@ -344,26 +333,61 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 				
 				if ((Entity->Type == Entity_Torch) || (Entity->Type == Entity_Container))
 				{
-					PointLightsGPU[PointLightCount].Color.rgb = 8.0f * Entity->Color;
+					PointLightsGPU[PointLightCount].Color.rgb = Entity->Color;
 				}
 				
 				if (LengthSq(PointLightsGPU[PointLightCount].Color.rgb) > 0.0f)
 				{
-					bool bInsideFrustum = true;
-					for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
-					{
-						bInsideFrustum = Dot(Vec4(PointLightsGPU[PointLightCount].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -PointLightsGPU[PointLightCount].Radius;
-					}
-
-					if (bInsideFrustum)
-					{
-						PointLightCount++;
-					}
+					PointLightCount++;
 				}
 			}
 		}
 	}
-    
+
+	uint32_t PointLightInFrustumCount = 0;
+	bool PointLightsCulling[ArrayCount(Level->PointLights)];
+	for (uint32_t I = 0; I < PointLightCount; I++)
+	{
+		bool bInsideFrustum = true;
+		for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
+		{
+			bInsideFrustum = Dot(Vec4(PointLightsGPU[I].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -PointLightsGPU[I].Radius;
+		}
+
+		PointLightsCulling[I] = bInsideFrustum;
+		if (bInsideFrustum)
+		{
+			PointLightInFrustumCount++;
+		}
+	}
+
+	// Bubble sort
+	for (uint32_t I = 0; I < PointLightCount; I++)
+	{
+		bool bSwapped = false;
+		for (uint32_t J = 0; J < PointLightCount - 1 - I; J++)
+		{
+			if (!PointLightsCulling[J] && PointLightsCulling[J + 1])
+			{
+				bool TempBool = PointLightsCulling[J];
+				PointLightsCulling[J] = PointLightsCulling[J + 1];
+				PointLightsCulling[J + 1] = TempBool;
+
+				SPointLight TempLight = PointLightsGPU[J];
+				PointLightsGPU[J] = PointLightsGPU[J + 1];
+				PointLightsGPU[J + 1] = TempLight;
+
+				bSwapped = true;
+			}
+		}
+
+		if (!bSwapped)
+		{
+			break;
+		}
+	}
+
+
 	VkCommandBufferBeginInfo CommandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	CommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VkCheck(vkBeginCommandBuffer(Vulkan.CommandBuffer, &CommandBufferBeginInfo));
@@ -375,9 +399,6 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	// NOTE(georgii): Delete all voxels that were marked for deletion. Add all voxels that were added. Chnage all voxels that were updated. Update appropriate GPU buffers.
 	UpdateVoxels(EngineState, Vulkan, Level);
 
-	// Update particles
-	uint32_t TotalParticleCount = UpdateParticles(EngineState, Vulkan, Level, GameInput.dt);
-    
 	// Sound mixing
 	STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
 	OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory);
@@ -387,7 +408,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
 
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, PointLightCount, TotalParticleCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged, MousePos);
+	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, PointLightInFrustumCount, PointLightCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged, MousePos);
 	EndTempMemoryArena(&RenderTempMemory);
 
 	// Update text stuff

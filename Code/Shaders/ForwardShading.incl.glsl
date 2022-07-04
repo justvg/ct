@@ -94,9 +94,9 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
     Tangent = normalize(Tangent - Normal*dot(Normal, Tangent));
     vec3 Bitangent = cross(Normal, Tangent);
 
+	const float MaxDistance = 24.0;
     for(int I = 0; I < AO_SAMPLES; I++)
     {
-        const float MaxDistance = 2.5;
         vec3 StartPos = FragPosWS;
         vec3 DirTS = SampleHemisphere(BlueNoiseVec2());
         vec3 Dir = Tangent*DirTS.x + Bitangent*DirTS.y + Normal*DirTS.z;
@@ -108,7 +108,7 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
         
         float HitDist = RaytraceDirectional(StartPos, Dir, MaxDistance, 0.6 * VoxelDim);
         float t = clamp(HitDist / MaxDistance, 0.0, 1.0);
-        t = pow(t, 2.0);
+        t = pow(t, 1.3);
 
         Ambient += AmbientColor.rgb * t;
         Ambient += AmbientConstant.rgb * max(1.0, HitDist / (2.0 * VoxelDim));
@@ -120,7 +120,13 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
 
 float GetAttenuation(float Distance, float Range)
 {
-	float Attenuation = 1.0 - smoothstep(0.1*Range, Range, Distance);
+	float A = (Distance / Range);
+	A = A * A * A * A;
+	A = max(0.0, 1.0 - A);
+	A = A * A;
+	float Attenuation = A / (Distance * Distance + 0.1);
+
+	Attenuation = max(Attenuation, 0.0);
 
 	return Attenuation;
 }
@@ -140,7 +146,7 @@ vec3 CalculatePointLight(SPointLight PointLight, vec3 FragPosWS, vec3 Normal)
     const float LightRange = (1.0 + PenumbraSize) * PointLight.Radius;
     const vec3 LightPos = PointLight.Pos + PenumbraSize * (2.0 * BlueNoiseVec3() - 1.0);
     const float DistanceToLight = length(LightPos - FragPosWS);
-    if (DistanceToLight <= LightRange)
+    if ((DistanceToLight >= 0.01) && (DistanceToLight <= LightRange))
     {
         vec3 LightVec = (LightPos - FragPosWS) / DistanceToLight;
         

@@ -826,30 +826,6 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 					MenuState->SelectedMenuElement = MenuElement_Resolution;
 				}
 			} break;
-
-			case MenuElement_Multisampling:
-			{
-				const float YPos = -0.24f;
-
-				char MultisamplingText[32] = {};
-				if (Vulkan->SampleCountMSAA == 1)
-				{
-					ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), MultisamplingText, "Disabled");
-				}
-				else
-				{
-					const char ValueMSAA[2] = { char(Vulkan->SampleCountMSAA + '0'), '\0' };
-					ConcStrings(MultisamplingText, ArrayCount(MultisamplingText), ValueMSAA, "x MSAA");
-				}
-
-				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Multisampling:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
-				bMouseInItem = MenuItemDefault(EngineState, MenuState, MultisamplingText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
-				if (bMouseInItem && MenuState->bMousePosChanged)
-				{
-					bSelected = true;
-					MenuState->SelectedMenuElement = MenuElement_Multisampling;
-				}
-			} break;
 		}
 
 		if ((bSelected && MenuState->bArrowUsed) || (bSelected && bMouseInItem && MenuState->bMouseLeftReleased))
@@ -943,32 +919,6 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 						EngineState->NewInternalHeight = Height;
 						EngineState->bSwapchainChanged = true;
 					}
-				} break;
-
-				case MenuElement_Multisampling:
-				{
-					uint32_t MaxSampleCountMSAA = uint32_t(Vulkan->MaxSampleCountMSAA);
-					uint32_t SampleCountMSAA = uint32_t(Vulkan->SampleCountMSAA);
-
-					if (MenuState->bArrowRight || (!MenuState->bArrowRight && !MenuState->bArrowLeft))
-					{
-						SampleCountMSAA *= 2;
-						if (SampleCountMSAA > MaxSampleCountMSAA)
-						{
-							SampleCountMSAA = 1;
-						}
-					}
-					else
-					{
-						SampleCountMSAA /= 2;
-						if (SampleCountMSAA == 0)
-						{
-							SampleCountMSAA = MaxSampleCountMSAA;
-						}
-					}
-
-					EngineState->bSampleCountMSAAChanged = true;
-					EngineState->NewSampleCountMSAA = SampleCountMSAA;
 				} break;
 			}
 		}
@@ -1217,10 +1167,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(&AOQuality, SaveFilePointer, sizeof(int32_t));
 			SaveFilePointer += sizeof(int32_t);
 
-			int32_t SampleCountMSAA;
-			memcpy(&SampleCountMSAA, SaveFilePointer, sizeof(int32_t));
-			SaveFilePointer += sizeof(int32_t);
-
 			uint32_t InternalWidth;
 			memcpy(&InternalWidth, SaveFilePointer, sizeof(uint32_t));
 			SaveFilePointer += sizeof(uint32_t);
@@ -1237,11 +1183,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			PlatformChangeVSync(bVSync);
 			EngineState->bVignetteEnabled = bVignetteEnabled;
 			EngineState->Renderer.AOQuality = EAOQuality(AOQuality);
-			if (Vulkan->SampleCountMSAA != SampleCountMSAA)
-			{
-				EngineState->bSampleCountMSAAChanged = true;
-				EngineState->NewSampleCountMSAA = SampleCountMSAA;
-			}
 			EngineState->LastFullscreenInternalWidth = InternalWidth;
 			EngineState->LastFullscreenInternalHeight = InternalHeight;
 
@@ -1385,7 +1326,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		bool bVSync = PlatformGetVSync();
 		bool bVignetteEnabled = EngineState->bVignetteEnabled;
 		int32_t AOQuality = EngineState->Renderer.AOQuality;
-		int32_t SampleCountMSAA = int32_t(Vulkan->SampleCountMSAA);
 		uint32_t Width = EngineState->LastFullscreenInternalWidth;
 		uint32_t Height = EngineState->LastFullscreenInternalHeight;
 
@@ -1393,7 +1333,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&bVignetteEnabled, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&AOQuality, sizeof(int32_t), 1, GeneralSaveFile);
-		fwrite(&SampleCountMSAA, sizeof(int32_t), 1, GeneralSaveFile);
 		fwrite(&Width, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
 

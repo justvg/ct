@@ -14,13 +14,10 @@ layout (push_constant) uniform PushConstants
 	vec4 Scale; // w - unused
 	vec4 Orientation; // w - unused
 	vec4 MeshColor;
-	vec4 Offset; // w contains point lights count
+	vec4 Offset; // w - unused
 
 	vec4 PrevPosition; // w - unused
 	vec4 PrevOrientation; // w - unused
-
-    uint FrameNumber;
-	uint FPWeaponDepthTest;
 
 	float Time;
 	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
@@ -38,6 +35,7 @@ layout (set = 0, binding = 0) uniform CameraBuffer
 	vec4 CameraPosition; 
     vec4 Viewport; // Width, Height, Near, Far
 	vec4 Frustum[6];
+    vec4 FrustumCorners[6];
 };
 
 vec3 RotateQuaternion(vec3 V, vec4 Q)
@@ -60,9 +58,4 @@ void main()
 	LocalPos = LocalPosition;
 
 	gl_Position = Proj * View * vec4(FragPosWS, 1.0);
-	
-	if (FPWeaponDepthTest == 0)
-	{
-		gl_Position.z = 0.0;
-	}
 }

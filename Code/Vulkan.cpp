@@ -14,6 +14,7 @@
 #define VkCheck(Call) Call
 #endif
 
+// NOTE(georgii): Can't be just changed. Will introduce bugs. But we are fine with FramesInFlight=2.
 const uint32_t FramesInFlight = 2;
 
 struct SImage

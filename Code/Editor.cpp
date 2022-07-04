@@ -181,12 +181,12 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 									for (uint32_t X = XCenter - 7; X < XCenter + 7; X++)
 									{
 										SetVoxelActive(EditorState->NewLevel.Voxels, X, Y, Z, true);
-										SetVoxelColor(EditorState->NewLevel.Voxels, X, Y, Z, 77, 77, 77);
+										SetVoxelColor(EditorState->NewLevel.Voxels, X, Y, Z, 255, 255, 255);
 									}	
 								}	
 							}
 
-							EditorState->NewLevel.AmbientColor = Vec3(15.0f / 255.0f, 30.0f / 255.0f, 60.0f / 255.0f);
+							EditorState->NewLevel.AmbientColor = Vec3(0.0f / 255.0f, 0.0f / 255.0f, 0.0f / 255.0f);
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
                             
 							AddHero(EditorState->NewLevel, Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim));
@@ -245,6 +245,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			{
 				EditorState->SelectedVoxelsCount = 0;
 				EditorState->SelectedVoxelColorFloat = Vec3(0.0f);
+				EditorState->SelectedVoxelReflectFloat = 0.0f;
+				EditorState->SelectedVoxelRoughFloat = 0.0f;
 
 				EngineState->LevelGameStartState = EngineState->Level;
 				ReloadGameLevel(EngineState);
@@ -265,6 +267,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->WallSetMode = WallSetMode_None;
 				EditorState->SelectedVoxelsCount = 0;
 				EditorState->SelectedVoxelColorFloat = Vec3(0.0f);
+				EditorState->SelectedVoxelReflectFloat = 0.0f;
+				EditorState->SelectedVoxelRoughFloat = 0.0f;
 			}
             
 			ImGui::SetWindowPos(ImVec2(0, Max(LevelsWindowSize.y, ModeWindowSize.y)), true);
@@ -291,6 +295,52 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 						uint32_t Z = ID / (LevelDimX*LevelDimY);
                         
 						MarkVoxelForChangingColor(EngineState, X, Y, Z, Red, Green, Blue);
+					}
+                    
+					if ((EditorState->SelectedVoxelsCount > 0) && !EditorState->bImGuiChangeStarted)
+					{
+						SaveLevelHistory(EditorState, &EngineState->Level);
+                        
+						EditorState->bImGuiChangeStarted = true;
+						EditorState->ImGuiChangeTimePassed = 0.0f;
+					}
+				}
+
+				if (EditorDragFloat(EditorState, "Reflectivity", &EditorState->SelectedVoxelReflectFloat, 0.05f, 0.0f, 1.0f))
+				{
+					uint8_t Reflectivity = uint8_t(EditorState->SelectedVoxelReflectFloat * 15.0f);
+
+					for (uint32_t I = 0; I < EditorState->SelectedVoxelsCount; I++)
+					{
+						uint32_t ID = EditorState->SelectedVoxels[I];
+						uint32_t X = ID % LevelDimX;
+						uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
+						uint32_t Z = ID / (LevelDimX*LevelDimY);
+                        
+						MarkVoxelForChangingReflectivity(EngineState, X, Y, Z, Reflectivity);
+					}
+                    
+					if ((EditorState->SelectedVoxelsCount > 0) && !EditorState->bImGuiChangeStarted)
+					{
+						SaveLevelHistory(EditorState, &EngineState->Level);
+                        
+						EditorState->bImGuiChangeStarted = true;
+						EditorState->ImGuiChangeTimePassed = 0.0f;
+					}
+				}
+
+				if (EditorDragFloat(EditorState, "Roughness", &EditorState->SelectedVoxelRoughFloat, 0.2f, 0.0f, 1.0f))
+				{
+					uint8_t Roughness = uint8_t(EditorState->SelectedVoxelRoughFloat * 7.0f);
+
+					for (uint32_t I = 0; I < EditorState->SelectedVoxelsCount; I++)
+					{
+						uint32_t ID = EditorState->SelectedVoxels[I];
+						uint32_t X = ID % LevelDimX;
+						uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
+						uint32_t Z = ID / (LevelDimX*LevelDimY);
+                        
+						MarkVoxelForChangingRoughness(EngineState, X, Y, Z, Roughness);
 					}
                     
 					if ((EditorState->SelectedVoxelsCount > 0) && !EditorState->bImGuiChangeStarted)
@@ -542,10 +592,38 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 					}
 				}
 			}
+
+			if (ImGui::Button("Select Y=0 Blocks"))
+			{
+				EditorState->SelectedEntity = 0;
+				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->bCircleSelected = false;
+				EditorState->SelectedDimHelper = SelectedDimHelper_None;
+				EditorState->bSelectDoor = false;
+
+				EditorState->SelectedVoxelsCount = 0;
+				for (uint32_t Z = 0; Z < LevelDimZ; Z++)
+				{
+					for (uint32_t X = 0; X < LevelDimX; X++)
+					{
+						if (IsVoxelActive(EngineState->Level.Voxels, X, 0, Z))
+						{
+							uint32_t ID = Z*LevelDimX*LevelDimY + 0*LevelDimX + X;
+							EditorState->SelectedVoxels[EditorState->SelectedVoxelsCount++] = ID;			
+						}
+					}
+				}
+			}
             
 			if (ImGui::Checkbox("HideEntities", &EngineState->bHideEntities))
 			{
 				EditorState->SelectedEntity = 0;
+			}
+
+			if (ImGui::Checkbox("HideVoxels", &EngineState->bHideVoxels))
+			{
+				EditorState->SelectedVoxelsCount = 0;
 			}
 
 			EditorDragFloat(EditorState, "CameraSpeed", &EditorState->CameraSpeed, 0.05f, 0.0f, FloatMax);
@@ -1003,7 +1081,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		
 		bool bNoHelpersHit = !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset && !bGreenArrowHitTargetOffset && !bBlueArrowHitTargetOffset && !bCircleHit && !bRedDimHelperHit && !bGreenDimHelperHit && !bBlueDimHelperHit;
 		SRaytraceVoxelsResult RaytraceResult = RaytraceVoxels(Level, RayStartP, RayDir, 100.0f, true);
-		if ((RaytraceResult.bHit && (RaytraceResult.Distance < tHitObject) && bNoHelpersHit) || (!HitEntity && !HitPointLight && bNoHelpersHit))
+		if (!EngineState->bHideVoxels && ((RaytraceResult.bHit && (RaytraceResult.Distance < tHitObject) && bNoHelpersHit) || (!HitEntity && !HitPointLight && bNoHelpersHit)))
 		{
 			HitEntity = 0;
 			HitEntityIndex = -1;
@@ -1120,11 +1198,9 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 					uint32_t Y = (ID % (LevelDimX*LevelDimY)) / LevelDimX;
 					uint32_t Z = ID / (LevelDimX*LevelDimY);
 					
-					uint32_t* Voxel = &Level->Voxels.ColorActive[Z][Y][X];
-					float Red = ((*Voxel >> 24) & 0xFF) / 255.0f;
-					float Green = ((*Voxel >> 16) & 0xFF) / 255.0f;
-					float Blue = ((*Voxel >> 8) & 0xFF) / 255.0f;
-					EditorState->SelectedVoxelColorFloat = Vec3(Red, Green, Blue);
+					EditorState->SelectedVoxelColorFloat = GetVoxelColorVec3(Level->Voxels, X, Y, Z);
+					EditorState->SelectedVoxelReflectFloat = GetVoxelReflectivity(Level->Voxels, X, Y, Z) / 15.0f;
+					EditorState->SelectedVoxelRoughFloat = GetVoxelRoughness(Level->Voxels, X, Y, Z) / 7.0f;
 				}
 				
 				if (WasDown(GameInput->Buttons[Button_Delete]))
@@ -1724,7 +1800,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			{
 				if (Entity->Type == Entity_Turret)
 				{
-					Renderer->DebugRenderPass.DrawDebugBox(Entity->Pos, Entity->FireballDim, Entity->Color, QuaternionToAxisAngle(EulerToQuat(Entity->Orientation.xyz)), Entity->TargetOffset);
+					Renderer->DebugRenderPass.DrawDebugSphere(Entity->Pos + RotateByQuaternion(Entity->TargetOffset, EulerToQuat(Entity->Orientation.xyz)), Entity->FireballDim, Entity->Color);
 				}
 				else
 				{

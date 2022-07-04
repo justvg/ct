@@ -12,6 +12,7 @@ struct SCameraBuffer
 	vec4 Pos;
 	vec4 Viewport;
 	vec4 Frustums[6];
+    vec4 FrustumCorners[6];
 };
 
 struct SHUDProjectionBuffer
@@ -41,7 +42,6 @@ struct SRenderer
 	SBuffer IndexBuffer;
 	SBuffer VoxelDrawBuffer;
 	SBuffer VoxelVisibilityBuffer;
-	SBuffer ParticleDrawBuffer;
 	SBuffer IndirectBuffer;
 	SBuffer CountBuffer;
 	SBuffer VoxelsBuffer;
@@ -59,12 +59,9 @@ struct SRenderer
 
 	VkDescriptorPool DescriptorPool;
 
-	SImage HDRTargetImageMSAA;
-	SImage DepthImageMSAA;
-	SImage LinearDepthImageMSAA;
-	SImage VelocityImageMSAA;
-
-	SImage HDRTargetImage;
+	SImage AlbedoImage;
+	SImage NormalsImage;
+	SImage MaterialImage;
 	SImage DepthImage;
 	SImage LinearDepthImage;
 	SImage VelocityImages[2];
@@ -72,6 +69,14 @@ struct SRenderer
 	SImage DepthPyramidImage;
 	uint32_t DepthPyramidMipCount;
 	VkImageView DepthPyramidMipViews[16];
+
+	SImage DiffuseLightImage;
+	SImage DiffuseLightHistoryImages[2];
+	SImage DiffuseImage;
+
+	SImage SpecularLightImage;
+	SImage SpecularLightHistoryImages[2];
+	SImage CompositeImage;
 
 	SImage BrightnessImage;
 	VkImageView BrightnessMipViews[SExposureRenderPass::BrightnessImageMipCount];
@@ -90,10 +95,12 @@ struct SRenderer
 	SBuffer HUDProjectionBuffers[FramesInFlight];
 
 	SVoxelCullingComputePass CullingVoxComputePass;
-	SForwardVoxelRenderPass ForwardVoxRenderPass;
-	SForwardRenderPass ForwardRenderPass;
-	SForwardParticleRenderPass ForwardPartRenderPass;
+	SGBufferVoxelRenderPass GBufferVoxelRenderPass;
+	SGBufferRenderPass GBufferRenderPass;
 	SDownscaleComputePass DownscaleComputePass;
+	SDiffuseLightingPass DiffuseLightingPass;
+	STransparentRenderPass TransparentRenderPass;
+	SSpecularLightingPass SpecularLightingPass;
 	SExposureRenderPass ExposureRenderPass;
 	SBloomRenderPass BloomRenderPass;
 	STaaRenderPass TaaRenderPass;

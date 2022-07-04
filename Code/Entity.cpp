@@ -162,7 +162,7 @@ SEntity* AddFireball(SLevel& Level, vec3 Pos, vec3 Dim, vec3 Orientation, vec3 C
 	Entity->Speed = Speed;
 
 	Entity->Color = Color;
-	Entity->MeshIndex = 1;
+	Entity->MeshIndex = 3;
 
 	Entity->bUndiffusable = bUndiffusable;
 

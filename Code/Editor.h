@@ -54,6 +54,8 @@ struct SEditorState
 	uint32_t SelectedVoxelsCount;
 	uint32_t SelectedVoxels[LevelDimZ*LevelDimY*LevelDimX];
 	vec3 SelectedVoxelColorFloat;
+	float SelectedVoxelReflectFloat;
+	float SelectedVoxelRoughFloat;
 
 	uint32_t BuildingVoxelsToAddCount;
 	uint32_t BuildingVoxelsToAdd[LevelDimZ*LevelDimY*LevelDimX];

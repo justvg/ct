@@ -47,7 +47,7 @@ void main()
     
     // Exposure
     float Exposure = texture(ExposureTexture, vec2(0.5, 0.5)).r;
-    Color *= 1.0;//Exposure;
+    Color *= Exposure;
 
     // Tone mapping
     vec3 ColorFinal = vec3(1.0) - exp(-Color);

@@ -1,18 +1,17 @@
-struct SForwardVoxelRenderPass
+struct SGBufferVoxelRenderPass
 {
 public:
-    static SForwardVoxelRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-    void RenderEarly(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, vec3 AmbientColor, EAOQuality AOQuality, uint32_t FrameID);
-    void RenderLate(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID);
-	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
-	void HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage);
+    static SGBufferVoxelRenderPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& VoxelsBuffer, const SImage& AlbedoImage, const SImage& NormalsImage, const SImage& MaterialImage, const SImage* VelocityImages, const SImage& LinearDepthImage, const SImage& DepthImage);
+    void RenderEarly(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, vec3 AmbientColor, uint32_t FrameID, bool bDraw);
+    void RenderLate(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t FrameID, bool bDraw);
+	void UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& AlbedoImage, const SImage& NormalsImage, const SImage& MaterialImage, const SImage* VelocityImages, const SImage& LinearDepthImage, const SImage& DepthImage);
 
 private:
-    VkPipeline PipelineEarly[AOQuality_Count], PipelineLate[AOQuality_Count];
+    VkPipeline PipelineEarly, PipelineLate;
     VkPipelineLayout PipelineLayout;
 
     VkRenderPass RenderPassEarly, RenderPassLate;
-    VkFramebuffer FramebufferEarly, FramebufferLate;
+    VkFramebuffer FramebuffersEarly[2], FramebuffersLate[2];
 
     VkDescriptorSetLayout DescrSetLayout;
     VkDescriptorSet DescrSets[FramesInFlight];
@@ -21,30 +20,21 @@ private:
     VkShaderModule FShader;
 
 private:
-    static VkRenderPass CreateRenderPassEarly(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount);
-	static VkRenderPass CreateRenderPassLate(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount);
-	static VkPipeline CreateGraphicsPipelineEarly(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO);
-	static VkPipeline CreateGraphicsPipelineLate(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO);
+    static VkRenderPass CreateRenderPassEarly(VkDevice Device, VkFormat ColorFormat, VkFormat NormalsFormat, VkFormat MaterialFormat, VkFormat VelocityFormat, VkFormat LinearDepthFormat, VkFormat DepthFormat);
+	static VkRenderPass CreateRenderPassLate(VkDevice Device, VkFormat ColorFormat, VkFormat NormalsFormat, VkFormat MaterialFormat, VkFormat VelocityFormat, VkFormat LinearDepthFormat, VkFormat DepthFormat);
+	static VkPipeline CreateGraphicsPipelineEarly(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS);
+	static VkPipeline CreateGraphicsPipelineLate(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS);
 };
 
-struct SForwardRenderVoxPushConstants
-{
-    uint32_t FrameNumber;
-	uint32_t PointLightCount;
-};
-
-SForwardVoxelRenderPass SForwardVoxelRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, 
-                                              			const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers,
-                                              			const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
+SGBufferVoxelRenderPass SGBufferVoxelRenderPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, 
+                                              			const SBuffer* CameraBuffers, const SBuffer& DrawBuffer, const SBuffer& VoxelsBuffer,
+                                              			const SImage& AlbedoImage, const SImage& NormalsImage, const SImage& MaterialImage, const SImage* VelocityImages, const SImage& LinearDepthImage, const SImage& DepthImage)
 {
     VkDescriptorSetLayoutBinding CameraBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding DrawsBinding = CreateDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
-    VkDescriptorSetLayoutBinding VoxelsBinding = CreateDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkDescriptorSetLayoutBinding NoiseBinding = CreateDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkDescriptorSetLayoutBinding LightBinding = CreateDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkDescriptorSetLayoutBinding PointLightsBinding = CreateDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayoutBinding VoxelsBinding = CreateDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     
-    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, DrawsBinding, VoxelsBinding, NoiseBinding, LightBinding, PointLightsBinding };
+    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, DrawsBinding, VoxelsBinding };
     VkDescriptorSetLayout DescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(DescrSetLayoutBindings), DescrSetLayoutBindings);
 
     VkDescriptorSet DescrSets[FramesInFlight] = {};
@@ -54,80 +44,81 @@ SForwardVoxelRenderPass SForwardVoxelRenderPass::Create(const SVulkanContext& Vu
     	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, CameraBuffers[I], CameraBuffers[I].Size);
     	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, DrawBuffer, DrawBuffer.Size);
     	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VoxelsBuffer, VoxelsBuffer.Size);
-    	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, NoiseSampler, NoiseTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, LightBuffers[I], LightBuffers[I].Size);
-    	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, PointLightsBuffers[I], PointLightsBuffers[I].Size);
 	}
 
-    VkRenderPass RenderPassEarly = CreateRenderPassEarly(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
-    VkRenderPass RenderPassLate = CreateRenderPassLate(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
+    VkRenderPass RenderPassEarly = CreateRenderPassEarly(Vulkan.Device, AlbedoImage.Format, NormalsImage.Format, MaterialImage.Format, VelocityImages[0].Format, LinearDepthImage.Format, Vulkan.DepthFormat);
+    VkRenderPass RenderPassLate = CreateRenderPassLate(Vulkan.Device, AlbedoImage.Format, NormalsImage.Format, MaterialImage.Format, VelocityImages[0].Format, LinearDepthImage.Format, Vulkan.DepthFormat);
 
-	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    VkFramebuffer FramebufferEarly = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
-    VkFramebuffer FramebufferLate = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
+    VkFramebuffer FramebuffersEarly[2] = {};
+    VkFramebuffer FramebuffersLate[2] = {};
+	for (uint32_t I = 0; I < 2; I++)
+	{
+		VkImageView FramebufferAttachments[] = { AlbedoImage.View, NormalsImage.View, MaterialImage.View, VelocityImages[I].View, LinearDepthImage.View, DepthImage.View };
+		FramebuffersEarly[I] = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), AlbedoImage.Width, AlbedoImage.Height);
+		FramebuffersLate[I] = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), AlbedoImage.Width, AlbedoImage.Height);
+	}
 
     VkShaderModule VShader = LoadShader(Vulkan.Device, "Shaders\\Voxel.vert.spv");
     VkShaderModule FShader = LoadShader(Vulkan.Device, "Shaders\\Voxel.frag.spv");
 
-    VkPipelineLayout PipelineLayout = CreatePipelineLayout(Vulkan.Device, 1, &DescrSetLayout, sizeof(SForwardRenderVoxPushConstants), VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkPipelineLayout PipelineLayout = CreatePipelineLayout(Vulkan.Device, 1, &DescrSetLayout);
+	VkPipeline PipelineEarly = CreateGraphicsPipelineEarly(Vulkan.Device, RenderPassEarly, PipelineLayout, VShader, FShader);
+	VkPipeline PipelineLate = CreateGraphicsPipelineLate(Vulkan.Device, RenderPassLate, PipelineLayout, VShader, FShader);
 
-    SForwardVoxelRenderPass ForwardRenderPass = {};
-	for (uint32_t I = 0; I < AOQuality_Count; I++)
-	{
-		const int32_t SampleCountAO = 1 << I;
-		ForwardRenderPass.PipelineEarly[I] = CreateGraphicsPipelineEarly(Vulkan.Device, RenderPassEarly, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
-		ForwardRenderPass.PipelineLate[I] = CreateGraphicsPipelineLate(Vulkan.Device, RenderPassLate, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
-	}
+    SGBufferVoxelRenderPass GBufferVoxelRenderPass = {};
+	GBufferVoxelRenderPass.PipelineEarly = PipelineEarly;
+	GBufferVoxelRenderPass.PipelineLate = PipelineLate;
+    GBufferVoxelRenderPass.PipelineLayout = PipelineLayout;
+    GBufferVoxelRenderPass.RenderPassEarly = RenderPassEarly;
+    GBufferVoxelRenderPass.RenderPassLate = RenderPassLate;
+    GBufferVoxelRenderPass.DescrSetLayout = DescrSetLayout;
+    GBufferVoxelRenderPass.VShader = VShader;
+    GBufferVoxelRenderPass.FShader = FShader;
+    memcpy(GBufferVoxelRenderPass.FramebuffersEarly, FramebuffersEarly, sizeof(GBufferVoxelRenderPass.FramebuffersEarly));
+    memcpy(GBufferVoxelRenderPass.FramebuffersLate, FramebuffersLate, sizeof(GBufferVoxelRenderPass.FramebuffersLate));
+	memcpy(GBufferVoxelRenderPass.DescrSets, DescrSets, sizeof(GBufferVoxelRenderPass.DescrSets));
 
-    ForwardRenderPass.PipelineLayout = PipelineLayout;
-    ForwardRenderPass.RenderPassEarly = RenderPassEarly;
-    ForwardRenderPass.RenderPassLate = RenderPassLate;
-    ForwardRenderPass.FramebufferEarly = FramebufferEarly;
-    ForwardRenderPass.FramebufferLate = FramebufferLate;
-    ForwardRenderPass.DescrSetLayout = DescrSetLayout;
-    ForwardRenderPass.VShader = VShader;
-    ForwardRenderPass.FShader = FShader;
-	memcpy(ForwardRenderPass.DescrSets, DescrSets, sizeof(ForwardRenderPass.DescrSets));
-
-    return ForwardRenderPass;
+    return GBufferVoxelRenderPass;
 }
 
-void SForwardVoxelRenderPass::RenderEarly(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, vec3 AmbientColor, EAOQuality AOQuality, uint32_t FrameID)
+void SGBufferVoxelRenderPass::RenderEarly(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, vec3 AmbientColor, uint32_t FrameID, bool bDraw)
 {
 	BEGIN_GPU_PROFILER_BLOCK("VOXEL_RENDER_EARLY", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	VkClearValue ClearColorValue = { AmbientColor.x, AmbientColor.y, AmbientColor.z };
-	VkClearValue ClearLinearDepthValue = { 1.0f };
+	VkClearValue ClearNormalsValue = { 0.0f, 0.0f, 0.0f, 0.0f };
+	VkClearValue ClearMaterialValue = { 0.0f, 0.0f };
 	VkClearValue ClearVelocityValue = { 0.0f, 0.0f };
+	VkClearValue ClearLinearDepthValue = { 1.0f };
 	VkClearValue ClearDepthValue = { 1.0f, 0.0f };
-	VkClearValue ClearValues[] = { ClearColorValue, ClearLinearDepthValue, ClearVelocityValue, ClearDepthValue };
+	VkClearValue ClearValues[] = { ClearColorValue, ClearNormalsValue, ClearMaterialValue, ClearVelocityValue, ClearLinearDepthValue, ClearDepthValue };
 	VkRenderPassBeginInfo RenderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	RenderPassBeginInfo.renderPass = RenderPassEarly;
-	RenderPassBeginInfo.framebuffer = FramebufferEarly;
+	RenderPassBeginInfo.framebuffer = FramebuffersEarly[FrameID % 2];
 	RenderPassBeginInfo.renderArea.extent.width = Vulkan.InternalWidth;
 	RenderPassBeginInfo.renderArea.extent.height = Vulkan.InternalHeight;
 	RenderPassBeginInfo.clearValueCount = ArrayCount(ClearValues);
 	RenderPassBeginInfo.pClearValues = ClearValues;
 	vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineEarly[AOQuality]);
+	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineEarly);
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
-
-	SForwardRenderVoxPushConstants PushConstants = { FrameID % 8, PointLightCount };
-	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderVoxPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	if (Vulkan.vkCmdDrawIndexedIndirectCount)
+	if (bDraw)
 	{
-		Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
-	}
-	else
-	{
-		vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		if (Vulkan.vkCmdDrawIndexedIndirectCount)
+		{
+			Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		}
+		else
+		{
+			vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		}
 	}
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);
@@ -135,88 +126,64 @@ void SForwardVoxelRenderPass::RenderEarly(const SVulkanContext& Vulkan, const SB
 	END_GPU_PROFILER_BLOCK("VOXEL_RENDER_EARLY", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }
 
-void SForwardVoxelRenderPass::RenderLate(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t PointLightCount, EAOQuality AOQuality, uint32_t FrameID)
+void SGBufferVoxelRenderPass::RenderLate(const SVulkanContext& Vulkan, const SBuffer& VertexBuffer, const SBuffer& IndexBuffer, const SBuffer& IndirectBuffer, const SBuffer& CountBuffer, uint32_t ObjectsCount, uint32_t FrameID, bool bDraw)
 {
 	BEGIN_GPU_PROFILER_BLOCK("VOXEL_RENDER_LATE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	VkRenderPassBeginInfo RenderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	RenderPassBeginInfo.renderPass = RenderPassLate;
-	RenderPassBeginInfo.framebuffer = FramebufferLate;
+	RenderPassBeginInfo.framebuffer = FramebuffersLate[FrameID % 2];
 	RenderPassBeginInfo.renderArea.extent.width = Vulkan.InternalWidth;
 	RenderPassBeginInfo.renderArea.extent.height = Vulkan.InternalHeight;
 	vkCmdBeginRenderPass(Vulkan.CommandBuffer, &RenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLate[AOQuality]);
+	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLate);
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[Vulkan.FrameInFlight], 0, 0);
-
-	SForwardRenderVoxPushConstants PushConstants = { FrameID % 8, PointLightCount };
-	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SForwardRenderVoxPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;
 	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &VertexBuffer.Buffer, &Offset);
 	vkCmdBindIndexBuffer(Vulkan.CommandBuffer, IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	if (Vulkan.vkCmdDrawIndexedIndirectCount)
+	if (bDraw)
 	{
-		Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
-	}		
-	else
-	{
-		vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		if (Vulkan.vkCmdDrawIndexedIndirectCount)
+		{
+			Vulkan.vkCmdDrawIndexedIndirectCount(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, CountBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		}		
+		else
+		{
+			vkCmdDrawIndexedIndirect(Vulkan.CommandBuffer, IndirectBuffer.Buffer, 0, ObjectsCount, sizeof(VkDrawIndexedIndirectCommand));
+		}
 	}
-	
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);
 
 	END_GPU_PROFILER_BLOCK("VOXEL_RENDER_LATE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }
 
-void SForwardVoxelRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
+void SGBufferVoxelRenderPass::UpdateAfterResize(const SVulkanContext& Vulkan, const SImage& AlbedoImage, const SImage& NormalsImage, const SImage& MaterialImage, const SImage* VelocityImages, const SImage& LinearDepthImage, const SImage& DepthImage)
 {
-	vkDestroyFramebuffer(Vulkan.Device, FramebufferEarly, 0);
-	vkDestroyFramebuffer(Vulkan.Device, FramebufferLate, 0);
+	for (uint32_t I = 0; I < ArrayCount(FramebuffersEarly); I++)
+	{
+		vkDestroyFramebuffer(Vulkan.Device, FramebuffersEarly[I], 0);
+		vkDestroyFramebuffer(Vulkan.Device, FramebuffersLate[I], 0);
+	}
 	
-	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    FramebufferEarly = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
-    FramebufferLate = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
-}
-
-void SForwardVoxelRenderPass::HandleSampleMSAAChange(const SVulkanContext& Vulkan, const SImage& HDRTargetImage, const SImage& LinearDepthImage, const SImage& VelocityImage, const SImage& DepthImage)
-{
-	for (uint32_t I = 0; I < AOQuality_Count; I++)
+    for (uint32_t I = 0; I < 2; I++)
 	{
-		vkDestroyPipeline(Vulkan.Device, PipelineEarly[I], 0);
-		vkDestroyPipeline(Vulkan.Device, PipelineLate[I], 0);
-	}
-
-	vkDestroyFramebuffer(Vulkan.Device, FramebufferEarly, 0);
-	vkDestroyFramebuffer(Vulkan.Device, FramebufferLate, 0);
-
-	vkDestroyRenderPass(Vulkan.Device, RenderPassEarly, 0);
-	vkDestroyRenderPass(Vulkan.Device, RenderPassLate, 0);
-
-	RenderPassEarly = CreateRenderPassEarly(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
-    RenderPassLate = CreateRenderPassLate(Vulkan.Device, HDRTargetImage.Format, Vulkan.DepthFormat, Vulkan.SampleCountMSAA);
-
-	VkImageView FramebufferAttachments[] = { HDRTargetImage.View, LinearDepthImage.View, VelocityImage.View, DepthImage.View };
-    FramebufferEarly = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
-    FramebufferLate = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), HDRTargetImage.Width, HDRTargetImage.Height);
-
-	for (uint32_t I = 0; I < AOQuality_Count; I++)
-	{
-		const int32_t SampleCountAO = 1 << I;
-		PipelineEarly[I] = CreateGraphicsPipelineEarly(Vulkan.Device, RenderPassEarly, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
-		PipelineLate[I] = CreateGraphicsPipelineLate(Vulkan.Device, RenderPassLate, PipelineLayout, VShader, FShader, Vulkan.SampleCountMSAA, SampleCountAO);
+		VkImageView FramebufferAttachments[] = { AlbedoImage.View, NormalsImage.View, MaterialImage.View, VelocityImages[I].View, LinearDepthImage.View, DepthImage.View };
+		FramebuffersEarly[I] = CreateFramebuffer(Vulkan.Device, RenderPassLate, FramebufferAttachments, ArrayCount(FramebufferAttachments), AlbedoImage.Width, AlbedoImage.Height);
+		FramebuffersLate[I] = CreateFramebuffer(Vulkan.Device, RenderPassEarly, FramebufferAttachments, ArrayCount(FramebufferAttachments), AlbedoImage.Width, AlbedoImage.Height);
 	}
 }
 
-VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount)
+VkRenderPass SGBufferVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkFormat ColorFormat, VkFormat NormalsFormat, VkFormat MaterialFormat, VkFormat VelocityFormat, VkFormat LinearDepthFormat, VkFormat DepthFormat)
 {
-	VkAttachmentDescription Attachments[4] = {};
+	VkAttachmentDescription Attachments[6] = {};
 
 	Attachments[0].format = ColorFormat;
-	Attachments[0].samples = SampleCount;
+	Attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	Attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -224,8 +191,8 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkF
 	Attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	Attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	
-	Attachments[1].format = VK_FORMAT_R32_SFLOAT;
-	Attachments[1].samples = SampleCount;
+	Attachments[1].format = NormalsFormat;
+	Attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	Attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -233,8 +200,8 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkF
 	Attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	Attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	Attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
-	Attachments[2].samples = SampleCount;
+	Attachments[2].format = MaterialFormat;
+	Attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	Attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -242,21 +209,41 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkF
 	Attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	Attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	Attachments[3].format = DepthFormat;
-	Attachments[3].samples = SampleCount;
+	Attachments[3].format = VelocityFormat;
+	Attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	Attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	Attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	Attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	Attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	Attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	Attachments[4].format = LinearDepthFormat;
+	Attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
+	Attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	Attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	Attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	Attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	Attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	Attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	Attachments[5].format = DepthFormat;
+	Attachments[5].samples = VK_SAMPLE_COUNT_1_BIT;
+	Attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	Attachments[5].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	Attachments[5].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	Attachments[5].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	Attachments[5].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	Attachments[5].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentReference ColorAttachment = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference LinearDepthAttachment = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference VelocityAttachment = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference DepthAttachment = { 3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference NormalsAttachment = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference MaterialAttachment = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference VelocityAttachment = { 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference LinearDepthAttachment = { 4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference DepthAttachment = { 5, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-	VkAttachmentReference ColorAttachments[] = { ColorAttachment, LinearDepthAttachment, VelocityAttachment };
+	VkAttachmentReference ColorAttachments[] = { ColorAttachment, NormalsAttachment, MaterialAttachment, VelocityAttachment, LinearDepthAttachment };
 
 	VkSubpassDescription Subpass = {};
 	Subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -277,12 +264,12 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassEarly(VkDevice Device, VkF
 	return RenderPass;
 }
 
-VkRenderPass SForwardVoxelRenderPass::CreateRenderPassLate(VkDevice Device, VkFormat ColorFormat, VkFormat DepthFormat, VkSampleCountFlagBits SampleCount)
+VkRenderPass SGBufferVoxelRenderPass::CreateRenderPassLate(VkDevice Device, VkFormat ColorFormat, VkFormat NormalsFormat, VkFormat MaterialFormat, VkFormat VelocityFormat, VkFormat LinearDepthFormat, VkFormat DepthFormat)
 {
-	VkAttachmentDescription Attachments[4] = {};
+	VkAttachmentDescription Attachments[6] = {};
 
 	Attachments[0].format = ColorFormat;
-	Attachments[0].samples = SampleCount;
+	Attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	Attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -290,17 +277,17 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassLate(VkDevice Device, VkFo
 	Attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	Attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	Attachments[1].format = VK_FORMAT_R32_SFLOAT;
-	Attachments[1].samples = SampleCount;
+	Attachments[1].format = NormalsFormat;
+	Attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	Attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	Attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	Attachments[1].initialLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	Attachments[1].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	Attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	
-	Attachments[2].format = VK_FORMAT_R16G16_SFLOAT;
-	Attachments[2].samples = SampleCount;
+
+	Attachments[2].format = MaterialFormat;
+	Attachments[2].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	Attachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[2].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -308,21 +295,41 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassLate(VkDevice Device, VkFo
 	Attachments[2].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	Attachments[2].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	Attachments[3].format = DepthFormat;
-	Attachments[3].samples = SampleCount;
+	Attachments[3].format = VelocityFormat;
+	Attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
 	Attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	Attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	Attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	Attachments[3].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	Attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	Attachments[3].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	Attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	Attachments[4].format = LinearDepthFormat;
+	Attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
+	Attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+	Attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	Attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	Attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	Attachments[4].initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	Attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	Attachments[5].format = DepthFormat;
+	Attachments[5].samples = VK_SAMPLE_COUNT_1_BIT;
+	Attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+	Attachments[5].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	Attachments[5].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	Attachments[5].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	Attachments[5].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	Attachments[5].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentReference ColorAttachment = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference LinearDepthAttachment = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference VelocityAttachment = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-	VkAttachmentReference DepthAttachment = { 3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference NormalsAttachment = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference MaterialAttachment = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference VelocityAttachment = { 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference LinearDepthAttachment = { 4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+	VkAttachmentReference DepthAttachment = { 5, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
-	VkAttachmentReference ColorAttachments[] = { ColorAttachment, LinearDepthAttachment, VelocityAttachment };
+	VkAttachmentReference ColorAttachments[] = { ColorAttachment, NormalsAttachment, MaterialAttachment, VelocityAttachment, LinearDepthAttachment };
 
 	VkSubpassDescription Subpass = {};
 	Subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -343,11 +350,8 @@ VkRenderPass SForwardVoxelRenderPass::CreateRenderPassLate(VkDevice Device, VkFo
 	return RenderPass;
 }
 
-VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO)
+VkPipeline SGBufferVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS)
 {
-	VkSpecializationMapEntry SpecializationEntry = { 0, 0, sizeof(int32_t) };
-	VkSpecializationInfo SpecializationInfo = { 1, &SpecializationEntry, sizeof(int32_t), &SampleCountAO };
-
 	VkPipelineShaderStageCreateInfo ShaderStages[2] = {};
 	ShaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	ShaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -357,7 +361,6 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device,
 	ShaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	ShaderStages[1].module = FS;
 	ShaderStages[1].pName = "main";
-	ShaderStages[1].pSpecializationInfo = &SpecializationInfo;
 
 	VkVertexInputBindingDescription BindingDescr = {};
 	BindingDescr.binding = 0;
@@ -394,7 +397,7 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device,
 	RasterizationStateInfo.lineWidth = 1.0f;
 
 	VkPipelineMultisampleStateCreateInfo MultisampleStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-	MultisampleStateInfo.rasterizationSamples = SampleCount;
+	MultisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkPipelineDepthStencilStateCreateInfo DepthStencilStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 	DepthStencilStateInfo.depthTestEnable = VK_TRUE;
@@ -402,10 +405,12 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device,
 	DepthStencilStateInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	DepthStencilStateInfo.stencilTestEnable = VK_FALSE;
 
-	VkPipelineColorBlendAttachmentState ColorAttachmentStates[3] = {};
+	VkPipelineColorBlendAttachmentState ColorAttachmentStates[5] = {};
 	ColorAttachmentStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	ColorAttachmentStates[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	ColorAttachmentStates[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	ColorAttachmentStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	ColorAttachmentStates[4].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	VkPipelineColorBlendStateCreateInfo ColorBlendStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 	ColorBlendStateInfo.attachmentCount = ArrayCount(ColorAttachmentStates);
@@ -437,11 +442,8 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineEarly(VkDevice Device,
 	return GraphicsPipeline;
 }
 
-VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineLate(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS, VkSampleCountFlagBits SampleCount, const int32_t SampleCountAO)
+VkPipeline SGBufferVoxelRenderPass::CreateGraphicsPipelineLate(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS)
 {
-	VkSpecializationMapEntry SpecializationEntry = { 0, 0, sizeof(int32_t) };
-	VkSpecializationInfo SpecializationInfo = { 1, &SpecializationEntry, sizeof(int32_t), &SampleCountAO };
-
 	VkPipelineShaderStageCreateInfo ShaderStages[2] = {};
 	ShaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	ShaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -451,7 +453,6 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineLate(VkDevice Device, 
 	ShaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	ShaderStages[1].module = FS;
 	ShaderStages[1].pName = "main";
-	ShaderStages[1].pSpecializationInfo = &SpecializationInfo;
 
 	VkVertexInputBindingDescription BindingDescr = {};
 	BindingDescr.binding = 0;
@@ -488,7 +489,7 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineLate(VkDevice Device, 
 	RasterizationStateInfo.lineWidth = 1.0f;
 
 	VkPipelineMultisampleStateCreateInfo MultisampleStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-	MultisampleStateInfo.rasterizationSamples = SampleCount;
+	MultisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkPipelineDepthStencilStateCreateInfo DepthStencilStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 	DepthStencilStateInfo.depthTestEnable = VK_TRUE;
@@ -496,10 +497,12 @@ VkPipeline SForwardVoxelRenderPass::CreateGraphicsPipelineLate(VkDevice Device, 
 	DepthStencilStateInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 	DepthStencilStateInfo.stencilTestEnable = VK_FALSE;
 
-	VkPipelineColorBlendAttachmentState ColorAttachmentStates[3] = {};
+	VkPipelineColorBlendAttachmentState ColorAttachmentStates[5] = {};
 	ColorAttachmentStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	ColorAttachmentStates[1].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	ColorAttachmentStates[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	ColorAttachmentStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	ColorAttachmentStates[4].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 	VkPipelineColorBlendStateCreateInfo ColorBlendStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 	ColorBlendStateInfo.attachmentCount = ArrayCount(ColorAttachmentStates);

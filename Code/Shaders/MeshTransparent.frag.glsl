@@ -15,13 +15,10 @@ layout (push_constant) uniform PushConstants
 	vec4 Scale; // w - unused
 	vec4 Orientation;
 	vec4 MeshColor;
-	vec4 Offset; // w contains point lights count
+	vec4 Offset; // w - unused
 
 	vec4 PrevPosition; // w - unused
 	vec4 PrevOrientation; // w - unused
-
-    uint FrameNumber;
-	uint FPWeaponDepthTest;
 
 	float Time;
 	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
@@ -39,42 +36,10 @@ layout (set = 0, binding = 0) uniform CameraBuffer
 	vec4 CameraPosition; 
     vec4 Viewport; // Width, Height, Near, Far
 	vec4 Frustum[6];
-};
-
-layout (set = 0, binding = 1) readonly buffer Voxels
-{
-	uint VoxelActive[LevelDimZ][LevelDimY][LevelDimX];
-};
-
-layout (set = 0, binding = 2) uniform sampler2D BlueNoiseTexture;
-
-layout (set = 0, binding = 3) uniform LightBuffer
-{
-	vec4 AmbientColor; // w - unused
-	vec4 AmbientConstant; // w - unused
-};
-
-#include "ForwardShading.incl.glsl"
-
-layout (set = 0, binding = 4) readonly buffer PointsLights
-{
-	SPointLight PointLight[];
+    vec4 FrustumCorners[6];
 };
 
 void main()
 {
-	vec3 Normal = normalize(NormalWS);
-
-	vec3 Ambient = AmbientColor.rgb;
-	
-	vec3 Diffuse = vec3(0.0, 0.0, 0.0);
-	uint PointLightCount = uint(Offset.w);
-	for (uint I = 0; I < PointLightCount; I++)
-	{
-		Diffuse += CalculatePointLight(PointLight[I], FragPosWS, Normal);
-	}
-
-	vec3 ColorFinal = (Ambient + Diffuse) * MeshColor.rgb;
-
-	FragColor = vec4(ColorFinal, MeshColor.w);
+	FragColor = vec4(MeshColor.rgb, min(0.99999, MeshColor.a));
 }
