@@ -5,5 +5,6 @@ workspace.code-workspace
 Log.txt
 TODO
 cloc.exe
-Content/Saves/*
+Content/Saves/GeneralSave
+Content/Saves/MainHubSaved.ctl
 WinMain.sln
