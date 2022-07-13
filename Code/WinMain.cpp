@@ -878,6 +878,10 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 				WinToggleFullscreen(Window);
 
+				// NOTE(georgii): Fix for vkEnumeratePhysicalDevices bug on laptops with AMD and NVIDIA GPUs
+				// https://github.com/KhronosGroup/Vulkan-Loader/issues/552
+				SetEnvironmentVariableA("DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1", "1");
+
 				memset(GameMemory.Storage, 0, GameMemory.StorageSize);
 
 				SVulkanVersion VulkanVersion = GetVulkanVersion();
@@ -1184,7 +1188,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					if (FrameID > (FramesInFlight - 2))
 					{
-						OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
+						// OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
 					}
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();
