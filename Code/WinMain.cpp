@@ -139,9 +139,10 @@ static SPlatformData GlobalPlatformData;
 static bool bGlobalRunning = true;
 static bool bGlobalWindowFocused = true;
 static bool bGlobalShowMouse = true;
-static bool bGlobalMouseStateBeforeMinimization = false;
+static bool bGlobalShowMouseBeforeMinimization = false;
 static bool bGlobalCursorWasJustDisabled = false;
 static bool bGlobalShowCursor = true;
+static bool bGlobalShowCursorBeforeMinimization = false;
 
 static int64_t GlobalPerfCounterFrequency;
 
@@ -463,9 +464,10 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 		case WM_SETFOCUS:
 		{
 			bGlobalWindowFocused = true;
-			if (PlatformData && GameInput && !bGlobalMouseStateBeforeMinimization)
+
+			if (GameInput)
 			{
-				WinDisableCursor(PlatformData, GameInput);
+				PlatformToggleCursor(GameInput, bGlobalShowMouseBeforeMinimization, bGlobalShowCursorBeforeMinimization);
 			}
 
 			// NOTE(georgii): Handle Alt + Tab bug.
@@ -478,8 +480,10 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 
 		case WM_KILLFOCUS:
 		{
-			bGlobalMouseStateBeforeMinimization = bGlobalShowMouse;
 			bGlobalWindowFocused = false;
+
+			bGlobalShowMouseBeforeMinimization = bGlobalShowMouse;
+			bGlobalShowCursorBeforeMinimization = bGlobalShowCursor;
 			if (PlatformData && GameInput)
 			{
 				WinEnableCursor(PlatformData, GameInput);
