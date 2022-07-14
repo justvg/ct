@@ -850,7 +850,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					SaveFilePointer += sizeof(bool);
 					SaveFilePointer += sizeof(bool);
 					SaveFilePointer += sizeof(int32_t);
-					SaveFilePointer += sizeof(int32_t);
 
 					memcpy(&InternalWidthSaved, SaveFilePointer, sizeof(uint32_t));
 					SaveFilePointer += sizeof(uint32_t);
