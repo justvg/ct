@@ -617,17 +617,17 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 				LevelMemory += sizeof(SPointLight);
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].CurrentColor, LevelMemory, sizeof(vec3));
+				memcpy(&Level->Entities[I].AnimationColor, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 				memcpy(&Level->Entities[I].TargetColor, LevelMemory, sizeof(vec3));
 				LevelMemory += sizeof(vec3);
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].TimeToMove, LevelMemory, sizeof(float));
+				memcpy(&Level->Entities[I].TimeToDisappear, LevelMemory, sizeof(float));
 				LevelMemory += sizeof(float);
 				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].TimeToMoveCurrent, LevelMemory, sizeof(float));
+				memcpy(&Level->Entities[I].TimeToDisappearCurrent, LevelMemory, sizeof(float));
 				LevelMemory += sizeof(float);
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
@@ -747,7 +747,7 @@ void FixDoorIndex(SLevel* Level, uint32_t OldDoorIndex, uint32_t NewDoorIndex)
 	{
 		SEntity* Entity = Level->Entities + I;
 
-		if ((Entity->Type == Entity_Checkpoint) && (Entity->DoorIndex == OldDoorIndex))
+		if (((Entity->Type == Entity_Checkpoint) || (Entity->Type == Entity_Torch)) && (Entity->DoorIndex == OldDoorIndex))
 		{
 			Entity->DoorIndex = NewDoorIndex;
 		}

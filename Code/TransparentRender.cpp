@@ -178,24 +178,6 @@ void STransparentRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entit
 		const SMesh& Mesh = Geometry.Meshes[Entity.MeshIndex];
 		vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SMeshRenderPushConstants), &PushConstants);
 		vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
-
-		if (Entity.Type == Entity_Door)
-		{
-			PushConstants.Offset.xyz = Vec3(-0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
-			PushConstants.Scale = Hadamard(PushConstants.Scale, Vec4(0.15f, 0.15f, 1.03f, 0.0f));
-			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.TargetColor : 10.0f * Entity.TargetColor;
-			PushConstants.ShaderValue0 = 0.5f;
-		
-			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SMeshRenderPushConstants), &PushConstants);
-			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
-
-			PushConstants.Offset.xyz = Vec3(0.3f * Entity.Scale * Entity.Dim.x, 0.0f, 0.0f);
-			PushConstants.Color.rgb = IsEqual(Entity.CurrentColor, Entity.TargetColor) ? 150.0f * Entity.CurrentColor : 10.0f * Entity.CurrentColor;
-			PushConstants.ShaderValue0 = 0.5f;
-
-			vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SMeshRenderPushConstants), &PushConstants);
-			vkCmdDrawIndexed(Vulkan.CommandBuffer, Mesh.IndexCount, 1, Mesh.IndexOffset, Mesh.VertexOffset, 0);
-		}
 	}
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);

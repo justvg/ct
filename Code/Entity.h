@@ -14,9 +14,7 @@ enum EEntityType
 	Entity_Fireball,
 	Entity_MessageToggler,
 	Entity_Container,
-
 	Entity_Checkpoint,
-
 	Entity_ColorField,
 };
 
@@ -53,7 +51,7 @@ struct SEntity
 	float Drag;
 	float JumpPower;
 
-	uint32_t DoorIndex; // NOTE(georgii): Used for checkpoint to close a door.
+	uint32_t DoorIndex; // NOTE(georgii): Used for checkpoint to close a door. And for torches to control doors.
 	
 	float Alpha;
 
@@ -78,7 +76,7 @@ struct SEntity
 	};
 
 	// Gameplay colors
-	vec3 CurrentColor;
+	vec3 AnimationColor;
 	union
 	{
 		vec3 TargetColor;
@@ -89,8 +87,8 @@ struct SEntity
 	{
 		struct
 		{
-			float TimeToMove;
-			float TimeToMoveCurrent;
+			float TimeToDisappear;
+			float TimeToDisappearCurrent;
 		};
 
 		struct
@@ -111,8 +109,11 @@ struct SEntity
 	vec3 BasePos;
 	vec3 TargetOffset;
 
-	// NOTE(georgii): Currently this is used for hero/gates collision, so we don't immediately handle it, but after some time.
-	bool bCollisionWithHeroStarted; 
+	union
+	{
+		bool bCollisionWithHeroStarted; // NOTE(georgii): Currently this is used for hero/gates collision, so we don't immediately handle it, but after some time.
+		bool bOpen;
+	};
 	float CollisionWithHeroTimePassed;
 
 	uint32_t MeshIndex;

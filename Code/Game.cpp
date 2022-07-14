@@ -8,8 +8,11 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 
 	if (WasDown(GameInput->Buttons[Button_R]))
 	{
-		ReloadGameLevel(EngineState);
-		GameState->CurrentCheckpointIndex = 0;
+		if (!CompareStrings(EngineState->LevelName, "Levels\\MainHub.ctl"))
+		{
+			ReloadGameLevel(EngineState);
+			GameState->CurrentCheckpointIndex = 0;
+		}
 	}
 
 	Camera->PrevDir = Camera->Dir;
@@ -125,7 +128,8 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 		HeroControl.bUseLamp = true;
 	}
 	
-	if (HeroControl.bUseLamp && !GameState->bDeathAnimation)
+	Assert((Level->EntityCount == 0) || (Level->Entities[0].Type == Entity_Hero));
+	if (HeroControl.bUseLamp && !GameState->bDeathAnimation && !Level->Entities[0].bChangeColorAnimation)
 	{
 		// SPlayingSound* ShootSound = PlaySound(AudioState, false, 1);
 		// ChangePitch(ShootSound, RandomFloat(1.15f, 2.0f));
@@ -141,16 +145,19 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			
 			if ((TestEntity->Type != Entity_Hero) && (TestEntity->Type != Entity_ColorField))
 			{
-				const SMesh& TestMesh = EngineState->Geometry.Meshes[TestEntity->MeshIndex];
-				Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, Hadamard(TestEntity->Dim, TestMesh.Dim), EulerToQuat(TestEntity->Orientation.xyz));
-				
-				float tTest;
-				if (IntersectRectRay(TestEntityAABB, RayStart, RayDir, tTest))
+				if ((TestEntity->Type != Entity_Door) || (TestEntity->Alpha > 0.05f))
 				{
-					if (tTest < tMin)
+					const SMesh& TestMesh = EngineState->Geometry.Meshes[TestEntity->MeshIndex];
+					Rect TestEntityAABB = RectCenterDimOrientation(TestEntity->Pos, Hadamard(TestEntity->Dim, TestMesh.Dim), EulerToQuat(TestEntity->Orientation.xyz));
+					
+					float tTest;
+					if (IntersectRectRay(TestEntityAABB, RayStart, RayDir, tTest))
 					{
-						tMin = tTest;
-						HitEntity = TestEntity;
+						if (tTest < tMin)
+						{
+							tMin = tTest;
+							HitEntity = TestEntity;
+						}
 					}
 				}
 			}
@@ -164,6 +171,8 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			{
 				bVoxelHitFirst = true;
 				tMin = RaytraceVoxelsResult.Distance;
+
+				HitEntity = 0;
 			}
 		}
 		
@@ -181,8 +190,63 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						vec3 ResultColor = HeroEntity->Color + HitEntity->Color;
 						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
 						{
-							HeroEntity->Color = ResultColor;
-							HitEntity->Color = Vec3(0.0f);
+							HitEntity->bChangeColorAnimation = true;
+							HitEntity->AnimationColor = Vec3(0.0f);
+							HitEntity->TimeToChangeColor = 0.5f;
+							HitEntity->TimeToChangeColorCurrent = 0.0f;
+
+							HeroEntity->bChangeColorAnimation = true;
+							HeroEntity->AnimationColor = ResultColor;
+							HeroEntity->TimeToChangeColor = 0.5f;
+							HeroEntity->TimeToChangeColorCurrent = 0.0f;
+
+							if ((HitEntity->DoorIndex > 0) && (HitEntity->DoorIndex < Level->EntityCount))
+							{
+								uint32_t DoorIndex = HitEntity->DoorIndex;
+								Assert(Level->Entities[DoorIndex].Type == Entity_Door);
+
+								if (!Level->Entities[DoorIndex].bForceClose)
+								{
+									Level->Entities[DoorIndex].bOpen = false;
+								}
+							}
+						}
+					}
+					else if (WasDown(GameInput->Buttons[Button_MouseRight]))
+					{
+						vec3 ResultColor = HeroEntity->Color + HitEntity->Color;
+						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
+						{
+							HitEntity->bChangeColorAnimation = true;
+							HitEntity->AnimationColor = ResultColor;
+							HitEntity->TimeToChangeColor = 0.5f;
+							HitEntity->TimeToChangeColorCurrent = 0.0f;
+							
+							HeroEntity->bChangeColorAnimation = true;
+							HeroEntity->AnimationColor = Vec3(0.0f);
+							HeroEntity->TimeToChangeColor = 0.5f;
+							HeroEntity->TimeToChangeColorCurrent = 0.0f;
+
+							if ((HitEntity->DoorIndex > 0) && (HitEntity->DoorIndex < Level->EntityCount))
+							{
+								uint32_t DoorIndex = HitEntity->DoorIndex;
+								Assert(Level->Entities[DoorIndex].Type == Entity_Door);
+
+								if (IsEqual(ResultColor, HitEntity->TargetColor))
+								{
+									if (!Level->Entities[DoorIndex].bForceClose)
+									{
+										Level->Entities[DoorIndex].bOpen = true;
+									}
+								}
+								else
+								{
+									if (!Level->Entities[DoorIndex].bForceClose)
+									{
+										Level->Entities[DoorIndex].bOpen = false;
+									}
+								}
+							}
 						}
 					}
 				} break;
@@ -197,31 +261,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					} 
 				} break;
 				
-				case Entity_Door:
-				{
-					if (!HitEntity->bForceClose)
-					{
-						if (WasDown(GameInput->Buttons[Button_MouseLeft]))
-						{
-							vec3 ResultColor = HeroEntity->Color + HitEntity->CurrentColor;
-							if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
-							{
-								HeroEntity->Color = ResultColor;
-								HitEntity->CurrentColor = Vec3(0.0f);
-							}
-						}
-						else if (WasDown(GameInput->Buttons[Button_MouseRight]))
-						{
-							vec3 ResultColor = HeroEntity->Color + HitEntity->CurrentColor;
-							if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
-							{
-								HitEntity->CurrentColor = ResultColor;
-								HeroEntity->Color = Vec3(0.0f);
-							}
-						}
-					}
-				} break;
-				
 				case Entity_Fireball:
 				{
 					if (WasDown(GameInput->Buttons[Button_MouseLeft]))
@@ -229,8 +268,14 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						vec3 ResultColor = HeroEntity->Color + HitEntity->Color;
 						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
 						{
-							HeroEntity->Color = ResultColor;
 							HitEntity->Color = Vec3(0.0f);
+
+							HeroEntity->bChangeColorAnimation = true;
+							HeroEntity->AnimationColor = ResultColor;
+							HeroEntity->TimeToChangeColor = 0.5f;
+							HeroEntity->TimeToChangeColorCurrent = 0.0f;
+
+							HitEntity->bRemoved = true;
 						}
 					}
 				} break;
@@ -345,12 +390,12 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					{
 						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
 						{
-							Entity->Color = Lerp(Entity->Color, Entity->TargetColor, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
+							Entity->Color = Lerp(Entity->Color, Entity->AnimationColor, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
 							Entity->TimeToChangeColorCurrent += GameInput->dt;
 						}
 						else
 						{
-							Entity->Color = Entity->TargetColor;
+							Entity->Color = Entity->AnimationColor;
 							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
 							Entity->bChangeColorAnimation = false;
 						}
@@ -371,27 +416,45 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					Entity->PointLight.Pos = (0.2f * Entity->LampOffset.x * Entity->Dim.x * Camera->Right) + (0.3f * Entity->Dim.z * Camera->Dir) + (0.2f * Entity->LampOffset.y * Camera->Up);
 				} break;
 				
+				case Entity_Torch:
+				{
+					if (Entity->bChangeColorAnimation)
+					{
+						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
+						{
+							Entity->Color = Lerp(Entity->Color, Entity->AnimationColor, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
+							Entity->TimeToChangeColorCurrent += GameInput->dt;
+						}
+						else
+						{
+							Entity->Color = Entity->AnimationColor;
+							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
+							Entity->bChangeColorAnimation = false;
+						}
+					}
+				} break;
+
 				case Entity_Door:
 				{
-					Entity->Pos = Entity->BasePos + Min(Entity->TimeToMoveCurrent / Entity->TimeToMove, 1.0f) * Entity->TargetOffset;
+					Entity->Alpha = Lerp(0.99999f, 0.0f, Min(Entity->TimeToDisappearCurrent / Entity->TimeToDisappear, 1.0f));
 
 					if (!Entity->bForceClose)
 					{
-						if (IsEqual(Entity->CurrentColor, Entity->TargetColor))
+						if (Entity->bOpen)
 						{
-							Entity->TimeToMoveCurrent += GameInput->dt;
+							Entity->TimeToDisappearCurrent += GameInput->dt;
 						}
 						else if (Entity->bGoBack)
 						{
-							Entity->TimeToMoveCurrent -= GameInput->dt;
+							Entity->TimeToDisappearCurrent -= GameInput->dt;
 						}
 					}
 					else
 					{
-						Entity->TimeToMoveCurrent -= GameInput->dt;
+						Entity->TimeToDisappearCurrent -= GameInput->dt;
 					}
 					
-					Entity->TimeToMoveCurrent = Clamp(Entity->TimeToMoveCurrent, 0.0f, Entity->TimeToMove);
+					Entity->TimeToDisappearCurrent = Clamp(Entity->TimeToDisappearCurrent, 0.0f, Entity->TimeToDisappear);
 				} break;
 				
 				case Entity_Turret:
@@ -416,7 +479,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						SMoveEntityInfo MoveInfo = { false, false, false, true, Acceleration };
 						MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
 						
-						Entity->TimeToMoveCurrent += GameInput->dt;
+						Entity->TimeToDisappearCurrent += GameInput->dt;
 					}
 					else
 					{

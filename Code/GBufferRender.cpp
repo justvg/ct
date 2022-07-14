@@ -130,7 +130,15 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 		{
 			case Entity_Hero:
 			{
-				continue;
+				if (bGameMode)
+				{
+					continue;
+				}
+				else
+				{
+					PushConstants.Scale = Vec4(0.3f, 0.3f, 0.3f, 0.3f);
+					PushConstants.Color = Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+				}
 			} break;
 
 			case Entity_Torch:

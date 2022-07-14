@@ -78,4 +78,5 @@ void main()
 	}
 
 	FragColor = vec4(FragAmbient * texture(AlbedoTexture, TexCoords).rgb, 1.0);
+	FragColor.rgb = clamp(FragColor.rgb, 0.0, 3.0);
 }

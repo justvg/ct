@@ -401,17 +401,21 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 						{
 							bValueChanged |= EditorDragFloat3(EditorState, "LightOffset", &Entity->PointLight.Pos.x, 0.05f);
 							bValueChanged |= EditorDragFloat(EditorState, "LightRadius", &Entity->PointLight.Radius, 0.05f, 0.0f, FloatMax);
+
+							bValueChanged |= EditorColorEdit3(EditorState, "TargetColor", &Entity->TargetColor);
+
+							bValueChanged |= EditorInputU32(EditorState, "DoorIndex", &Entity->DoorIndex, ImGuiInputTextFlags_ReadOnly);
+							if (ImGui::Button("SelectDoor"))
+							{
+								EditorState->bSelectDoor = true;
+							}
 						} break;
                         
 						case Entity_Door:
 						{
-							bValueChanged |= EditorColorEdit3(EditorState, "CurrentColor", &Entity->CurrentColor);
-							bValueChanged |= EditorColorEdit3(EditorState, "TargetColor", &Entity->TargetColor);
-                            
-							bValueChanged |= EditorDragFloat3(EditorState, "TargetOffset", &Entity->TargetOffset.x, 0.05f);
-							bValueChanged |= EditorDragFloat(EditorState, "MoveTime", &Entity->TimeToMove, 0.05f, 0.0f, FloatMax);
+							bValueChanged |= EditorDragFloat(EditorState, "DisappearTime", &Entity->TimeToDisappear, 0.05f, 0.0f, FloatMax);
 
-							bValueChanged |= ImGui::Checkbox("GoBack", &Entity->bGoBack);
+							bValueChanged |= ImGui::Checkbox("AppearBack", &Entity->bGoBack);
 						} break;
                         
 						case Entity_Turret:
@@ -1419,8 +1423,10 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				{
 					if (EditorState->bSelectDoor && (HitEntity->Type == Entity_Door))
 					{
-						Assert(EditorState->SelectedEntity && (EditorState->SelectedEntity->Type == Entity_Checkpoint));
+						Assert(EditorState->SelectedEntity && ((EditorState->SelectedEntity->Type == Entity_Checkpoint) || ((EditorState->SelectedEntity->Type == Entity_Torch))));
 						Assert(HitEntityIndex > 0);
+
+						SaveLevelHistory(EditorState, Level);
 
 						EditorState->SelectedEntity->DoorIndex = uint32_t(HitEntityIndex);
 						EditorState->bSelectDoor = false;

@@ -55,7 +55,7 @@ void main()
 	float NewMaxComponent = MaxComponent + MaxComponentNoise;
 	float MaxComponentFactor = step(NewMaxComponent, 1.0); // * (1.0 - smoothstep(0.6, max(0.6, NewMaxComponent), MaxComponent));
 
-	float Alpha = MaxComponentFactor * RadiusFactor;
+	float Alpha = MaxComponentFactor * RadiusFactor * MeshColor.a;
 
 	vec3 Color = MeshColor.rgb;
 

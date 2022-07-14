@@ -72,7 +72,7 @@ SEntity* AddContainer(SLevel& Level, vec3 Pos)
 	return Entity;	
 }
 
-SEntity* AddDoor(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation, vec3 Color, vec3 TargetColor, vec3 TargetOffset, float TimeToMove = 1.0f)
+SEntity* AddDoor(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation, vec3 Color, vec3 TargetColor, vec3 TargetOffset, float TimeToDisappear = 1.0f)
 {
 	Assert(Level.EntityCount < ArrayCount(Level.Entities));
 	SEntity* Entity = &Level.Entities[Level.EntityCount++];
@@ -83,15 +83,12 @@ SEntity* AddDoor(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation, vec3 Color
 	Entity->Dim = Dim;
 	Entity->Scale = 1.0f;
 
-	Entity->Alpha = 0.8f;
+	Entity->Alpha = 0.99999f;
 
-	Entity->TimeToMove = TimeToMove;
-	Entity->BasePos = Entity->Pos;
-	Entity->TargetOffset = TargetOffset;
+	Entity->TimeToDisappear = TimeToDisappear;
 
 	Entity->Color = Color;
-	Entity->TargetColor = TargetColor;
-	Entity->MeshIndex = 1;
+	Entity->MeshIndex = 2;
 
 	return Entity;
 }
@@ -254,7 +251,7 @@ SEntity* AddEntityCopy(SLevel* Level, const SEntity* EntityToCopy)
 
 bool HasTargetPos(const SEntity* Entity)
 {
-	bool bResult = (Entity->Type == Entity_Door) || (Entity->Type == Entity_Turret);
+	bool bResult = (Entity->Type == Entity_Turret);
 
 	return bResult;
 }
@@ -282,6 +279,15 @@ bool BlockOnCollision(const SEntity* A, const SEntity* B)
 	if ((A->Type == Entity_Fireball) || (B->Type == Entity_Fireball))
 	{
 		bResult = false;
+
+		if (A->Type == Entity_Door)
+		{
+			bResult = A->Alpha > 0.05f;
+		}
+	}
+	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Door))
+	{
+		bResult = B->Alpha > 0.05f;
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Gates))
 	{
@@ -346,7 +352,7 @@ void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* L
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Checkpoint))
 	{
 		A->bChangeColorAnimation = true;
-		A->TargetColor = Vec3(0.0f);
+		A->AnimationColor = Vec3(0.0f);
 		A->TimeToChangeColor = 1.0f;
 		A->TimeToChangeColorCurrent = 0.0f;
 
@@ -367,9 +373,23 @@ void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* L
 		if (!A->bChangeColorAnimation)
 		{
 			A->bChangeColorAnimation = true;
-			A->TargetColor = Vec3(0.0f);
+			A->AnimationColor = Vec3(0.0f);
 			A->TimeToChangeColor = 0.5f;
 			A->TimeToChangeColorCurrent = 0.0f;
+		}
+	}
+	else if ((A->Type == Entity_Fireball && B->Type != Entity_Fireball) || (A->Type != Entity_Fireball && B->Type == Entity_Fireball))
+	{
+		if ((A->Type != Entity_Turret) && (A->Type != Entity_Door || A->Alpha > 0.05f))
+		{
+			if (A->Type == Entity_Fireball)
+			{
+				A->bRemoved = true;
+			}
+			else
+			{
+				B->bRemoved = true;
+			}
 		}
 	}
 }
@@ -596,10 +616,6 @@ void MoveEntity(SGameState* GameState, SEngineState* EngineState, SEntity* Entit
 				if (Entity->Type == Entity_Fireball)
 				{
 					if (t < 1.0f)
-					{
-						Entity->bRemoved = true;
-					}
-					else if (HitEntity && (HitEntity->Type != Entity_Turret) && (HitEntity->Type != Entity_Fireball))
 					{
 						Entity->bRemoved = true;
 					}
