@@ -240,6 +240,25 @@ SEntity* AddColorField(SLevel& Level, vec3 Pos)
 	return Entity;
 }
 
+SEntity* AddWire(SLevel& Level, vec3 Pos)
+{
+	Assert(Level.EntityCount < ArrayCount(Level.Entities));
+	SEntity* Entity = &Level.Entities[Level.EntityCount++];
+	memset(Entity, 0, sizeof(SEntity));
+
+	Entity->Type = Entity_Wire;
+	Entity->Pos = Pos;
+	Entity->Dim = Vec3(0.05f, 0.03f, 0.5f);
+	Entity->Scale = 1.0f;
+
+	Entity->Color = Vec3(1.0f, 0.0f, 0.0f);
+	Entity->Alpha = 1.0f;
+
+	Entity->MeshIndex = 1;
+
+	return Entity;
+}
+
 SEntity* AddEntityCopy(SLevel* Level, const SEntity* EntityToCopy)
 {
 	Assert(Level->EntityCount < ArrayCount(Level->Entities));

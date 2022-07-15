@@ -507,6 +507,13 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
+				if (ImGui::Button("Wire"))
+				{
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddWire(EngineState->Level, SpawnPos);
+					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedVoxelsCount = 0;
+				}
 				if (ImGui::Button("Container"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);

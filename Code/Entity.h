@@ -16,6 +16,7 @@ enum EEntityType
 	Entity_Container,
 	Entity_Checkpoint,
 	Entity_ColorField,
+	Entity_Wire
 };
 
 struct SPointLight
@@ -97,7 +98,7 @@ struct SEntity
 			float TimeToShootCurrent;
 		};
 
-		// NOTE(georgii): These are used to animate color changing for hero.
+		// NOTE(georgii): These are used to animate color changing animation.
 		struct 
 		{
 			float TimeToChangeColor;
@@ -112,9 +113,15 @@ struct SEntity
 	union
 	{
 		bool bCollisionWithHeroStarted; // NOTE(georgii): Currently this is used for hero/gates collision, so we don't immediately handle it, but after some time.
-		bool bOpen;
+		bool bOpen; // NOTE(georgii): Currently used for doors
+		bool bActive; // NOTE(georgii): Currently used for wires
 	};
-	float CollisionWithHeroTimePassed;
+
+	union
+	{
+		float CollisionWithHeroTimePassed;
+		float ColorScale;
+	};
 
 	uint32_t MeshIndex;
 

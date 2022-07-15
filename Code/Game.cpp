@@ -210,6 +210,41 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 									Level->Entities[DoorIndex].bOpen = false;
 								}
 							}
+
+							const SMesh& TorchMesh = EngineState->Geometry.Meshes[HitEntity->MeshIndex];
+							Rect TorchAABB = RectCenterDimOrientation(HitEntity->Pos, Hadamard(HitEntity->Dim, TorchMesh.Dim), EulerToQuat(HitEntity->Orientation.xyz));
+		
+							SEntity* TestEntity = HitEntity;
+							Rect TestAABB = TorchAABB;
+							while (TestEntity)
+							{
+								bool bFoundCollision = false;
+								for (uint32_t I = 0; I < Level->EntityCount; I++)
+								{
+									SEntity* WireEntity = Level->Entities + I;
+									
+									if ((WireEntity->Type == Entity_Wire) && WireEntity->bActive)
+									{
+										const SMesh& WireMesh = EngineState->Geometry.Meshes[WireEntity->MeshIndex];
+										Rect WireAABB = RectCenterDimOrientation(WireEntity->Pos, Hadamard(WireEntity->Dim + Vec3(0.01f), WireMesh.Dim), EulerToQuat(WireEntity->Orientation.xyz));
+										
+										if (IntersectRects(TestAABB, WireAABB))
+										{
+											WireEntity->bActive = false;
+
+											TestEntity = WireEntity;
+											TestAABB = WireAABB;
+
+											bFoundCollision = true;
+										}
+									}
+								}
+
+								if (!bFoundCollision)
+								{
+									TestEntity = 0;
+								}
+							}
 						}
 					}
 					else if (WasDown(GameInput->Buttons[Button_MouseRight]))
@@ -244,6 +279,48 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 									if (!Level->Entities[DoorIndex].bForceClose)
 									{
 										Level->Entities[DoorIndex].bOpen = false;
+									}
+								}
+							}
+
+							if (IsEqual(ResultColor, HitEntity->TargetColor))
+							{
+								const SMesh& TorchMesh = EngineState->Geometry.Meshes[HitEntity->MeshIndex];
+								Rect TorchAABB = RectCenterDimOrientation(HitEntity->Pos, Hadamard(HitEntity->Dim, TorchMesh.Dim), EulerToQuat(HitEntity->Orientation.xyz));
+			
+								SEntity* TestEntity = HitEntity;
+								Rect TestAABB = TorchAABB;
+								vec3 TestColor = HitEntity->TargetColor;
+								while (TestEntity)
+								{
+									bool bFoundCollision = false;
+									for (uint32_t I = 0; I < Level->EntityCount; I++)
+									{
+										SEntity* WireEntity = Level->Entities + I;
+										
+										if ((WireEntity->Type == Entity_Wire) && !WireEntity->bActive && IsEqual(TestColor, WireEntity->Color))
+										{
+											const SMesh& WireMesh = EngineState->Geometry.Meshes[WireEntity->MeshIndex];
+											Rect WireAABB = RectCenterDimOrientation(WireEntity->Pos, Hadamard(WireEntity->Dim + Vec3(0.01f), WireMesh.Dim), EulerToQuat(WireEntity->Orientation.xyz));
+											
+											if (IntersectRects(TestAABB, WireAABB))
+											{
+												WireEntity->bActive = true;
+												WireEntity->bChangeColorAnimation = true;
+												WireEntity->TimeToChangeColor = 0.5f;
+												WireEntity->TimeToChangeColorCurrent = 0.0f;
+
+												TestEntity = WireEntity;
+												TestAABB = WireAABB;
+
+												bFoundCollision = true;
+											}
+										}
+									}
+
+									if (!bFoundCollision)
+									{
+										TestEntity = 0;
 									}
 								}
 							}
@@ -428,6 +505,24 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						else
 						{
 							Entity->Color = Entity->AnimationColor;
+							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
+							Entity->bChangeColorAnimation = false;
+						}
+					}
+				} break;
+
+				case Entity_Wire:
+				{
+					if (Entity->bChangeColorAnimation)
+					{
+						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
+						{
+							Entity->ColorScale = Lerp(1.0f, 150.0f, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
+							Entity->TimeToChangeColorCurrent += GameInput->dt;
+						}
+						else
+						{
+							Entity->ColorScale = 150.0f;
 							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
 							Entity->bChangeColorAnimation = false;
 						}
