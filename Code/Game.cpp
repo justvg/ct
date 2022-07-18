@@ -127,6 +127,91 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	{
 		HeroControl.bUseLamp = true;
 	}
+
+	if (GameState->bReload)
+	{
+		for (uint32_t I = 0; I < Level->EntityCount; I++)
+		{
+			const SEntity* Entity = Level->Entities + I;
+
+			if (Entity->Type == Entity_Torch)
+			{
+				if (IsEqual(Entity->Color, Entity->TargetColor))
+				{
+					if ((Entity->DoorIndex > 0) && (Entity->DoorIndex < Level->EntityCount))
+					{
+						uint32_t DoorIndex = Entity->DoorIndex;
+						Assert(Level->Entities[DoorIndex].Type == Entity_Door);
+
+						if (!Level->Entities[DoorIndex].bForceClose)
+						{
+							Level->Entities[DoorIndex].bOpen = true;
+						}
+					}
+
+					const SMesh& TorchMesh = EngineState->Geometry.Meshes[Entity->MeshIndex];
+					Rect TorchAABB = RectCenterDimOrientation(Entity->Pos, Hadamard(Entity->Dim, TorchMesh.Dim), EulerToQuat(Entity->Orientation.xyz));
+
+					const SEntity* TestEntity = Entity;
+					Rect TestAABB = TorchAABB;
+					vec3 TestColor = Entity->TargetColor;
+					while (TestEntity)
+					{
+						bool bFoundCollision = false;
+						for (uint32_t I = 0; I < Level->EntityCount; I++)
+						{
+							SEntity* WireEntity = Level->Entities + I;
+							
+							if ((WireEntity->Type == Entity_Wire) && !WireEntity->bActive && IsEqual(TestColor, WireEntity->Color))
+							{
+								const SMesh& WireMesh = EngineState->Geometry.Meshes[WireEntity->MeshIndex];
+								Rect WireAABB = RectCenterDimOrientation(WireEntity->Pos, Hadamard(WireEntity->Dim + Vec3(0.01f), WireMesh.Dim), EulerToQuat(WireEntity->Orientation.xyz));
+								
+								if (IntersectRects(TestAABB, WireAABB))
+								{
+									WireEntity->bActive = true;
+									WireEntity->bChangeColorAnimation = true;
+									WireEntity->TimeToChangeColor = 0.5f;
+									WireEntity->TimeToChangeColorCurrent = 0.0f;
+
+									TestEntity = WireEntity;
+									TestAABB = WireAABB;
+
+									bFoundCollision = true;
+								}
+							}
+						}
+
+						if (!bFoundCollision)
+						{
+							TestEntity = 0;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (uint32_t I = 0; I < Level->EntityCount; I++)
+	{
+		SEntity* Entity = Level->Entities + I;
+
+		if ((Entity->Type == Entity_Door) && !Entity->bForceClose)
+		{
+			bool bOpen = true;
+			for (uint32_t J = 0; J < Level->EntityCount; J++)
+			{
+				const SEntity* TestEntity = Level->Entities + J;
+
+				if ((TestEntity->Type == Entity_Torch) && (TestEntity->DoorIndex == I))
+				{
+					bOpen = bOpen && IsEqual(TestEntity->Color, TestEntity->TargetColor);
+				}
+			}
+
+			Entity->bOpen = bOpen;
+		}
+	}
 	
 	Assert((Level->EntityCount == 0) || (Level->Entities[0].Type == Entity_Hero));
 	if (HeroControl.bUseLamp && !GameState->bDeathAnimation && !Level->Entities[0].bChangeColorAnimation)
@@ -200,17 +285,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 							HeroEntity->TimeToChangeColor = 0.5f;
 							HeroEntity->TimeToChangeColorCurrent = 0.0f;
 
-							if ((HitEntity->DoorIndex > 0) && (HitEntity->DoorIndex < Level->EntityCount))
-							{
-								uint32_t DoorIndex = HitEntity->DoorIndex;
-								Assert(Level->Entities[DoorIndex].Type == Entity_Door);
-
-								if (!Level->Entities[DoorIndex].bForceClose)
-								{
-									Level->Entities[DoorIndex].bOpen = false;
-								}
-							}
-
 							const SMesh& TorchMesh = EngineState->Geometry.Meshes[HitEntity->MeshIndex];
 							Rect TorchAABB = RectCenterDimOrientation(HitEntity->Pos, Hadamard(HitEntity->Dim, TorchMesh.Dim), EulerToQuat(HitEntity->Orientation.xyz));
 		
@@ -261,27 +335,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 							HeroEntity->AnimationColor = Vec3(0.0f);
 							HeroEntity->TimeToChangeColor = 0.5f;
 							HeroEntity->TimeToChangeColorCurrent = 0.0f;
-
-							if ((HitEntity->DoorIndex > 0) && (HitEntity->DoorIndex < Level->EntityCount))
-							{
-								uint32_t DoorIndex = HitEntity->DoorIndex;
-								Assert(Level->Entities[DoorIndex].Type == Entity_Door);
-
-								if (IsEqual(ResultColor, HitEntity->TargetColor))
-								{
-									if (!Level->Entities[DoorIndex].bForceClose)
-									{
-										Level->Entities[DoorIndex].bOpen = true;
-									}
-								}
-								else
-								{
-									if (!Level->Entities[DoorIndex].bForceClose)
-									{
-										Level->Entities[DoorIndex].bOpen = false;
-									}
-								}
-							}
 
 							if (IsEqual(ResultColor, HitEntity->TargetColor))
 							{
@@ -1408,8 +1461,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 
 		GameState->CurrentCheckpointIndex = 0;
 		GameState->LastCheckpointPos = EngineState->Level.Entities[0].Pos;
-
-		GameState->bReload = false;
 	}
 
 	SMenuState* MenuState = &GameState->MenuState;
@@ -1501,4 +1552,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		fclose(GeneralSaveFile);
 	}
 #endif
+
+	GameState->bReload = false;
 }

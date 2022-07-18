@@ -626,6 +626,73 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 					}
 				}
 			}
+
+			if (ImGui::Button("Select Highest Y"))
+			{
+				uint32_t HighestY = 0;
+				for (uint32_t Z = 0; Z < LevelDimZ; Z++)
+				{
+					for (uint32_t Y = 0; Y < LevelDimY; Y++)
+					{
+						for (uint32_t X = 0; X < LevelDimX; X++)
+						{
+							if (IsVoxelActive(EngineState->Level.Voxels, X, Y, Z))
+							{
+								if (Y > HighestY)
+								{
+									HighestY = Y;
+								}
+							}
+						}
+					}
+				}
+
+				EditorState->SelectedEntity = 0;
+				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->bCircleSelected = false;
+				EditorState->SelectedDimHelper = SelectedDimHelper_None;
+				EditorState->bSelectDoor = false;
+
+				EditorState->SelectedVoxelsCount = 0;
+				for (uint32_t Z = 0; Z < LevelDimZ; Z++)
+				{
+					for (uint32_t X = 0; X < LevelDimX; X++)
+					{
+						if (IsVoxelActive(EngineState->Level.Voxels, X, HighestY, Z))
+						{
+							uint32_t ID = Z*LevelDimX*LevelDimY + HighestY*LevelDimX + X;
+							EditorState->SelectedVoxels[EditorState->SelectedVoxelsCount++] = ID;			
+						}
+					}
+				}
+			}
+
+			static uint8_t SelectedY = 0;
+			EditorInputU8(EditorState, "Y", &SelectedY);
+			ImGui::SameLine();
+			if (ImGui::Button("SelectY"))
+			{
+				EditorState->SelectedEntity = 0;
+				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->bCircleSelected = false;
+				EditorState->SelectedDimHelper = SelectedDimHelper_None;
+				EditorState->bSelectDoor = false;
+
+				EditorState->SelectedVoxelsCount = 0;
+				for (uint32_t Z = 0; Z < LevelDimZ; Z++)
+				{
+					for (uint32_t X = 0; X < LevelDimX; X++)
+					{
+						if (IsVoxelActive(EngineState->Level.Voxels, X, SelectedY, Z))
+						{
+							uint32_t ID = Z*LevelDimX*LevelDimY + SelectedY*LevelDimX + X;
+							EditorState->SelectedVoxels[EditorState->SelectedVoxelsCount++] = ID;			
+						}
+					}
+				}
+			}
             
 			if (ImGui::Checkbox("HideEntities", &EngineState->bHideEntities))
 			{
