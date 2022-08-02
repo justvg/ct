@@ -1,7 +1,7 @@
 .vs
 .vscode
 Binaries
-workspace.code-workspace
+VSCodeWorkspace.code-workspace
 Log.txt
 TODO
 cloc.exe
