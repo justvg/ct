@@ -695,7 +695,6 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 
 #ifndef ENGINE_RELEASE
 		EngineState->LevelGameStartState = *Level;
-		EngineState->EditorState.LevelHistoryHead = EngineState->EditorState.LevelHistoryTail = 0;
 #endif
 
 		memcpy(EngineState->LevelName, Path, StringLength(Path) + 1);

@@ -116,6 +116,7 @@ void STransparentRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entit
 		PushConstants.Offset = Vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		PushConstants.PrevPosition.xyz = Entity.PrevPos;
 		PushConstants.PrevOrientation = EulerToQuat(Entity.PrevOrientation.xyz);
+		PushConstants.FirstPersonDepthTest = false;
 
 		switch (Entity.Type)
 		{

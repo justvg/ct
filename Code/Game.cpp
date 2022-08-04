@@ -540,10 +540,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					
 					SMoveEntityInfo MoveInfo = { !EngineState->bFlyMode, EngineState->bFlyMode, true, true, HeroControl.Acceleration };
 					MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
-
-					Entity->PointLight.Color.rgb = Entity->Color;
-					Entity->PointLight.Radius = 3.0f;
-					Entity->PointLight.Pos = (0.2f * Entity->LampOffset.x * Entity->Dim.x * Camera->Right) + (0.3f * Entity->Dim.z * Camera->Dir) + (0.2f * Entity->LampOffset.y * Camera->Up);
 				} break;
 				
 				case Entity_Torch:

@@ -22,7 +22,7 @@ SEntity* AddHero(SLevel& Level, vec3 Pos)
 	Entity->LampOffset = Entity->LampBaseOffset;
 	Entity->LampRotationOffset = Vec2(10.0f, 10.0f);
 
-	Entity->MeshIndex = 1;
+	Entity->MeshIndex = 3;
 
 	return Entity;
 }
@@ -321,6 +321,10 @@ bool BlockOnCollision(const SEntity* A, const SEntity* B)
 		bResult = false;
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_ColorField))
+	{
+		bResult = false;
+	}
+	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Wire))
 	{
 		bResult = false;
 	}

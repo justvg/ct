@@ -19,6 +19,8 @@ layout (push_constant) uniform PushConstants
 	vec4 PrevPosition; // w - unused
 	vec4 PrevOrientation; // w - unused
 
+	uint FirstPersonDepthTest;
+
 	float Time;
 	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
 };
@@ -58,4 +60,9 @@ void main()
 	LocalPos = LocalPosition;
 
 	gl_Position = Proj * View * vec4(FragPosWS, 1.0);
+
+	if (FirstPersonDepthTest > 0)
+	{
+		gl_Position.z = 0.0;
+	}
 }

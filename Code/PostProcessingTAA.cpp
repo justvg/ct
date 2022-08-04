@@ -79,7 +79,7 @@ void STaaRenderPass::Render(const SVulkanContext& Vulkan, const SImage* HistoryI
 	const uint32_t TargetIndex = FrameID % 2;
     const uint32_t PrevIndex = (TargetIndex + 1) % 2;
 
-	if ((FrameID == 0) || bSwapchainChanged)
+	if (FrameID == 0)
 	{
 		VkImageMemoryBarrier TAABeginBarrier = CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, HistoryImages[PrevIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT);
 		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &TAABeginBarrier);

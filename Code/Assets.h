@@ -21,7 +21,7 @@ struct SGeometry
 	SVertex Vertices[8192];
 
 	uint32_t IndexCount;
-	uint32_t Indices[16384];
+	uint32_t Indices[32768];
 
 	uint32_t MeshCount;
 	SMesh Meshes[512];

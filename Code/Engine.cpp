@@ -243,6 +243,10 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		if (EngineState->bReloadLevelEditor)
 		{
 			EngineState->Level = EngineState->LevelGameStartState;
+#ifndef ENGINE_RELEASE
+			EngineState->EditorState.LevelHistoryHead = EngineState->EditorState.LevelHistoryTail = 0;
+			SaveLevelHistory(&EngineState->EditorState, &EngineState->LevelGameStartState);
+#endif
 		}
 
 		memset(EngineState->VoxelDraws, 0, sizeof(EngineState->VoxelDraws));

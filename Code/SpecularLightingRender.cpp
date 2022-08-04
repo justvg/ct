@@ -179,7 +179,7 @@ void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& S
 	VkImageMemoryBarrier SpecularReadBarrier = CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, SpecularLightImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &SpecularReadBarrier);
 
-	if ((FrameID == 0) || bSwapchainChanged)
+	if (FrameID == 0)
 	{
 		VkImageMemoryBarrier SpecularReadBarrier = CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, SpecularLightHistoryImages[PrevIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT);
 		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &SpecularReadBarrier);

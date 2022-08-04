@@ -34,6 +34,8 @@ struct SMeshRenderPushConstants
 	vec4 PrevPosition; // w - unused
 	quat PrevOrientation;
 
+	uint32_t FirstPersonDepthTest;
+
 	float Time;
 	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
 };
@@ -125,6 +127,7 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 		PushConstants.Offset = Vec4(0.0f, 0.0f, 0.0f, 0.0f);
 		PushConstants.PrevPosition.xyz = Entity.PrevPos;
 		PushConstants.PrevOrientation = EulerToQuat(Entity.PrevOrientation.xyz);
+		PushConstants.FirstPersonDepthTest = false;
 
 		switch (Entity.Type)
 		{
@@ -132,7 +135,9 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 			{
 				if (bGameMode)
 				{
-					continue;
+					PushConstants.Scale = Vec4(Vec3(Entity.Scale), 0.0f);
+					PushConstants.Color.rgb *= 200.0f;
+					PushConstants.FirstPersonDepthTest = true;
 				}
 				else
 				{

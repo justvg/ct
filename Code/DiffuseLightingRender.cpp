@@ -164,7 +164,7 @@ void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& Di
 
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline[AOQuality]);
 
-	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[FrameID % 2], 0, 0);
+	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[TargetIndex], 0, 0);
 
 	SDiffuseLightingPushConstants PushConstants = { FrameID % 8, PointLightCount };
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SDiffuseLightingPushConstants), &PushConstants);
@@ -179,7 +179,7 @@ void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& Di
 	VkImageMemoryBarrier DiffuseReadBarrier = CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DiffuseLightImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DiffuseReadBarrier);
 
-	if ((FrameID == 0) || bSwapchainChanged)
+	if (FrameID == 0)
 	{
 		VkImageMemoryBarrier DiffuseReadBarrier = CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, DiffuseLightHistoryImages[PrevIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT);
 		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DiffuseReadBarrier);
@@ -199,7 +199,7 @@ void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& Di
 
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DenoisePipeline);
 
-	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DenoisePipelineLayout, 0, 1, &DenoiseDescrSets[FrameID % 2], 0, 0);
+	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, DenoisePipelineLayout, 0, 1, &DenoiseDescrSets[TargetIndex], 0, 0);
 	vkCmdPushConstants(Vulkan.CommandBuffer, DenoisePipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SDiffuseLightingPushConstants), &PushConstants);
 
 	vkCmdDraw(Vulkan.CommandBuffer, 6, 1, 0, 0);

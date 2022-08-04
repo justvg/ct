@@ -22,6 +22,8 @@ layout (push_constant) uniform PushConstants
 	vec4 PrevPosition; // w - unused
 	vec4 PrevOrientation; // w - unused
 
+	uint FirstPersonDepthTest;
+
 	float Time;
 	float ShaderValue0; // NOTE(georgii): Currently used for material parameters. Like MaxComponentNoise in door shader
 };

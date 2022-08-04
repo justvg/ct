@@ -180,8 +180,8 @@ void CreateQuadMesh(SGeometry& Geometry)
 
 void CreateSphereMesh(SGeometry& Geometry)
 {
-	const uint32_t StackCount = 16;
-	const uint32_t SectorCount = 16;
+	const uint32_t StackCount = 64;
+	const uint32_t SectorCount = 64;
 
 	const uint32_t VertexCount = (StackCount - 1) * SectorCount + 2;
 	const uint32_t IndexCount = 2 * 3 * SectorCount + (StackCount - 2) * SectorCount * 6;
