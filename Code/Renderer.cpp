@@ -107,6 +107,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->DiffuseLightingPass = SDiffuseLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->PointLightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->DiffuseImage);
 	Renderer->TransparentRenderPass = STransparentRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->DiffuseImage, Renderer->DepthImage);
 	Renderer->SpecularLightingPass = SSpecularLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->PointLightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->CompositeImage);
+	Renderer->FirstPersonRenderPass = SFirstPersonRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->CompositeImage, Renderer->VelocityImages);
 	Renderer->ExposureRenderPass = SExposureRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->CompositeImage, Renderer->LinearEdgeSamplerMips, Renderer->BrightnessImage, Renderer->BrightnessMipViews, Renderer->PointEdgeSampler, Renderer->ExposureImages);
 	Renderer->BloomRenderPass = SBloomRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
 	Renderer->TaaRenderPass = STaaRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->CompositeImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImages);
@@ -378,7 +379,28 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DiffuseRenderEndBarrier);
 
 	// Calculate specular lighting
-	Renderer->SpecularLightingPass.Render(Vulkan, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->CompositeImage, Renderer->QuadVB, PointLightCount, FrameID, bSwapchainChanged);
+	Renderer->SpecularLightingPass.Render(Vulkan, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->QuadVB, PointLightCount, FrameID, bSwapchainChanged);
+
+	// Render first person
+	if (EngineState->EngineMode == EngineMode_Game)
+	{
+		Renderer->FirstPersonRenderPass.Render(Vulkan, RenderEntities[0], EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, FrameID);
+
+		VkImageMemoryBarrier FirstPersonEndBarriers[] = 
+		{
+			CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->CompositeImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
+			CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->VelocityImages[FrameID % 2].Image, VK_IMAGE_ASPECT_COLOR_BIT),
+		};
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(FirstPersonEndBarriers), FirstPersonEndBarriers);	
+	}
+	else
+	{
+		VkImageMemoryBarrier FirstPersonEndBarriers[] = 
+		{
+			CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Renderer->CompositeImage.Image, VK_IMAGE_ASPECT_COLOR_BIT),
+		};
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(FirstPersonEndBarriers), FirstPersonEndBarriers);	
+	}
 
 	// Get scene exposure
 	Renderer->ExposureRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BrightnessImage, Renderer->ExposureImages, FrameID);
@@ -645,6 +667,7 @@ void RendererHandleChanges(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	Renderer->DiffuseLightingPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseImage);
 	Renderer->TransparentRenderPass.UpdateAfterResize(Vulkan, Renderer->DiffuseImage, Renderer->DepthImage);
 	Renderer->SpecularLightingPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->CompositeImage);
+	Renderer->FirstPersonRenderPass.UpdateAfterResize(Vulkan, Renderer->CompositeImage, Renderer->VelocityImages);
 	Renderer->ExposureRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->CompositeImage);
 	Renderer->BloomRenderPass.UpdateAfterResize(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
 	Renderer->TaaRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->CompositeImage, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->VelocityImages);

@@ -2,7 +2,7 @@ struct SSpecularLightingPass
 {
 public:
     static SSpecularLightingPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage* VelocityImages, const SImage& AlbedoImage, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage);
-    void Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged);
+    void Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage* VelocityImages, const SImage& AlbedoImage, const SImage& CompositeImage);
 
 private:
@@ -148,7 +148,7 @@ SSpecularLightingPass SSpecularLightingPass::Create(const SVulkanContext& Vulkan
     return SpecularLightingPass;
 }
 
-void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged)
+void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged)
 {
 	const uint32_t TargetIndex = FrameID % 2;
     const uint32_t PrevIndex = (TargetIndex + 1) % 2;
@@ -205,12 +205,8 @@ void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& S
 
 	vkCmdEndRenderPass(Vulkan.CommandBuffer);
 
-	VkImageMemoryBarrier DenoiseEndBarriers[] =
-	{
-		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, SpecularLightHistoryImages[TargetIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT),
-		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, CompositeImage.Image, VK_IMAGE_ASPECT_COLOR_BIT)
-	};
-	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(DenoiseEndBarriers), DenoiseEndBarriers);
+	VkImageMemoryBarrier DenoiseEndBarrier = CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, SpecularLightHistoryImages[TargetIndex].Image, VK_IMAGE_ASPECT_COLOR_BIT);
+	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DenoiseEndBarrier);
 
 	END_GPU_PROFILER_BLOCK("SPECULAR_LIGHTING_DENOISE", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 }

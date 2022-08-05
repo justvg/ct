@@ -135,9 +135,7 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 			{
 				if (bGameMode)
 				{
-					PushConstants.Scale = Vec4(Vec3(Entity.Scale), 0.0f);
-					PushConstants.Color.rgb *= 200.0f;
-					PushConstants.FirstPersonDepthTest = true;
+					continue;
 				}
 				else
 				{

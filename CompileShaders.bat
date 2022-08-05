@@ -18,6 +18,7 @@ set DebugFlags=-g
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Downscale.comp.glsl" -o Content\Shaders\Downscale.comp.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Exposure.frag.glsl" -o Content\Shaders\Exposure.frag.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Fireball.frag.glsl" -o Content\Shaders\Fireball.frag.spv
+%VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\FirstPerson.frag.glsl" -o Content\Shaders\FirstPerson.frag.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Fullscreen.vert.glsl" -o Content\Shaders\Fullscreen.vert.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\FullscreenLighting.vert.glsl" -o Content\Shaders\FullscreenLighting.vert.spv
 %VulkanSDKPath%Bin\glslangValidator -V %DebugFlags% "Code\Shaders\HUD.vert.glsl" -o Content\Shaders\HUD.vert.spv

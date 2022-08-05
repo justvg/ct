@@ -51,6 +51,7 @@ enum EAOQuality
 #include "DiffuseLightingRender.cpp"
 #include "TransparentRender.cpp"
 #include "SpecularLightingRender.cpp"
+#include "FirstPersonRender.cpp"
 #include "Exposure.cpp"
 #include "PostProcessingBloom.cpp"
 #include "PostProcessingTAA.cpp"

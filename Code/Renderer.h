@@ -101,6 +101,7 @@ struct SRenderer
 	SDiffuseLightingPass DiffuseLightingPass;
 	STransparentRenderPass TransparentRenderPass;
 	SSpecularLightingPass SpecularLightingPass;
+	SFirstPersonRenderPass FirstPersonRenderPass;
 	SExposureRenderPass ExposureRenderPass;
 	SBloomRenderPass BloomRenderPass;
 	STaaRenderPass TaaRenderPass;
