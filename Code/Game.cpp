@@ -754,24 +754,55 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	
 	END_PROFILER_BLOCK("ENTITIES_SIMULATION");
 	
+	// NOTE(georgii): Simple hack for velocity
 	if (!GameState->bDeathAnimation && Length(Level->Entities[0].Pos - Level->Entities[0].PrevPos) > 0.00001f)
 	{
 		Camera->Pos = Level->Entities[0].Pos + Camera->OffsetFromPlayer;
 	}
 
+	if (!GameState->bDeathAnimation)
+	{
+		GameState->DeathPosTimer += GameInput->dt;
+		
+		const float DeathPosUpdateTime = 1.5f;
+		if (GameState->DeathPosTimer >= DeathPosUpdateTime)
+		{
+			GameState->DeathPosTimer -= DeathPosUpdateTime;
+
+			Assert(GameState->PosForDeathAnimationCount > 0);
+			const uint32_t LastDeathPosIndex = GameState->PosForDeathAnimationCount - 1;
+			if (Length(Level->Entities[0].Pos - GameState->PosForDeathAnimation[LastDeathPosIndex]) > 0.5f)
+			{
+				if (GameState->PosForDeathAnimationCount < ArrayCount(GameState->PosForDeathAnimation))
+				{
+					GameState->PosForDeathAnimation[GameState->PosForDeathAnimationCount++] = Level->Entities[0].Pos;
+				}
+			}
+		}
+	}
+
 	if (GameState->bDeathAnimation && !EngineState->bReloadLevel && !EngineState->bReloadLevelEditor)
 	{
-		vec3 MoveDelta = GameState->DeathAnimationSpeed * GameInput->dt * NormalizeSafe0(GameState->DeathAnimationTargetPos - GameState->DeathPos);
-		GameState->DeathAnimationLengthMoved += Length(MoveDelta);
+		Assert(GameState->PosForDeathAnimationCount >= 2);
+		const uint32_t CurrentIndex = GameState->PosForDeathAnimationCount - 1;
+		const uint32_t NextIndex = GameState->PosForDeathAnimationCount - 2;
+
+		vec3 MoveDelta = GameState->DeathAnimationSpeed * GameInput->dt * NormalizeSafe0(GameState->PosForDeathAnimation[NextIndex] - GameState->PosForDeathAnimation[CurrentIndex]);
 		Camera->Pos += MoveDelta;
-		
-		if ((Length((Camera->Pos - Camera->OffsetFromPlayer) - GameState->DeathAnimationTargetPos) < 0.07f) ||
-			(GameState->DeathAnimationLengthMoved >= Length(GameState->DeathAnimationTargetPos - GameState->DeathPos)))
+		GameState->DeathAnimationLengthMoved += Length(MoveDelta);
+
+		if ((Length((Camera->Pos - Camera->OffsetFromPlayer) - GameState->PosForDeathAnimation[NextIndex]) < 0.07f) ||
+			(GameState->DeathAnimationLengthMoved >= Length(GameState->PosForDeathAnimation[NextIndex] - GameState->PosForDeathAnimation[CurrentIndex])))
 		{
-			GameState->bDeathAnimation = false;
+			GameState->PosForDeathAnimationCount--;
 			GameState->DeathAnimationLengthMoved = 0.0f;
 
-			Level->Entities[0].Pos = GameState->LastCheckpointPos;
+			Assert(GameState->PosForDeathAnimationCount > 0);
+			if (GameState->PosForDeathAnimationCount == 1)
+			{
+				GameState->bDeathAnimation = false;
+				Level->Entities[0].Pos = GameState->LastCheckpointPos;
+			}
 		}
 	}
 }
@@ -1453,10 +1484,13 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 	{
 		GameState->bDeathAnimation = false;
 		GameState->DeathAnimationLengthMoved = 0.0f;
-		GameState->DeathPos = Vec3(0.0f);
+		GameState->DeathPosTimer = 0.0f;
 
 		GameState->CurrentCheckpointIndex = 0;
 		GameState->LastCheckpointPos = EngineState->Level.Entities[0].Pos;
+
+		GameState->PosForDeathAnimationCount = 1;
+		GameState->PosForDeathAnimation[0] = GameState->LastCheckpointPos;
 	}
 
 	SMenuState* MenuState = &GameState->MenuState;

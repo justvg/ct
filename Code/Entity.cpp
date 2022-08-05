@@ -361,9 +361,7 @@ void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* L
 		{
 			ReloadGameLevel(EngineState, false, false);
 
-			GameState->bDeathAnimation = true;
-			GameState->DeathPos = A->Pos;
-			GameState->DeathAnimationTargetPos = GameState->LastCheckpointPos;
+			StartDeathAnimation(GameState, A->Pos);
 		}
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_MessageToggler))
@@ -380,6 +378,9 @@ void HandleCollision(SGameState* GameState, SEngineState* EngineState, SLevel* L
 		A->TimeToChangeColorCurrent = 0.0f;
 
 		GameState->LastCheckpointPos = B->Pos;
+
+		GameState->PosForDeathAnimationCount = 1;
+		GameState->PosForDeathAnimation[0] = GameState->LastCheckpointPos;
 
 		B->bRemoved = true;
 

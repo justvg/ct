@@ -78,8 +78,10 @@ struct SGameState
 	bool bDeathAnimation;
     float DeathAnimationSpeed;
     float DeathAnimationLengthMoved;
-    vec3 DeathPos;
-	vec3 DeathAnimationTargetPos;
+
+	uint32_t PosForDeathAnimationCount;
+	vec3 PosForDeathAnimation[1024]; // NOTE(georgii): Positions for death animation
+	float DeathPosTimer;
 
 	// NOTE(georgii): Don't wanna resave every level when I change these params for hero, so I just store them in SEngineState.
 	float HeroSpeed;
@@ -92,3 +94,16 @@ struct SGameState
     uint8_t CurrentCheckpointIndex;
 	vec3 LastCheckpointPos;
 };
+
+void StartDeathAnimation(SGameState* GameState, vec3 DeathPos)
+{
+	GameState->bDeathAnimation = true;
+
+	if (GameState->PosForDeathAnimationCount == 0)
+	{
+		GameState->PosForDeathAnimationCount = 1;
+	}
+
+	GameState->PosForDeathAnimation[0] = GameState->LastCheckpointPos;
+	GameState->PosForDeathAnimation[GameState->PosForDeathAnimationCount++] = DeathPos;
+}
