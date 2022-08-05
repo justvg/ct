@@ -7,7 +7,7 @@
 inline LARGE_INTEGER WinGetWallClock();
 inline float WinGetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End);
 
-// TODO(georgii): Currently this doesn't support recursion.
+// NOTE(georgii): Currently this doesn't support recursion.
 struct SCpuProfilerBlock
 {
     const char* Name;

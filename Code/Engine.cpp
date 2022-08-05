@@ -185,6 +185,8 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
         EngineState->Camera.Far = 300.0f;
         EngineState->Camera.FoV = 70.0f;
 
+		EngineState->FullscreenResolutionPercent = 100;
+
 		EngineState->bVignetteEnabled = true;
 
 		SParsedConfigFile ConfigFile = ParseConfigFile("Engine.cfg");
@@ -218,8 +220,8 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	{
 		if (EngineState->bSwapchainChanged)
 		{
-			Vulkan.InternalWidth = EngineState->NewInternalWidth;
-			Vulkan.InternalHeight = EngineState->NewInternalHeight;
+			Vulkan.InternalWidth = uint32_t(Vulkan.Width * (EngineState->FullscreenResolutionPercent / 100.0f));
+			Vulkan.InternalHeight = uint32_t(Vulkan.Height * (EngineState->FullscreenResolutionPercent / 100.0f));
 		}
 
 		RendererHandleChanges(&EngineState->Renderer, Vulkan);

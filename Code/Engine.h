@@ -165,8 +165,7 @@ struct SEngineState
 	SRenderer Renderer;
 
 	bool bSwapchainChanged;
-	uint32_t NewInternalWidth;
-	uint32_t NewInternalHeight;
+	uint32_t FullscreenResolutionPercent;
 
 	uint32_t LastFullscreenInternalWidth;
 	uint32_t LastFullscreenInternalHeight;

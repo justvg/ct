@@ -4,7 +4,7 @@
 
 static const uint32_t FramesHistory = FramesInFlight;
 
-// TODO(georgii): Currently this doesn't support timings with the same name.
+// NOTE(georgii): Currently this doesn't support timings with the same name.
 struct SGpuProfilerBlock
 {
     const char* Name;

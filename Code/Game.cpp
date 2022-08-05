@@ -1050,7 +1050,7 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 				const float YPos = -0.12f;
 
 				char ResolutionText[32] = {};
-				snprintf(ResolutionText, sizeof(ResolutionText), "%d", EngineState->LastFullscreenInternalHeight);
+				snprintf(ResolutionText, sizeof(ResolutionText), "%d%%", EngineState->FullscreenResolutionPercent);
 	
 				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Resolution:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
 				bMouseInItem = MenuItemDefault(EngineState, MenuState, ResolutionText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
@@ -1076,8 +1076,6 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 
 					if (PlatformGetFullscreen())
 					{
-						EngineState->NewInternalWidth = EngineState->LastFullscreenInternalWidth;
-						EngineState->NewInternalHeight = EngineState->LastFullscreenInternalHeight;
 						EngineState->bSwapchainChanged = true;
 					}
 				} break;
@@ -1119,42 +1117,36 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 				{
 					if (PlatformGetFullscreen())
 					{
-						// TODO(georgii): This is just for test. Need to proper get all available resolution for a monitor and use them!
-						uint32_t Width = Vulkan->InternalWidth;
-						uint32_t Height = Vulkan->InternalHeight;
+						const uint32_t MinResolutionPercent = 50;
+						const uint32_t MaxResolutionPercent = 100;
+						const uint32_t ResolutionStep = 10;
+
+						uint32_t ResolutionPercent = EngineState->FullscreenResolutionPercent;
 						if (MenuState->bArrowRight || (!MenuState->bArrowRight && !MenuState->bArrowLeft))
 						{
-							if (Height == 1080)
+							if (ResolutionPercent == MaxResolutionPercent)
 							{
-								Width = 1280;
-								Height = 720;
+								ResolutionPercent = MinResolutionPercent;
 							}
 							else
 							{
-								Assert(Height == 720);
-
-								Width = 1920;
-								Height = 1080;
+								ResolutionPercent += ResolutionStep;
 							}
 						}
 						else
 						{
-							if (Height == 1080)
+							if (ResolutionPercent == MinResolutionPercent)
 							{
-								Width = 1280;
-								Height = 720;
+								ResolutionPercent = MaxResolutionPercent;
 							}
 							else
 							{
-								Assert(Height == 720);
-
-								Width = 1920;
-								Height = 1080;
+								ResolutionPercent -= ResolutionStep;
 							}
 						}
 
-						EngineState->NewInternalWidth = Width;
-						EngineState->NewInternalHeight = Height;
+						Assert((ResolutionPercent <= MaxResolutionPercent) && (ResolutionPercent >= MinResolutionPercent));
+						EngineState->FullscreenResolutionPercent = ResolutionPercent;
 						EngineState->bSwapchainChanged = true;
 					}
 				} break;
@@ -1413,6 +1405,10 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(&InternalHeight, SaveFilePointer, sizeof(uint32_t));
 			SaveFilePointer += sizeof(uint32_t);
 
+			uint32_t FullscreenResolutionPercent;
+			memcpy(&FullscreenResolutionPercent, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
 			uint64_t WindowPlacementSize;
 			memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
 			SaveFilePointer += sizeof(uint64_t);
@@ -1423,6 +1419,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			EngineState->Renderer.AOQuality = EAOQuality(AOQuality);
 			EngineState->LastFullscreenInternalWidth = InternalWidth;
 			EngineState->LastFullscreenInternalHeight = InternalHeight;
+			EngineState->FullscreenResolutionPercent = FullscreenResolutionPercent;
 
 			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
 			{
@@ -1567,6 +1564,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		int32_t AOQuality = EngineState->Renderer.AOQuality;
 		uint32_t Width = EngineState->LastFullscreenInternalWidth;
 		uint32_t Height = EngineState->LastFullscreenInternalHeight;
+		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
 
 		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
@@ -1574,6 +1572,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		fwrite(&AOQuality, sizeof(int32_t), 1, GeneralSaveFile);
 		fwrite(&Width, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(&FullscreenResolutionPercent, sizeof(uint32_t), 1, GeneralSaveFile);
 
 		SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
 		fwrite(&WindowPlacement.InfoSizeInBytes, sizeof(uint64_t), 1, GeneralSaveFile);
