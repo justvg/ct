@@ -796,13 +796,36 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				Camera->Pos -= SpeedScale * 0.3f * Camera->Right;
 			}
 
+
+			vec3 VectorsToTest[] = 
+			{
+				Vec3(1.0f, 0.0f, 0.0f),
+				Vec3(-1.0f, 0.0f, 0.0f),
+				Vec3(0.0f, 1.0f, 0.0f),
+				Vec3(0.0f, -1.0f, 0.0f),
+				Vec3(0.0f, 0.0f, 1.0f),
+				Vec3(0.0f, 0.0f, -1.0f),
+			};
+
+			float MaxDot = -FloatMax;
+			vec3 VectorForQE = Camera->Up;
+			for (uint32_t I = 0 ; I < ArrayCount(VectorsToTest); I++)
+			{
+				float DotProduct = Dot(Camera->Up, VectorsToTest[I]);
+				if (DotProduct > MaxDot)
+				{
+					MaxDot = DotProduct;
+					VectorForQE = VectorsToTest[I];
+				}
+			}
+
 			if (GameInput->Buttons[Button_E].IsDown)
 			{
-				Camera->Pos += SpeedScale * 0.3f * Vec3(0.0f, 1.0f, 0.0f);
+				Camera->Pos += SpeedScale * 0.3f * VectorForQE;
 			}
 			if (GameInput->Buttons[Button_Q].IsDown)
 			{
-				Camera->Pos -= SpeedScale * 0.3f * Vec3(0.0f, 1.0f, 0.0f);
+				Camera->Pos -= SpeedScale * 0.3f * VectorForQE;
 			}
 		}
 		else
