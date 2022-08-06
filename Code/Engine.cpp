@@ -217,6 +217,9 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		EngineState->LoadedSounds[Sound_SuccessColor] = LoadWAV("Sounds\\Effects\\SuccessColor.wav");
 		EngineState->LoadedSounds[Sound_NegativeColor] = LoadWAV("Sounds\\Effects\\NegativeColor.wav");
 		EngineState->LoadedSounds[Sound_Portal] = LoadWAV("Sounds\\Effects\\Portal.wav");
+		EngineState->LoadedSounds[Sound_Turret0] = LoadWAV("Sounds\\Effects\\Turret0.wav");
+		EngineState->LoadedSounds[Sound_Turret1] = LoadWAV("Sounds\\Effects\\Turret1.wav");
+		EngineState->LoadedSounds[Sound_Turret2] = LoadWAV("Sounds\\Effects\\Turret2.wav");
 
         EngineState->bInitialized = true;
     }
@@ -413,7 +416,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 
 	// Sound mixing
 	STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-	OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory);
+	OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
 	EndTempMemoryArena(&SoundTempMemory);
     
 	// Render

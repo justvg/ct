@@ -1,6 +1,6 @@
 #include "Audio.h"
 
-SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID, bool bExclusive = true)
+SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID, bool bExclusive = true, bool bThreeD = false, vec3 Pos = Vec3(0.0f))
 {
 	Assert(AudioState->PlayingSoundCount < ArrayCount(AudioState->PlayingSounds));
 
@@ -20,6 +20,8 @@ SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID, 
 		SPlayingSound PlayingSound = {};
 		PlayingSound.bLoop = bLoop;
 		PlayingSound.SoundID = SoundID;
+		PlayingSound.bThreeD = bThreeD;
+		PlayingSound.Pos = Pos;
 
 		PlayingSound.CurrentVolume = PlayingSound.TargetVolume = Vec2(1.0f, 1.0f);
 		PlayingSound.Pitch = 1.0f;
@@ -58,7 +60,7 @@ void ChangePitch(SPlayingSound* Sound, float Pitch)
 	}
 }
 
-void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundBuffer, const SLoadedWAV* LoadedSounds, STempMemoryArena* MemoryArena)
+void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundBuffer, const SLoadedWAV* LoadedSounds, STempMemoryArena* MemoryArena, const vec3 ListenerPos, const SLevel* Level)
 {
 	BEGIN_PROFILER_BLOCK("SOUND_MIXING");
 
@@ -105,6 +107,34 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 				{
 					vec2 MasterVolume = Vec2(AudioState->MasterVolume / 100.0f);
 					vec2 Volume = Hadamard(MasterVolume, PlayingSound->CurrentVolume);
+					if (PlayingSound->bThreeD)
+					{
+						const float MaxSoundDistance = 30.0f;
+
+						vec3 DistanceVec = ListenerPos - PlayingSound->Pos;
+						float DistanceSquared = Dot(DistanceVec, DistanceVec);
+
+						if (DistanceSquared > Square(MaxSoundDistance))
+						{
+							Volume = Vec2(0.0f);
+						}
+						else
+						{
+							float Distance = SquareRoot(DistanceSquared);
+
+							float HitCoefficient = 1.0f;
+							SRaytraceVoxelsResult RaytraceVoxelsResult = RaytraceVoxels(Level, PlayingSound->Pos, Normalize(DistanceVec), Distance);
+							if (RaytraceVoxelsResult.bHit)
+							{
+								HitCoefficient *= RaytraceVoxelsResult.Distance / Distance;
+							}
+
+							if (DistanceSquared > FloatEpsilon)
+							{
+								Volume *= HitCoefficient * Min(Square(9.0f) / DistanceSquared, 1.0f);
+							}
+						}
+					}
 
 					float Position = J * Step;
 					uint32_t LeftSampleIndex = FloorToUInt32(Position);

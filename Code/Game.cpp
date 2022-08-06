@@ -630,6 +630,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					}
 					else
 					{
+						PlaySound(&EngineState->AudioState, false, RandomU32(Sound_Turret0, Sound_Turret2), false, true, Entity->Pos);
 						AddFireball(*Level, Entity->Pos, Entity->FireballDim, Entity->Orientation.xyz, Entity->FireballColor, RotateByQuaternion(Entity->TargetOffset, EulerToQuat(Entity->Orientation.xyz)), Entity->Speed, LengthSq(Entity->FireballColor) == 0.0f);
 						Entity->TimeToShootCurrent = 0.0f;
 					}

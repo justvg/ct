@@ -169,6 +169,12 @@ enum ESounds
 	Sound_NegativeColor,
 
 	Sound_Portal,
+
+	Sound_Turret0,
+	Sound_Turret1,
+	Sound_Turret2,
+
+	Sound_Count
 };
 
 struct SEngineState
@@ -241,6 +247,8 @@ struct SEngineState
 	SEditorState EditorState;
 #endif
 };
+
+static_assert(Sound_Count <= ArrayCount(SEngineState::LoadedSounds));
 
 inline void AddText(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, vec4 Color = Vec4(1.0f), float Time = FloatMax, bool bAppearance = false, float TimeToAppear = 0.0f, float TimeToStartAppear = 0.0f)
 {

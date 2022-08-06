@@ -4,6 +4,9 @@ struct SPlayingSound
 {
 	bool bLoop;
 	bool bFinished;
+	
+	bool bThreeD;
+	vec3 Pos;
 
     vec2 CurrentVolume;
 	vec2 DeltaVolume;
