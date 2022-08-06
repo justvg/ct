@@ -18,6 +18,7 @@ enum EMenuElement
 	MenuElement_Vignetting,
 	MenuElement_AOQuality,
 	MenuElement_Resolution,
+	MenuElement_Volume,
 
 	MenuElement_SettingsCount,
 
@@ -56,6 +57,10 @@ struct SMenuState
 	bool bArrowLeft;
 	bool bArrowRight;
 	bool bArrowUsed;
+
+	bool bArrowLeftPressed;
+	bool bArrowRightPressed;
+	bool bArrowPressed;
 
 	bool bDisableStarted;
 

@@ -103,7 +103,8 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 				const float Step = PlayingSound->Pitch;
 				for (uint32_t J = 0; J < SamplesToMix; J++)
 				{
-					vec2 Volume = Hadamard(AudioState->MasterVolume, PlayingSound->CurrentVolume);
+					vec2 MasterVolume = Vec2(AudioState->MasterVolume / 100.0f);
+					vec2 Volume = Hadamard(MasterVolume, PlayingSound->CurrentVolume);
 
 					float Position = J * Step;
 					uint32_t LeftSampleIndex = FloorToUInt32(Position);

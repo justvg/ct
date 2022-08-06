@@ -862,6 +862,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					SaveFilePointer += sizeof(uint32_t);
 					
 					SaveFilePointer += sizeof(uint32_t);
+					SaveFilePointer += sizeof(uint32_t);
 
 					uint64_t WindowPlacementSize;
 					memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));

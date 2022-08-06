@@ -18,7 +18,7 @@ struct SPlayingSound
 
 struct SAudioState
 {
-	vec2 MasterVolume;
+	uint32_t MasterVolume;
 
 	uint32_t PlayingSoundCount;
 	SPlayingSound PlayingSounds[128];

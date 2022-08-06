@@ -1102,9 +1102,32 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 					MenuState->SelectedMenuElement = MenuElement_Resolution;
 				}
 			} break;
+
+			case MenuElement_Volume:
+			{
+				const float YPos = -0.24f;
+
+				char VolumeText[32] = {};
+				snprintf(VolumeText, sizeof(VolumeText), "%d%%", EngineState->AudioState.MasterVolume);
+	
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Audio volume:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, VolumeText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_Volume;
+				}
+			} break;
 		}
 
-		if ((bSelected && MenuState->bArrowUsed) || (bSelected && bMouseInItem && MenuState->bMouseLeftReleased))
+		if (bSelected &&
+			(MenuState->bArrowUsed || 
+			(bMouseInItem && MenuState->bMouseLeftReleased) || 
+			((MenuElement == MenuElement_Volume) && MenuState->bArrowPressed)))
 		{
 			switch (MenuElement)
 			{
@@ -1187,6 +1210,21 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 						EngineState->FullscreenResolutionPercent = ResolutionPercent;
 						EngineState->bSwapchainChanged = true;
 					}
+				} break;
+
+				case MenuElement_Volume:
+				{
+					uint32_t NewMasterVolume = EngineState->AudioState.MasterVolume;
+					if (MenuState->bArrowRightPressed || (!MenuState->bArrowRightPressed && !MenuState->bArrowLeftPressed))
+					{
+						NewMasterVolume += 1;
+					}
+					else
+					{
+						NewMasterVolume -= 1;
+					}
+
+					EngineState->AudioState.MasterVolume = Clamp(NewMasterVolume, 0, 200);
 				} break;
 			}
 		}
@@ -1315,6 +1353,10 @@ void UpdateMenu(SMenuState* MenuState, SEngineState* EngineState, const SGameInp
 	MenuState->bArrowLeft = WasDown(GameInput->Buttons[Button_A]) || WasDown(GameInput->Buttons[Button_ArrowLeft]);
 	MenuState->bArrowRight = WasDown(GameInput->Buttons[Button_D]) || WasDown(GameInput->Buttons[Button_ArrowRight]);
 	MenuState->bArrowUsed = MenuState->bArrowLeft || MenuState->bArrowRight;
+
+	MenuState->bArrowLeftPressed = GameInput->Buttons[Button_A].IsDown || GameInput->Buttons[Button_ArrowLeft].IsDown;
+	MenuState->bArrowRightPressed = GameInput->Buttons[Button_D].IsDown || GameInput->Buttons[Button_ArrowRight].IsDown;
+	MenuState->bArrowPressed = MenuState->bArrowLeftPressed || MenuState->bArrowRightPressed;
 
 	switch (MenuState->MenuMode)
 	{
@@ -1450,6 +1492,10 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(&FullscreenResolutionPercent, SaveFilePointer, sizeof(uint32_t));
 			SaveFilePointer += sizeof(uint32_t);
 
+			uint32_t MasterVolume;
+			memcpy(&MasterVolume, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
 			uint64_t WindowPlacementSize;
 			memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
 			SaveFilePointer += sizeof(uint64_t);
@@ -1461,6 +1507,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			EngineState->LastFullscreenInternalWidth = InternalWidth;
 			EngineState->LastFullscreenInternalHeight = InternalHeight;
 			EngineState->FullscreenResolutionPercent = FullscreenResolutionPercent;
+			EngineState->AudioState.MasterVolume = MasterVolume;
 
 			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
 			{
@@ -1606,6 +1653,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		uint32_t Width = EngineState->LastFullscreenInternalWidth;
 		uint32_t Height = EngineState->LastFullscreenInternalHeight;
 		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
+		uint32_t MasterVolume = EngineState->AudioState.MasterVolume;
 
 		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
@@ -1614,6 +1662,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		fwrite(&Width, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&FullscreenResolutionPercent, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(&MasterVolume, sizeof(uint32_t), 1, GeneralSaveFile);
 
 		SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
 		fwrite(&WindowPlacement.InfoSizeInBytes, sizeof(uint64_t), 1, GeneralSaveFile);
