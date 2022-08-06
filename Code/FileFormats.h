@@ -109,6 +109,7 @@ struct SWAVChunkHeader
 #define RIFF_FOURCC 'FFIR'
 #define WAVE_FOURCC 'EVAW'
 #define FMT_FOURCC ' tmf'
+#define LIST_FOURCC 'TSIL'
 #define DATA_FOURCC 'atad'
 
 struct SLoadedWAV
@@ -133,6 +134,10 @@ SLoadedWAV LoadWAV(const char* Path)
 		Assert(HeaderFMT->ID == FMT_FOURCC);
 
 		SWAVChunkHeader* HeaderData = (SWAVChunkHeader*) ((uint8_t*) HeaderFMT + sizeof(SWAVChunkHeader) + HeaderFMT->Size);
+		if (HeaderData->ID == LIST_FOURCC)
+		{
+			HeaderData = (SWAVChunkHeader*) ((uint8_t*) HeaderData + sizeof(SWAVChunkHeader) + HeaderData->Size);
+		}
 		Assert(HeaderData->ID == DATA_FOURCC);
 
 		SWAVInfo* Info = (SWAVInfo*) ((uint8_t*) HeaderFMT + sizeof(SWAVChunkHeader));

@@ -1757,8 +1757,18 @@ inline bool IsPointInRect(vec2 Point, vec4 Rect)
 
 inline float RandomFloat01()
 {
-    float Result = (rand() % 101) / 100.0f;
+    float Result = (rand() % (RAND_MAX + 1)) / float(RAND_MAX);
     
+    return Result;
+}
+
+inline uint32_t RandomU32(uint32_t Min, uint32_t Max)
+{
+    Assert(Max > Min);
+    float Step = RandomFloat01() * (Max - Min);
+    uint32_t Result = uint32_t(Min + Step + 0.5f);
+
+    Assert((Result >= Min) && (Result <= Max));
     return Result;
 }
 

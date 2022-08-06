@@ -175,11 +175,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		CreateSphereMesh(EngineState->Geometry);
         
 		InitializeRenderer(&EngineState->Renderer, Vulkan, &EngineState->Geometry);
-            
-		EngineState->LoadedSounds[0] = LoadWAV("Sounds\\example.wav");
-		EngineState->LoadedSounds[1] = LoadWAV("Sounds\\shotgun.wav");
-		EngineState->AudioState.MasterVolume = Vec2(1.0f, 1.0f);
-        
+                    
 		EngineState->Camera.OffsetFromPlayer = Vec3(0.0f, 0.8f*0.5f*1.5f, 0.0f);
         EngineState->Camera.Near = 0.01f;
         EngineState->Camera.Far = 300.0f;
@@ -211,6 +207,16 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		    EngineState->EditorState.CameraSpeed = 1.0f;
         #endif
 		}
+
+		EngineState->AudioState.MasterVolume = Vec2(1.0f, 1.0f);
+		EngineState->LoadedSounds[Sound_Footstep0] = LoadWAV("Sounds\\Footsteps\\Footstep0.wav");
+		EngineState->LoadedSounds[Sound_Footstep1] = LoadWAV("Sounds\\Footsteps\\Footstep1.wav");
+		EngineState->LoadedSounds[Sound_Footstep2] = LoadWAV("Sounds\\Footsteps\\Footstep2.wav");
+		EngineState->LoadedSounds[Sound_Footstep3] = LoadWAV("Sounds\\Footsteps\\Footstep3.wav");
+		EngineState->LoadedSounds[Sound_Footstep4] = LoadWAV("Sounds\\Footsteps\\Footstep4.wav");
+		EngineState->LoadedSounds[Sound_SuccessColor] = LoadWAV("Sounds\\Effects\\SuccessColor.wav");
+		EngineState->LoadedSounds[Sound_NegativeColor] = LoadWAV("Sounds\\Effects\\NegativeColor.wav");
+		EngineState->LoadedSounds[Sound_Portal] = LoadWAV("Sounds\\Effects\\Portal.wav");
 
         EngineState->bInitialized = true;
     }

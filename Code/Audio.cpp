@@ -1,18 +1,37 @@
 #include "Audio.h"
 
-SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID)
+SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID, bool bExclusive = true)
 {
 	Assert(AudioState->PlayingSoundCount < ArrayCount(AudioState->PlayingSounds));
-	SPlayingSound PlayingSound = {};
-	PlayingSound.bLoop = bLoop;
-	PlayingSound.SoundID = SoundID;
 
-    PlayingSound.CurrentVolume = PlayingSound.TargetVolume = Vec2(1.0f, 1.0f);
-	PlayingSound.Pitch = 1.0f;
+	if (AudioState->PlayingSoundCount < ArrayCount(AudioState->PlayingSounds))
+	{
+		if (bExclusive)
+		{
+			for (uint32_t I = 0; I < AudioState->PlayingSoundCount; I++)
+			{
+				if (AudioState->PlayingSounds[I].SoundID == SoundID)
+				{
+					return 0;
+				}
+			}
+		}
 
-	AudioState->PlayingSounds[AudioState->PlayingSoundCount++] = PlayingSound;
+		SPlayingSound PlayingSound = {};
+		PlayingSound.bLoop = bLoop;
+		PlayingSound.SoundID = SoundID;
 
-	return &AudioState->PlayingSounds[AudioState->PlayingSoundCount];
+		PlayingSound.CurrentVolume = PlayingSound.TargetVolume = Vec2(1.0f, 1.0f);
+		PlayingSound.Pitch = 1.0f;
+
+		AudioState->PlayingSounds[AudioState->PlayingSoundCount++] = PlayingSound;
+	
+		return &AudioState->PlayingSounds[AudioState->PlayingSoundCount - 1];
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 void ChangeVolume(SPlayingSound* Sound, float Seconds, vec2 Volume)
@@ -33,7 +52,10 @@ void ChangeVolume(SPlayingSound* Sound, float Seconds, vec2 Volume)
 
 void ChangePitch(SPlayingSound* Sound, float Pitch)
 {
-	Sound->Pitch = Pitch;
+	if (Sound)
+	{
+		Sound->Pitch = Pitch;
+	}
 }
 
 void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundBuffer, const SLoadedWAV* LoadedSounds, STempMemoryArena* MemoryArena)

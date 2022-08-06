@@ -125,7 +125,11 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	}
 	if ((WasDown(GameInput->Buttons[Button_MouseLeft]) || WasDown(GameInput->Buttons[Button_MouseRight])) && !GameInput->bShowMouse)
 	{
-		HeroControl.bUseLamp = true;
+		if (GameState->LampTime >= GameState->LampTimer)
+		{
+			HeroControl.bUseLamp = true;
+			GameState->LampTime = false;
+		}
 	}
 
 	if (GameState->bReload)
@@ -216,9 +220,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	Assert((Level->EntityCount == 0) || (Level->Entities[0].Type == Entity_Hero));
 	if (HeroControl.bUseLamp && !GameState->bDeathAnimation && !Level->Entities[0].bChangeColorAnimation)
 	{
-		// SPlayingSound* ShootSound = PlaySound(AudioState, false, 1);
-		// ChangePitch(ShootSound, RandomFloat(1.15f, 2.0f));
-		
 		vec3 RayStart = Camera->Pos;
 		vec3 RayDir = Camera->Dir;
 		
@@ -273,8 +274,10 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					if (WasDown(GameInput->Buttons[Button_MouseLeft]))
 					{
 						vec3 ResultColor = HeroEntity->Color + HitEntity->Color;
-						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
+						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f) && (Length(HitEntity->Color) > 0.0f))
 						{
+							ChangePitch(PlaySound(&EngineState->AudioState, false, Sound_SuccessColor), RandomFloat(0.75f, 1.25f));
+
 							HitEntity->bChangeColorAnimation = true;
 							HitEntity->AnimationColor = Vec3(0.0f);
 							HitEntity->TimeToChangeColor = 0.5f;
@@ -320,12 +323,18 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 								}
 							}
 						}
+						else
+						{
+							ChangePitch(PlaySound(&EngineState->AudioState, false, Sound_NegativeColor), RandomFloat(0.9f, 1.25f));
+						}
 					}
 					else if (WasDown(GameInput->Buttons[Button_MouseRight]))
 					{
 						vec3 ResultColor = HeroEntity->Color + HitEntity->Color;
-						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
+						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f) && (Length(HeroEntity->Color) > 0.0f))
 						{
+							ChangePitch(PlaySound(&EngineState->AudioState, false, Sound_SuccessColor), RandomFloat(0.75f, 1.25f));
+
 							HitEntity->bChangeColorAnimation = true;
 							HitEntity->AnimationColor = ResultColor;
 							HitEntity->TimeToChangeColor = 0.5f;
@@ -377,6 +386,10 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 									}
 								}
 							}
+						}
+						else
+						{
+							ChangePitch(PlaySound(&EngineState->AudioState, false, Sound_NegativeColor), RandomFloat(0.9f, 1.25f));
 						}
 					}
 				} break;
@@ -540,6 +553,14 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					
 					SMoveEntityInfo MoveInfo = { !EngineState->bFlyMode, EngineState->bFlyMode, true, true, HeroControl.Acceleration };
 					MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
+
+					if (Length(Vec3(Entity->Velocity.x, 0.0f, Entity->Velocity.z)) > 0.2f)
+					{
+						if (GameState->StepSoundTime >= GameState->StepSoundTimer)
+						{
+							ChangePitch(PlaySound(&EngineState->AudioState, false, RandomU32(Sound_Footstep0, Sound_Footstep4), false), RandomFloat(0.75f, 1.0f));
+						}
+					}
 				} break;
 				
 				case Entity_Torch:
@@ -641,95 +662,104 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			{
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
-					bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
-				#if ENGINE_RELEASE
-					if (bTargetMainHub)
+					PlaySound(&EngineState->AudioState, false, Sound_Portal);
+
+					if (Entity->CollisionWithHeroTimePassed > 0.2f)
 					{
-						SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
-						if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+						bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+					#if ENGINE_RELEASE
+						if (bTargetMainHub)
 						{
-							uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl", Level->Entities[0].Velocity);
+							SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
+							if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+							{
+								uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl", Level->Entities[0].Velocity);
 
-							EndPointer += sizeof(float);
-							EndPointer += sizeof(float);
-							EndPointer += sizeof(uint32_t);
-							EndPointer += sizeof(EngineState->TextsToRender);
+								EndPointer += sizeof(float);
+								EndPointer += sizeof(float);
+								EndPointer += sizeof(uint32_t);
+								EndPointer += sizeof(EngineState->TextsToRender);
 
-							memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
-							EndPointer += sizeof(vec3);
-							memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
-							EndPointer += sizeof(float);
+								memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
+								EndPointer += sizeof(vec3);
+								memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
+								EndPointer += sizeof(float);
 
-							free(MainHubSaveFile.Memory);
+								free(MainHubSaveFile.Memory);
+							}
+							else
+							{
+								char LevelName[264] = {};
+								ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
+								LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
+							}
 						}
 						else
+					#endif
 						{
 							char LevelName[264] = {};
 							ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 							LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
 						}
-					}
-					else
-				#endif
-					{
-						char LevelName[264] = {};
-						ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
-						LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
-					}
 
-					if (bTargetMainHub && Entity->bFinishGates)
-					{
-						SLevel* LoadedLevel = &EngineState->LevelBaseState;
-						for (uint32_t LoadedLevelEntityIndex = 0; LoadedLevelEntityIndex < LoadedLevel->EntityCount; LoadedLevelEntityIndex++)
+						if (bTargetMainHub && Entity->bFinishGates)
 						{
-							SEntity* LoadedLevelEntity = LoadedLevel->Entities + LoadedLevelEntityIndex;
-
-							if (LoadedLevelEntity->Type == Entity_Gates)
+							SLevel* LoadedLevel = &EngineState->LevelBaseState;
+							for (uint32_t LoadedLevelEntityIndex = 0; LoadedLevelEntityIndex < LoadedLevel->EntityCount; LoadedLevelEntityIndex++)
 							{
-								char LevelName[264] = {};
-								ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
-								ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
+								SEntity* LoadedLevelEntity = LoadedLevel->Entities + LoadedLevelEntityIndex;
 
-								if (CompareStrings(LevelName, CurrentLevelName))
+								if (LoadedLevelEntity->Type == Entity_Gates)
 								{
-									LoadedLevelEntity->bFinishedLevel = true;
-									break;
+									char LevelName[264] = {};
+									ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
+									ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
+
+									if (CompareStrings(LevelName, CurrentLevelName))
+									{
+										LoadedLevelEntity->bFinishedLevel = true;
+										break;
+									}
 								}
 							}
 						}
-					}
 
-					SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
+						SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
 
-					float GatesAngleDifference = 0.0f;
-					if (bTargetMainHub)
-					{
-						GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
+						float GatesAngleDifference = 0.0f;
+						if (bTargetMainHub)
+						{
+							GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
+						}
+						else
+						{
+							GatesAngleDifference = HeroEntity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+						}
+
+						quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
+						HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
+						Camera->Head += GatesAngleDifference;
+
+						if (bTargetMainHub)
+						{
+							HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
+						}
+						
+						Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
+						Camera->Dir.y = Sin(Radians(Camera->Pitch));
+						Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
+						Camera->Dir = Normalize(Camera->Dir);
+						
+						Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
+						Camera->Up = Cross(Camera->Right, Camera->Dir);
+						
+						Entity->bCollisionWithHeroStarted = false;
+						Entity->CollisionWithHeroTimePassed = 0.0f;
 					}
 					else
 					{
-						GatesAngleDifference = HeroEntity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+						Entity->CollisionWithHeroTimePassed += GameInput->dt;
 					}
-
-					quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
-					HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
-					Camera->Head += GatesAngleDifference;
-
-					if (bTargetMainHub)
-					{
-						HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
-					}
-					
-					Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
-					Camera->Dir.y = Sin(Radians(Camera->Pitch));
-					Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
-					Camera->Dir = Normalize(Camera->Dir);
-					
-					Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
-					Camera->Up = Cross(Camera->Right, Camera->Dir);
-					
-					Entity->bCollisionWithHeroStarted = false;
-					Entity->CollisionWithHeroTimePassed = 0.0f;
 				}
 				else
 				{
@@ -750,6 +780,14 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 				}
 			}
 		}
+
+		if (GameState->StepSoundTime >= GameState->StepSoundTimer)
+		{
+			GameState->StepSoundTime -= GameState->StepSoundTimer;
+		}
+		GameState->StepSoundTime += GameInput->dt;
+
+		GameState->LampTime += GameInput->dt;
 	}
 	
 	END_PROFILER_BLOCK("ENTITIES_SIMULATION");
@@ -1367,6 +1405,9 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		GameState->MenuState.OpenAnimationTime = 1.0f;
 		GameState->MenuState.SelectedStayBrightTime = 1.0f;
 		GameState->MenuState.SelectedAnimationTime = 2.0f;
+
+		GameState->LampTimer = 0.75f;
+		GameState->StepSoundTimer = 0.75f;
 
 #if ENGINE_RELEASE
 		SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");

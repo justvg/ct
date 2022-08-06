@@ -93,6 +93,11 @@ struct SGameState
 
     uint8_t CurrentCheckpointIndex;
 	vec3 LastCheckpointPos;
+
+	float LampTimer;
+	float LampTime;
+	float StepSoundTimer;
+	float StepSoundTime;
 };
 
 void StartDeathAnimation(SGameState* GameState, vec3 DeathPos)

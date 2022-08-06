@@ -157,6 +157,20 @@ enum EEngineMode
 	EngineMode_Editor,
 };
 
+enum ESounds
+{
+	Sound_Footstep0,
+	Sound_Footstep1,
+	Sound_Footstep2,
+	Sound_Footstep3,
+	Sound_Footstep4,
+
+	Sound_SuccessColor,
+	Sound_NegativeColor,
+
+	Sound_Portal,
+};
+
 struct SEngineState
 {
     bool bInitialized;
