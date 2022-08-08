@@ -526,7 +526,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				if (ImGui::Button("Door"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
-					EditorState->SelectedEntity = AddDoor(EngineState->Level, SpawnPos, Vec3(1.5f, 2.0f, 0.2f), Quat(0, 0, 0, 1), Vec3(0.58f, 0.29f, 0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(0.0f, 2.0f, 0.0f));
+					EditorState->SelectedEntity = AddDoor(EngineState->Level, SpawnPos, Vec3(1.5f, 2.0f, 0.2f), Quat(0, 0, 0, 1), Vec3(0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(0.0f, 2.0f, 0.0f));
 					EditorState->SelectedPointLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
