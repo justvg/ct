@@ -222,7 +222,8 @@ SWinSoundBackend WinInitializeSoundBackend()
 	SoundBackend.ChannelCount = 2;
 	SoundBackend.SamplesPerSec = 44100;
 	SoundBackend.BitsPerChannel = 16;
-	SoundBackend.TargetLatency = 45.0f;
+	// TODO(georgii): Review latency!
+	SoundBackend.TargetLatency = 50.0f;
 
 	WAVEFORMATEX WaveFormat = {};
 	WaveFormat.wFormatTag = WAVE_FORMAT_PCM;

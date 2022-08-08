@@ -217,9 +217,13 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		EngineState->LoadedSounds[Sound_SuccessColor] = LoadWAV("Sounds\\Effects\\SuccessColor.wav");
 		EngineState->LoadedSounds[Sound_NegativeColor] = LoadWAV("Sounds\\Effects\\NegativeColor.wav");
 		EngineState->LoadedSounds[Sound_Portal] = LoadWAV("Sounds\\Effects\\Portal.wav");
+		EngineState->LoadedSounds[Sound_PortalAmbient] = LoadWAV("Sounds\\Effects\\PortalAmbient.wav");
 		EngineState->LoadedSounds[Sound_Turret0] = LoadWAV("Sounds\\Effects\\Turret0.wav");
 		EngineState->LoadedSounds[Sound_Turret1] = LoadWAV("Sounds\\Effects\\Turret1.wav");
 		EngineState->LoadedSounds[Sound_Turret2] = LoadWAV("Sounds\\Effects\\Turret2.wav");
+		EngineState->LoadedSounds[Sound_ColorFieldAmbient] = LoadWAV("Sounds\\Effects\\ColorFieldAmbient.wav");
+
+		EngineState->LoadedSounds[Sound_PortalSoundtrack] = LoadWAV("Sounds\\Music\\PortalSoundtrack.wav");
 
         EngineState->bInitialized = true;
     }
@@ -420,6 +424,13 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	EndTempMemoryArena(&SoundTempMemory);
     
 	// Render
+#ifndef ENGINE_RELEASE
+	char FrameTimeText[64];
+	const float FrameMS = uint32_t(10000.0f * GameInput.dt) / 10.0f;
+	snprintf(FrameTimeText, sizeof(FrameTimeText), "%.1fms/f %dFPS\n\n", FrameMS, (uint32_t)(1000.0f / FrameMS));
+	AddTextOneFrame(EngineState, FrameTimeText, Vec2(-1.0f, -0.95f), 0.1f, Vec4(1.0f), TextAlignment_Left);
+#endif
+
 	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
 
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
@@ -431,7 +442,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	{
 		SText* Text = EngineState->TextsToRender + I;
 
-		if ((EngineState->bMenuOpened && Text->bMenuText) || (!EngineState->bMenuOpened && !Text->bMenuText))
+		if ((EngineState->bMenuOpened && Text->bMenuText) || (!EngineState->bMenuOpened && !Text->bMenuText) || (Text->Time == 0.0f))
 		{
 			Text->CurrentTime += GameInput.dt;
 			if (Text->CurrentTime > Text->Time)

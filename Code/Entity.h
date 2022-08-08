@@ -52,7 +52,11 @@ struct SEntity
 	float Drag;
 	float JumpPower;
 
-	uint32_t DoorIndex; // NOTE(georgii): Used for checkpoint to close a door. And for torches to control doors.
+	union
+	{
+		uint32_t DoorIndex; // NOTE(georgii): Used for checkpoint to close a door. And for torches to control doors.
+		bool bSoundStarted;
+	};
 	
 	float Alpha;
 

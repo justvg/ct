@@ -103,7 +103,7 @@ SEntity* AddGates(SLevel& Level, vec3 Pos, vec3 Dim, quat Orientation)
 	Entity->Pos = Pos;
 	Entity->Dim = Dim;
 	Entity->Scale = 1.0f;
-
+	
 	Entity->Alpha = 0.8f;
 
 	Entity->Color = Vec3(0.25f, 0.45f, 1.0f);

@@ -114,6 +114,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				
 				EngineState->EngineMode = EngineMode_Editor;
 
+				EngineState->AudioState.PlayingSoundCount = 0;
 				EngineState->TextsToRenderCount = 0;
 
 				EngineState->bMenuOpened = false;
@@ -251,6 +252,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EngineState->LevelGameStartState = EngineState->Level;
 				ReloadGameLevel(EngineState);
                 
+				PlaySound(&EngineState->AudioState, true, Sound_PortalSoundtrack);
 				EngineState->EngineMode = EngineMode_Game;
 			}
             

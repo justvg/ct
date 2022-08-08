@@ -169,10 +169,15 @@ enum ESounds
 	Sound_NegativeColor,
 
 	Sound_Portal,
+	Sound_PortalAmbient,
 
 	Sound_Turret0,
 	Sound_Turret1,
 	Sound_Turret2,
+
+	Sound_PortalSoundtrack,
+
+	Sound_ColorFieldAmbient,
 
 	Sound_Count
 };
@@ -277,6 +282,35 @@ inline void AddText(SEngineState* EngineState, const char* String, vec2 Pos, flo
 	Text->Alignment = TextAlignment_Center;
 
 	Text->Font = Font_KarminaRegular;
+}
+
+inline void AddTextOneFrame(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, vec4 Color = Vec4(1.0f), ETextAlignment Alignment = TextAlignment_Center)
+{
+	Assert(EngineState->TextsToRenderCount < ArrayCount(EngineState->TextsToRender));
+	SText* Text = &EngineState->TextsToRender[EngineState->TextsToRenderCount++];
+
+	uint32_t Length = StringLength(String);
+	Assert(ArrayCount(Text->String) >= Length + 1);
+
+	memcpy(Text->String, String, Length);
+	Text->String[Length] = 0;
+
+	Text->Pos = Pos;
+	Text->Scale = Vec2(Scale, Scale);
+
+	Text->CurrentTime = 0.0f;
+	Text->Time = 0.0f;
+	
+	Text->bAppearance = false;
+	Text->TimeToAppear = 0.0f;
+	Text->TimeToStartAppear = 0.0f;
+
+	Text->Color = Color;
+	Text->bMenuText = false;
+	Text->BlendFactor = 1.0f;
+	Text->Alignment = Alignment;
+
+	Text->Font = Font_KarminaBold;
 }
 
 inline void AddTextMenu(SEngineState* EngineState, const char* String, vec2 Pos, float Scale, EFont Font, vec4 Color = Vec4(1.0f), float BlendFactor = 1.0f, ETextAlignment Alignment = TextAlignment_Center)
