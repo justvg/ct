@@ -160,6 +160,13 @@ inline float SafeDivide0(float Dividend, float Divisor)
     return Result;
 }
 
+inline float FloatMod(float Dividend, float Divisor)
+{
+    float Result = float(fmod(Dividend, Divisor));
+
+    return Result;
+}
+
 inline uint32_t FindLeastSignificantSetBitIndex(uint32_t Value)
 {
     uint32_t Result = 0;

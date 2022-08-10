@@ -68,10 +68,12 @@ struct SEditorState
 
 	EEditorHelpersMode EditorHelpersMode;
 
+	bool bGridMode;
 	SEntity* SelectedEntity;
 	ESelectedArrowType SelectedArrow;
 	ESelectedDimHelperType SelectedDimHelper;
 	bool bCircleSelected;
+	float MoveDeltaAccum;
 
 	SPointLight* SelectedPointLight;
 

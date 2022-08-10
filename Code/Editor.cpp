@@ -277,7 +277,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			EditorState->bIsImguiWindowHovered |= ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_RootAndChildWindows);
 		}
 		ImGui::End();
-        
+
 		ImVec2 SelectedVoxelWindowSize = {};
 		if (EditorState->SelectedVoxelsCount > 0)
 		{
@@ -585,6 +585,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedPointLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
 				EditorState->SelectedDimHelper = SelectedDimHelper_None;
 				EditorState->bSelectDoor = false;
@@ -611,6 +612,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedPointLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
 				EditorState->SelectedDimHelper = SelectedDimHelper_None;
 				EditorState->bSelectDoor = false;
@@ -652,6 +654,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedPointLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
 				EditorState->SelectedDimHelper = SelectedDimHelper_None;
 				EditorState->bSelectDoor = false;
@@ -678,6 +681,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedPointLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
 				EditorState->SelectedDimHelper = SelectedDimHelper_None;
 				EditorState->bSelectDoor = false;
@@ -706,6 +710,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedVoxelsCount = 0;
 			}
 
+			ImGui::Checkbox("GridSnap", &EditorState->bGridMode);
+
 			EditorDragFloat(EditorState, "CameraSpeed", &EditorState->CameraSpeed, 0.05f, 0.0f, FloatMax);
             
 			if (bValueChanged && !EditorState->bImGuiChangeStarted)
@@ -731,6 +737,18 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 	vkCmdEndRenderPass(Vulkan->CommandBuffer);
     
 	END_GPU_PROFILER_BLOCK("IMGUI_RENDER", Vulkan->CommandBuffer, Vulkan->FrameInFlight);
+}
+
+void EditorMoveSnap(float& MoveDeltaAccum, float& EntityPos)
+{
+	float NewPos = EntityPos + MoveDeltaAccum;
+	NewPos = 0.5f * roundf((NewPos + 0.5f * VoxelDim) * 2.0f) - 0.5f * VoxelDim;
+	
+	if (Absolute(NewPos - EntityPos) >= FloatEpsilon)
+	{
+		EntityPos = NewPos;
+		MoveDeltaAccum = 0.0f; 
+	}
 }
 
 void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulkanContext* Vulkan, SRenderer* Renderer)
@@ -772,6 +790,11 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		
 		Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
 		Camera->Up = Cross(Camera->Right, Camera->Dir);
+	}
+
+	if (WasDown(GameInput->Buttons[Button_G]))
+	{
+		EditorState->bGridMode = !EditorState->bGridMode;
 	}
 	
 	if (!EditorState->bIsImguiWindowFocused)
@@ -844,12 +867,14 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			{
 				EditorState->EditorHelpersMode = EditorHelpersMode_Rotation;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->SelectedDimHelper = SelectedDimHelper_None;
 			}
 			if (WasDown(GameInput->Buttons[Button_C]))
 			{
 				EditorState->EditorHelpersMode = EditorHelpersMode_Scale;
 				EditorState->SelectedArrow = SelectedArrow_None;
+				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
 			}
 		}
@@ -1548,6 +1573,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		EditorState->SelectedEntity = 0;
 		EditorState->SelectedPointLight = 0;
 		EditorState->SelectedArrow = SelectedArrow_None;
+		EditorState->MoveDeltaAccum = 0.0f;
 		EditorState->bCircleSelected = false;
 		EditorState->SelectedDimHelper = SelectedDimHelper_None;
 		EditorState->bSelectDoor = false;
@@ -1699,6 +1725,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 					{
 						EditorState->SelectedArrow = bRedArrowHitTargetOffset ? SelectedArrow_RedTargetOffset : (bGreenArrowHitTargetOffset ? SelectedArrow_GreenTargetOffset : SelectedArrow_BlueTargetOffset);
 					}
+					EditorState->MoveDeltaAccum = 0.0f;
 					PlatformDisableCursor(GameInput);
 					
 					if (Entity && (Entity->Type != Entity_Hero) && GameInput->Buttons[Button_Alt].IsDown)
@@ -1725,7 +1752,15 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 						{
 							if (Entity)
 							{
-								Entity->Pos.x += 0.01f * WorldPosDelta.x;
+								if (EditorState->bGridMode)
+								{
+									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.x;
+									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.x);
+								}
+								else
+								{
+									Entity->Pos.x += 0.01f * WorldPosDelta.x;
+								}
 								Entity->BasePos = Entity->Pos;
 							}
 							else
@@ -1739,7 +1774,15 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 						{
 							if (Entity)
 							{
-								Entity->Pos.y += 0.01f * WorldPosDelta.y;
+								if (EditorState->bGridMode)
+								{
+									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.y;
+									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.y);
+								}
+								else
+								{		
+									Entity->Pos.y += 0.01f * WorldPosDelta.y;
+								}
 								Entity->BasePos = Entity->Pos;
 							}
 							else
@@ -1753,7 +1796,15 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 						{
 							if (Entity)
 							{
-								Entity->Pos.z += 0.01f * WorldPosDelta.z;
+								if (EditorState->bGridMode)
+								{
+									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.z;
+									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.z);
+								}
+								else
+								{
+									Entity->Pos.z += 0.01f * WorldPosDelta.z;
+								}
 								Entity->BasePos = Entity->Pos;
 							}
 							else
@@ -1771,13 +1822,29 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 							}
 							else
 							{
-								Entity->TargetOffset.x += 0.01f * WorldPosDelta.x;
+								if (EditorState->bGridMode)
+								{
+									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.x;
+									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.x);
+								}
+								else
+								{
+									Entity->TargetOffset.x += 0.01f * WorldPosDelta.x;
+								}
 							}
 						} break;
 						
 						case SelectedArrow_GreenTargetOffset:
 						{
-							Entity->TargetOffset.y += 0.01f * WorldPosDelta.y;
+							if (EditorState->bGridMode)
+							{
+								EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.y;
+								EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.y);
+							}
+							else
+							{
+								Entity->TargetOffset.y += 0.01f * WorldPosDelta.y;
+							}
 						} break;
 						
 						case SelectedArrow_BlueTargetOffset:
@@ -1788,7 +1855,15 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 							}
 							else
 							{
-								Entity->TargetOffset.z += 0.01f * WorldPosDelta.z;
+								if (EditorState->bGridMode)
+								{
+									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.z;
+									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.z);
+								}
+								else
+								{
+									Entity->TargetOffset.z += 0.01f * WorldPosDelta.z;
+								}
 							}
 						} break;
 					}
@@ -1797,6 +1872,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				if (WasReleased(GameInput->Buttons[Button_MouseLeft]) && (EditorState->SelectedArrow != SelectedArrow_None))
 				{
 					EditorState->SelectedArrow = SelectedArrow_None;
+					EditorState->MoveDeltaAccum = 0.0f;
 					PlatformEnableCursor(GameInput);
 				}
 			} break;

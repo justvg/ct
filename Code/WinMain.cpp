@@ -705,6 +705,10 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					{
 						WinProcessKeyboardMessage(GameInput->Buttons[Button_F], IsDown);
 					}
+					else if (VKCode == 'G')
+					{
+						WinProcessKeyboardMessage(GameInput->Buttons[Button_G], IsDown);
+					}
 					else if (VKCode == VK_UP)
 					{
 						WinProcessKeyboardMessage(GameInput->Buttons[Button_ArrowUp], IsDown);

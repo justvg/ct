@@ -142,6 +142,7 @@ enum EButtonType
 	Button_Q,
 	Button_E,
 	Button_F,
+	Button_G,
 
 	Button_ArrowUp,
 	Button_ArrowDown,
