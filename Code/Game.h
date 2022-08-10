@@ -19,6 +19,8 @@ enum EMenuElement
 	MenuElement_AOQuality,
 	MenuElement_Resolution,
 	MenuElement_Volume,
+	MenuElement_MusicVolume,
+	MenuElement_EffectsVolume,
 
 	MenuElement_SettingsCount,
 

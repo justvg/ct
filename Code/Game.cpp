@@ -1166,12 +1166,52 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 					MenuState->SelectedMenuElement = MenuElement_Volume;
 				}
 			} break;
+
+			case MenuElement_MusicVolume:
+			{
+				const float YPos = -0.36f;
+
+				char VolumeText[32] = {};
+				snprintf(VolumeText, sizeof(VolumeText), "%d%%", EngineState->AudioState.MusicVolume);
+	
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Music volume:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, VolumeText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_MusicVolume;
+				}
+			} break;
+
+			case MenuElement_EffectsVolume:
+			{
+				const float YPos = -0.48f;
+
+				char VolumeText[32] = {};
+				snprintf(VolumeText, sizeof(VolumeText), "%d%%", EngineState->AudioState.EffectsVolume);
+	
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, "Effects volume:", Vec2(LeftPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Left);
+				bMouseInItem = MenuItemDefault(EngineState, MenuState, VolumeText, Vec2(RightPos, YPos), TextScale, MenuState->ScreenDim, Color, MenuState->MousePos, Font, TextAlignment_Right) || bMouseInItem;
+				if (bMouseInItem && MenuState->bMousePosChanged)
+				{
+					if (!bSelected)
+					{
+						MenuState->SelectedTime = 0.0f;
+						bSelected = true;
+					}
+					MenuState->SelectedMenuElement = MenuElement_EffectsVolume;
+				}
+			} break;
 		}
 
 		if (bSelected &&
 			(MenuState->bArrowUsed || 
 			(bMouseInItem && MenuState->bMouseLeftReleased) || 
-			((MenuElement == MenuElement_Volume) && MenuState->bArrowPressed)))
+			(((MenuElement == MenuElement_Volume) || (MenuElement == MenuElement_MusicVolume) || (MenuElement == MenuElement_EffectsVolume)) && MenuState->bArrowPressed)))
 		{
 			switch (MenuElement)
 			{
@@ -1268,7 +1308,37 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 						NewMasterVolume -= 1;
 					}
 
-					EngineState->AudioState.MasterVolume = Clamp(NewMasterVolume, 0, 200);
+					EngineState->AudioState.MasterVolume = Clamp(NewMasterVolume, 0, 100);
+				} break;
+
+				case MenuElement_MusicVolume:
+				{
+					uint32_t NewMusicVolume = EngineState->AudioState.MusicVolume;
+					if (MenuState->bArrowRightPressed || (!MenuState->bArrowRightPressed && !MenuState->bArrowLeftPressed))
+					{
+						NewMusicVolume += 1;
+					}
+					else
+					{
+						NewMusicVolume -= 1;
+					}
+
+					EngineState->AudioState.MusicVolume = Clamp(NewMusicVolume, 0, 100);
+				} break;
+
+				case MenuElement_EffectsVolume:
+				{
+					uint32_t NewEffectsVolume = EngineState->AudioState.EffectsVolume;
+					if (MenuState->bArrowRightPressed || (!MenuState->bArrowRightPressed && !MenuState->bArrowLeftPressed))
+					{
+						NewEffectsVolume += 1;
+					}
+					else
+					{
+						NewEffectsVolume -= 1;
+					}
+
+					EngineState->AudioState.EffectsVolume = Clamp(NewEffectsVolume, 0, 100);
 				} break;
 			}
 		}
@@ -1540,6 +1610,14 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			memcpy(&MasterVolume, SaveFilePointer, sizeof(uint32_t));
 			SaveFilePointer += sizeof(uint32_t);
 
+			uint32_t MusicVolume;
+			memcpy(&MusicVolume, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
+			uint32_t EffectsVolume;
+			memcpy(&EffectsVolume, SaveFilePointer, sizeof(uint32_t));
+			SaveFilePointer += sizeof(uint32_t);
+
 			uint64_t WindowPlacementSize;
 			memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
 			SaveFilePointer += sizeof(uint64_t);
@@ -1552,6 +1630,8 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			EngineState->LastFullscreenInternalHeight = InternalHeight;
 			EngineState->FullscreenResolutionPercent = FullscreenResolutionPercent;
 			EngineState->AudioState.MasterVolume = MasterVolume;
+			EngineState->AudioState.MusicVolume = MusicVolume;
+			EngineState->AudioState.EffectsVolume = EffectsVolume;
 
 			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
 			{
@@ -1606,7 +1686,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
 #endif
 
-		PlaySound(&EngineState->AudioState, true, Sound_PortalSoundtrack);
+		PlayMusic(&EngineState->AudioState, true, Sound_PortalSoundtrack);
 
 		GameState->bInitialized = true;
 	}
@@ -1702,6 +1782,8 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		uint32_t Height = EngineState->LastFullscreenInternalHeight;
 		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
 		uint32_t MasterVolume = EngineState->AudioState.MasterVolume;
+		uint32_t MusicVolume = EngineState->AudioState.MusicVolume;
+		uint32_t EffectsVolume = EngineState->AudioState.EffectsVolume;
 
 		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
 		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
@@ -1711,6 +1793,8 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&FullscreenResolutionPercent, sizeof(uint32_t), 1, GeneralSaveFile);
 		fwrite(&MasterVolume, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(&MusicVolume, sizeof(uint32_t), 1, GeneralSaveFile);
+		fwrite(&EffectsVolume, sizeof(uint32_t), 1, GeneralSaveFile);
 
 		SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
 		fwrite(&WindowPlacement.InfoSizeInBytes, sizeof(uint64_t), 1, GeneralSaveFile);

@@ -4,6 +4,7 @@ struct SPlayingSound
 {
 	bool bLoop;
 	bool bFinished;
+	bool bMusic;
 	
 	bool bThreeD;
 	vec3 Pos;
@@ -22,6 +23,8 @@ struct SPlayingSound
 struct SAudioState
 {
 	uint32_t MasterVolume;
+	uint32_t MusicVolume;
+	uint32_t EffectsVolume;
 
 	uint32_t PlayingSoundCount;
 	SPlayingSound PlayingSounds[128];

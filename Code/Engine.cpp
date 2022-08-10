@@ -208,7 +208,9 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
         #endif
 		}
 
-		EngineState->AudioState.MasterVolume = 100;
+		EngineState->AudioState.MasterVolume = 50;
+		EngineState->AudioState.MusicVolume = 50;
+		EngineState->AudioState.EffectsVolume = 50;
 		EngineState->LoadedSounds[Sound_Footstep0] = LoadWAV("Sounds\\Footsteps\\Footstep0.wav");
 		EngineState->LoadedSounds[Sound_Footstep1] = LoadWAV("Sounds\\Footsteps\\Footstep1.wav");
 		EngineState->LoadedSounds[Sound_Footstep2] = LoadWAV("Sounds\\Footsteps\\Footstep2.wav");

@@ -252,7 +252,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EngineState->LevelGameStartState = EngineState->Level;
 				ReloadGameLevel(EngineState);
                 
-				PlaySound(&EngineState->AudioState, true, Sound_PortalSoundtrack);
+				PlayMusic(&EngineState->AudioState, true, Sound_PortalSoundtrack);
 				EngineState->EngineMode = EngineMode_Game;
 			}
             

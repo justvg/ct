@@ -19,9 +19,47 @@ SPlayingSound* PlaySound(SAudioState* AudioState, bool bLoop, uint32_t SoundID, 
 
 		SPlayingSound PlayingSound = {};
 		PlayingSound.bLoop = bLoop;
+		PlayingSound.bMusic = false;
 		PlayingSound.SoundID = SoundID;
 		PlayingSound.bThreeD = bThreeD;
 		PlayingSound.Pos = Pos;
+
+		PlayingSound.CurrentVolume = PlayingSound.TargetVolume = Vec2(1.0f, 1.0f);
+		PlayingSound.Pitch = 1.0f;
+
+		AudioState->PlayingSounds[AudioState->PlayingSoundCount++] = PlayingSound;
+	
+		return &AudioState->PlayingSounds[AudioState->PlayingSoundCount - 1];
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+SPlayingSound* PlayMusic(SAudioState* AudioState, bool bLoop, uint32_t SoundID, bool bExclusive = true)
+{
+	Assert(AudioState->PlayingSoundCount < ArrayCount(AudioState->PlayingSounds));
+
+	if (AudioState->PlayingSoundCount < ArrayCount(AudioState->PlayingSounds))
+	{
+		if (bExclusive)
+		{
+			for (uint32_t I = 0; I < AudioState->PlayingSoundCount; I++)
+			{
+				if (AudioState->PlayingSounds[I].SoundID == SoundID)
+				{
+					return 0;
+				}
+			}
+		}
+
+		SPlayingSound PlayingSound = {};
+		PlayingSound.bLoop = bLoop;
+		PlayingSound.bMusic = true;
+		PlayingSound.SoundID = SoundID;
+		PlayingSound.bThreeD = false;
+		PlayingSound.Pos = Vec3(0.0f);
 
 		PlayingSound.CurrentVolume = PlayingSound.TargetVolume = Vec2(1.0f, 1.0f);
 		PlayingSound.Pitch = 1.0f;
@@ -107,6 +145,18 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 				{
 					vec2 MasterVolume = Vec2(AudioState->MasterVolume / 100.0f);
 					vec2 Volume = Hadamard(MasterVolume, PlayingSound->CurrentVolume);
+
+					if (PlayingSound->bMusic)
+					{
+						vec2 MusicVolume = Vec2(AudioState->MusicVolume / 100.0f);
+						Volume = Hadamard(Volume, MusicVolume);
+					}
+					else
+					{
+						vec2 EffectsVolume = Vec2(AudioState->EffectsVolume / 100.0f);
+						Volume = Hadamard(Volume, EffectsVolume);
+					}
+
 					if (PlayingSound->bThreeD)
 					{
 						const float MaxSoundDistance = 30.0f;
@@ -187,11 +237,58 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 			}
 		}
 
+#if 0
+		float MaxValue = -FloatMax;
+		float MinValue = FloatMax;
+		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
+		{
+			if (SamplesFloat[2 * I] > MaxValue)
+			{
+				MaxValue = SamplesFloat[2 * I];
+			}
+			else if (SamplesFloat[2 * I] < MinValue)
+			{
+				MinValue = SamplesFloat[2 * I];
+			}
+
+			if (SamplesFloat[2 * I + 1] > MaxValue)
+			{
+				MaxValue = SamplesFloat[2 * I + 1];
+			}
+			else if (SamplesFloat[2 * I + 1] < MinValue)
+			{
+				MinValue = SamplesFloat[2 * I + 1];
+			}
+		}
+
+		float VolumeScale = 1.0f;
+		if (MaxValue >= float(INT16_MAX))
+		{
+			VolumeScale = float(INT16_MAX) / MaxValue;
+		}
+		if (MinValue <= float(INT16_MIN))
+		{
+			VolumeScale = Min(float(INT16_MIN) / MinValue, VolumeScale);
+		}
+		Assert(VolumeScale >= 0.0f);
+
+		char VolumeScaleText[64];
+		snprintf(VolumeScaleText, sizeof(VolumeScaleText), "%.5f Volume scale\n", VolumeScale);
+		PlatformOutputDebugString(VolumeScaleText);
+		
+		VolumeScale = 1.0f;
+		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
+		{
+			SoundBuffer.Samples[2 * I] = int16_t(Clamp(VolumeScale * SamplesFloat[2 * I], float(INT16_MIN), float(INT16_MAX)));
+			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(VolumeScale * SamplesFloat[2 * I + 1], float(INT16_MIN), float(INT16_MAX)));
+		}
+#else
 		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
 		{
 			SoundBuffer.Samples[2 * I] = int16_t(Clamp(SamplesFloat[2 * I], float(INT16_MIN), float(INT16_MAX)));
 			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(SamplesFloat[2 * I + 1], float(INT16_MIN), float(INT16_MAX)));
 		}
+#endif
 	}
 
 	END_PROFILER_BLOCK("SOUND_MIXING");
