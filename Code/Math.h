@@ -408,6 +408,16 @@ inline vec2 Lerp(vec2 A, vec2 B, vec2 t)
     return Result;
 }
 
+inline vec2 Min(vec2 A, vec2 B)
+{
+    vec2 Result;
+
+    Result.x = Min(A.x, B.x);
+    Result.y = Min(A.y, B.y);
+
+    return Result;
+}
+
 // 
 // NOTE(georgii): vec3
 // 

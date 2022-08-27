@@ -143,17 +143,18 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 				const float Step = PlayingSound->Pitch;
 				for (uint32_t J = 0; J < SamplesToMix; J++)
 				{
-					vec2 MasterVolume = Vec2(AudioState->MasterVolume / 100.0f);
-					vec2 Volume = Hadamard(MasterVolume, PlayingSound->CurrentVolume);
+					vec2 Volume = PlayingSound->CurrentVolume;
 
+					const float MusicCoeff = 0.5f;
+					const float EffectsCoeff = 0.25f;
 					if (PlayingSound->bMusic)
 					{
-						vec2 MusicVolume = Vec2(AudioState->MusicVolume / 100.0f);
+						vec2 MusicVolume = MusicCoeff * Vec2(AudioState->MusicVolume / 100.0f);
 						Volume = Hadamard(Volume, MusicVolume);
 					}
 					else
 					{
-						vec2 EffectsVolume = Vec2(AudioState->EffectsVolume / 100.0f);
+						vec2 EffectsVolume = EffectsCoeff * Vec2(AudioState->EffectsVolume / 100.0f);
 						Volume = Hadamard(Volume, EffectsVolume);
 					}
 
@@ -237,58 +238,20 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 			}
 		}
 
-#if 0
-		float MaxValue = -FloatMax;
-		float MinValue = FloatMax;
+		const vec2 MasterVolume = Vec2(AudioState->MasterVolume / 100.0f);
 		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
 		{
-			if (SamplesFloat[2 * I] > MaxValue)
-			{
-				MaxValue = SamplesFloat[2 * I];
-			}
-			else if (SamplesFloat[2 * I] < MinValue)
-			{
-				MinValue = SamplesFloat[2 * I];
-			}
+			SamplesFloat[2 * I] *= MasterVolume.x;
+			SamplesFloat[2 * I + 1] *= MasterVolume.y;
 
-			if (SamplesFloat[2 * I + 1] > MaxValue)
-			{
-				MaxValue = SamplesFloat[2 * I + 1];
-			}
-			else if (SamplesFloat[2 * I + 1] < MinValue)
-			{
-				MinValue = SamplesFloat[2 * I + 1];
-			}
-		}
+			Assert(SamplesFloat[2 * I] >= float(INT16_MIN));
+			Assert(SamplesFloat[2 * I] <= float(INT16_MAX));
+			Assert(SamplesFloat[2 * I + 1] >= float(INT16_MIN));
+			Assert(SamplesFloat[2 * I + 1] <= float(INT16_MAX));
 
-		float VolumeScale = 1.0f;
-		if (MaxValue >= float(INT16_MAX))
-		{
-			VolumeScale = float(INT16_MAX) / MaxValue;
-		}
-		if (MinValue <= float(INT16_MIN))
-		{
-			VolumeScale = Min(float(INT16_MIN) / MinValue, VolumeScale);
-		}
-		Assert(VolumeScale >= 0.0f);
-
-		char VolumeScaleText[64];
-		snprintf(VolumeScaleText, sizeof(VolumeScaleText), "%.5f Volume scale\n", VolumeScale);
-		PlatformOutputDebugString(VolumeScaleText);
-		
-		VolumeScale = 1.0f;
-		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
-		{
-			SoundBuffer.Samples[2 * I] = int16_t(Clamp(VolumeScale * SamplesFloat[2 * I], float(INT16_MIN), float(INT16_MAX)));
-			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(VolumeScale * SamplesFloat[2 * I + 1], float(INT16_MIN), float(INT16_MAX)));
-		}
-#else
-		for (uint32_t I = 0; I < SoundBuffer.SampleCount; I++)
-		{
 			SoundBuffer.Samples[2 * I] = int16_t(Clamp(SamplesFloat[2 * I], float(INT16_MIN), float(INT16_MAX)));
 			SoundBuffer.Samples[2 * I + 1] = int16_t(Clamp(SamplesFloat[2 * I + 1], float(INT16_MIN), float(INT16_MAX)));
 		}
-#endif
 	}
 
 	END_PROFILER_BLOCK("SOUND_MIXING");

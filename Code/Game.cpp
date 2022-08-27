@@ -289,7 +289,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						{
 							SPlayingSound* SuccessColorSound = PlaySound(&EngineState->AudioState, false, Sound_SuccessColor);
 							ChangePitch(SuccessColorSound, RandomFloat(0.75f, 1.25f));
-							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.2f));
+							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.1f));
 
 							HitEntity->bChangeColorAnimation = true;
 							HitEntity->AnimationColor = Vec3(0.0f);
@@ -340,7 +340,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						{
 							SPlayingSound* NegativeColorSound = PlaySound(&EngineState->AudioState, false, Sound_NegativeColor);
 							ChangePitch(NegativeColorSound, RandomFloat(0.9f, 1.25f));
-							ChangeVolume(NegativeColorSound, 0.0f, Vec2(0.4f));
+							ChangeVolume(NegativeColorSound, 0.0f, Vec2(0.2f));
 						}
 					}
 					else if (WasDown(GameInput->Buttons[Button_MouseRight]))
@@ -350,7 +350,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						{
 							SPlayingSound* SuccessColorSound = PlaySound(&EngineState->AudioState, false, Sound_SuccessColor);
 							ChangePitch(SuccessColorSound, RandomFloat(0.75f, 1.25f));
-							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.2f));
+							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.1f));
 
 							HitEntity->bChangeColorAnimation = true;
 							HitEntity->AnimationColor = ResultColor;
@@ -408,7 +408,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						{
 							SPlayingSound* NegativeColorSound = PlaySound(&EngineState->AudioState, false, Sound_NegativeColor);
 							ChangePitch(NegativeColorSound, RandomFloat(0.9f, 1.25f));
-							ChangeVolume(NegativeColorSound, 0.0f, Vec2(0.4f));
+							ChangeVolume(NegativeColorSound, 0.0f, Vec2(0.2f));
 						}
 					}
 				} break;
@@ -678,7 +678,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					{
 						SPlayingSound* PortalAmbientSound = PlaySound(&EngineState->AudioState, true, Sound_PortalAmbient, false, true, Entity->Pos);
 						ChangePitch(PortalAmbientSound, RandomFloat(0.8f, 1.2f));
-						ChangeVolume(PortalAmbientSound, 0.0f, Vec2(0.5f));
+						ChangeVolume(PortalAmbientSound, 0.0f, Vec2(0.25f));
 
 						Entity->bSoundStarted = true;
 					}
@@ -690,7 +690,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					{
 						SPlayingSound* PortalAmbientSound = PlaySound(&EngineState->AudioState, true, Sound_ColorFieldAmbient, false, true, Entity->Pos);
 						ChangePitch(PortalAmbientSound, RandomFloat(0.8f, 1.2f));
-						ChangeVolume(PortalAmbientSound, 0.0f, Vec2(0.5f));
+						ChangeVolume(PortalAmbientSound, 0.0f, Vec2(0.25f));
 
 						Entity->bSoundStarted = true;
 					}
@@ -706,7 +706,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			{
 				if (Entity->CollisionWithHeroTimePassed > 0.015f)
 				{
-					ChangeVolume(PlaySound(&EngineState->AudioState, false, Sound_Portal), 0.0f, Vec2(0.85f));
+					ChangeVolume(PlaySound(&EngineState->AudioState, false, Sound_Portal), 0.0f, Vec2(0.3f));
 
 					if (Entity->CollisionWithHeroTimePassed > 0.05f)
 					{
