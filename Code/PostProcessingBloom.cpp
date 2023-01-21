@@ -202,7 +202,7 @@ void SBloomRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadV
 	VkImageMemoryBarrier DownscaleStartBarrier[] = 
 	{
 		CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, BloomImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1),
-		CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, BloomImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, 1, BloomMipsCount - 1),
+		CreateImageMemoryBarrier(0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, BloomImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, 1),
 	};
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, ArrayCount(DownscaleStartBarrier), DownscaleStartBarrier);
 	
@@ -217,8 +217,9 @@ void SBloomRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadV
 
 		vkCmdDispatch(Vulkan.CommandBuffer, ((uint32_t)ImageSizeDst.x + 31) / 32, ((uint32_t)ImageSizeDst.y + 31) / 32, 1);
 
+		VkPipelineStageFlags DestinationStageMask = (I == ArrayCount(CompDescrSets) - 1) ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		VkImageMemoryBarrier DownscaleBarrier = CreateImageMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, BloomImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, I + 1, 1);
-		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DownscaleBarrier);
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, DestinationStageMask, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DownscaleBarrier);
 	}
 
 	END_GPU_PROFILER_BLOCK("DOWNSCALE_BLOOM", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
@@ -227,8 +228,6 @@ void SBloomRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadV
 	BEGIN_GPU_PROFILER_BLOCK("CALCULATE_BLOOM", Vulkan.CommandBuffer, Vulkan.FrameInFlight);
 
 	vkCmdBindPipeline(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, BloomPipeline);
-
-	vkCmdBindVertexBuffers(Vulkan.CommandBuffer, 0, 1, &QuadVertexBuffer.Buffer, &Offset);
 
 	for (uint32_t I = 0; I < ArrayCount(BloomDescrSets); I++)
 	{
@@ -244,6 +243,9 @@ void SBloomRenderPass::Render(const SVulkanContext& Vulkan, const SBuffer& QuadV
 		Scissor = { {0, 0}, {TargetWidth, TargetHeight} };
 		vkCmdSetViewport(Vulkan.CommandBuffer, 0, 1, &Viewport);
 		vkCmdSetScissor(Vulkan.CommandBuffer, 0, 1, &Scissor);
+
+		VkImageMemoryBarrier UpscaleBarrierTEST = CreateImageMemoryBarrier(VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, BloomImage.Image, VK_IMAGE_ASPECT_COLOR_BIT, MipTargetLevel, 1);
+		vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &UpscaleBarrierTEST);
 
 		VkRenderPassBeginInfo BloomRenderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 		BloomRenderPassBeginInfo.renderPass = BloomRenderPass;
@@ -425,7 +427,7 @@ VkRenderPass SBloomRenderPass::CreateBloomRenderPass(VkDevice Device, VkFormat C
 	Attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	Attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	Attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	Attachment.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	Attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	Attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentReference ColorAttachment = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
@@ -441,11 +443,11 @@ VkRenderPass SBloomRenderPass::CreateBloomRenderPass(VkDevice Device, VkFormat C
 	CreateInfo.subpassCount = 1;
 	CreateInfo.pSubpasses = &Subpass;
 
-	VkRenderPass BrightnessRenderPass = 0;
-	VkCheck(vkCreateRenderPass(Device, &CreateInfo, 0, &BrightnessRenderPass));
-	Assert(BrightnessRenderPass);
+	VkRenderPass BloomRenderPass = 0;
+	VkCheck(vkCreateRenderPass(Device, &CreateInfo, 0, &BloomRenderPass));
+	Assert(BloomRenderPass);
 
-	return BrightnessRenderPass;	
+	return BloomRenderPass;	
 }
 
 VkPipeline SBloomRenderPass::CreateBloomGraphicsPipeline(VkDevice Device, VkRenderPass RenderPass, VkPipelineLayout PipelineLayout, VkShaderModule VS, VkShaderModule FS)

@@ -18,6 +18,8 @@ constexpr uint64_t Kilobytes(uint64_t Value) { return Value*1024; }
 constexpr uint64_t Megabytes(uint64_t Value) { return Kilobytes(Value*1024); }
 constexpr uint64_t Gigabytes(uint64_t Value) { return Megabytes(Value*1024); }
 
+const uint32_t MaxPath = 260;
+
 void AlignAddress(void** Address, uint32_t Alignment)
 {
 	if (Alignment > 1)
@@ -100,6 +102,17 @@ SReadEntireFileResult ReadEntireTextFile(const char* Path)
 	}
 
 	return Result;
+}
+
+void FreeEntireFile(SReadEntireFileResult* EntireFile)
+{
+	Assert(EntireFile->Memory);
+
+	if (EntireFile->Memory)
+	{
+		free(EntireFile->Memory);
+		EntireFile->Memory = 0;
+	}
 }
 
 void WriteEntireFile(const char* Path, void* Data, size_t Size)
@@ -248,9 +261,13 @@ struct SWindowPlacementInfo
 // NOTE(georgii): Platform abstracted functions.
 //
 
+typedef void RunningThreadType(void* Data);
+void PlatformCreateThread(RunningThreadType* RunningThreadFunction, void* Data);
+void PlatformInterlockedExchange(uint32_t volatile* Target, uint32_t Value);
+uint32_t PlatformInterlockedIncrement(uint32_t volatile* Target);
+
 void PlatformDisableCursor(SGameInput* GameInput);
 void PlatformEnableCursor(SGameInput* GameInput);
-void PlatformToggleCursorOnOff(SGameInput* GameInput);
 void PlatformToggleCursor(SGameInput* GameInput, bool bEnable, bool bShowCursor = true);
 bool PlatformIsCursorEnabled();
 bool PlatformIsCursorShowed();
@@ -260,7 +277,6 @@ void PlatformGetAllFilenamesFromDir(const char* WildcardPath, char* Filenames, u
 bool PlatformGetFullscreen();
 void PlatformChangeFullscreen(bool bFullscreen);
 SWindowPlacementInfo PlatformGetWindowPlacement();
-void PlatformSetWindowPlacement(SWindowPlacementInfo PlacementInfo);
 
 bool PlatformGetVSync();
 void PlatformChangeVSync(bool bEnabled);

@@ -11,8 +11,102 @@ void DisableNonPersistentSounds(SAudioState* AudioState)
 	}
 }
 
-void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput, const char* CurrentLevelName)
+struct SMainHubSavedData
 {
+	bool bValid;
+
+	float CameraPitch;
+	float CameraHead;
+
+	uint32_t TextsToRenderCount;
+	SText TextsToRender[ArrayCount(SEngineState::TextsToRender)];
+
+	vec3 LastBaseLevelPos;
+	float LastBaseLevelGatesAngle;
+};
+
+SMainHubSavedData LoadMainHubAndSavedData(SEngineState* EngineState)
+{
+	SMainHubSavedData MainHubSavedData = {};
+
+	SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
+	if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+	{
+		MainHubSavedData.bValid = true;
+
+		uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl");
+
+		memcpy(&MainHubSavedData.CameraPitch, EndPointer, sizeof(float));
+		EndPointer += sizeof(float);
+		memcpy(&MainHubSavedData.CameraHead, EndPointer, sizeof(float));
+		EndPointer += sizeof(float);
+
+		memcpy(&MainHubSavedData.TextsToRenderCount, EndPointer, sizeof(uint32_t));
+		EndPointer += sizeof(uint32_t);
+		memcpy(MainHubSavedData.TextsToRender, EndPointer, sizeof(EngineState->TextsToRender));
+		EndPointer += sizeof(EngineState->TextsToRender);
+
+		memcpy(&MainHubSavedData.LastBaseLevelPos, EndPointer, sizeof(vec3));
+		EndPointer += sizeof(vec3);
+		memcpy(&MainHubSavedData.LastBaseLevelGatesAngle, EndPointer, sizeof(float));
+		EndPointer += sizeof(float);
+
+		FreeEntireFile(&MainHubSaveFile);
+	}
+
+	return MainHubSavedData;
+}
+
+void SaveMainHubSavedData(SEngineState* EngineState, const SGameState* GameState)
+{
+	// NOTE(georgii): FileVersion + Level + MainHubSaveData
+	void* WriteData = malloc(sizeof(uint32_t) + sizeof(SLevel) + sizeof(SMainHubSavedData));
+
+	if (WriteData)
+	{
+		uint8_t* CurrentPointer = (uint8_t*) WriteData;
+
+		// Save level
+		const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
+		memcpy(CurrentPointer, &FileVersion, sizeof(FileVersion));
+		CurrentPointer += sizeof(FileVersion);
+
+		memcpy(CurrentPointer, &EngineState->Level, sizeof(SLevel));
+		CurrentPointer += sizeof(SLevel);
+
+		// Save some camera info
+		memcpy(CurrentPointer, &EngineState->Camera.Pitch, sizeof(EngineState->Camera.Pitch));
+		CurrentPointer += sizeof(EngineState->Camera.Pitch);
+		memcpy(CurrentPointer, &EngineState->Camera.Head, sizeof(EngineState->Camera.Head));
+		CurrentPointer += sizeof(EngineState->Camera.Head);
+
+		// Save text stuff
+		memcpy(CurrentPointer, &EngineState->TextsToRenderCount, sizeof(EngineState->TextsToRenderCount));
+		CurrentPointer += sizeof(EngineState->TextsToRenderCount);
+		memcpy(CurrentPointer, EngineState->TextsToRender, sizeof(EngineState->TextsToRender));
+		CurrentPointer += sizeof(EngineState->TextsToRender);
+
+		// Save last base level stuff
+		memcpy(CurrentPointer, &GameState->LastBaseLevelPos, sizeof(GameState->LastBaseLevelPos));
+		CurrentPointer += sizeof(GameState->LastBaseLevelPos);
+		memcpy(CurrentPointer, &GameState->LastBaseLevelGatesAngle, sizeof(GameState->LastBaseLevelGatesAngle));
+		CurrentPointer += sizeof(GameState->LastBaseLevelGatesAngle);
+
+
+		SDiskWriteInfo DiskWriteInfo = {};
+		DiskWriteInfo.Path = "Saves\\MainHubSaved.ctl";
+		DiskWriteInfo.DataSize = CurrentPointer - (uint8_t*) WriteData;
+		DiskWriteInfo.Data = WriteData;
+
+		AddEntryToWriteDiskThread(&EngineState->WriteDiskThread, DiskWriteInfo);
+	}
+}
+
+void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGameInput* GameInput)
+{
+	char CurrentLevelName[ArrayCount(EngineState->LevelName)];
+	memcpy(CurrentLevelName, EngineState->LevelName, ArrayCount(CurrentLevelName));
+
 	SCamera* Camera = &EngineState->Camera;
 	SLevel* Level = &EngineState->Level;
 	SAudioState* AudioState = &EngineState->AudioState;
@@ -714,26 +808,15 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					#if ENGINE_RELEASE
 						if (bTargetMainHub)
 						{
-							SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
-							if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+							SMainHubSavedData MainHubSavedData = LoadMainHubAndSavedData(EngineState);
+							if (MainHubSavedData.bValid)
 							{
-								uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl", Level->Entities[0].Velocity);
-
-								EndPointer += sizeof(float);
-								EndPointer += sizeof(float);
-								EndPointer += sizeof(uint32_t);
-								EndPointer += sizeof(EngineState->TextsToRender);
-
-								memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
-								EndPointer += sizeof(vec3);
-								memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
-								EndPointer += sizeof(float);
-
-								free(MainHubSaveFile.Memory);
+								GameState->LastBaseLevelPos = MainHubSavedData.LastBaseLevelPos;
+								GameState->LastBaseLevelGatesAngle = MainHubSavedData.LastBaseLevelGatesAngle;
 							}
 							else
 							{
-								char LevelName[264] = {};
+								char LevelName[MaxPath] = {};
 								ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 								LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
 							}
@@ -741,7 +824,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						else
 					#endif
 						{
-							char LevelName[264] = {};
+							char LevelName[MaxPath] = {};
 							ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 							LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
 						}
@@ -755,7 +838,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 
 								if (LoadedLevelEntity->Type == Entity_Gates)
 								{
-									char LevelName[264] = {};
+									char LevelName[MaxPath] = {};
 									ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
 									ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
 
@@ -851,13 +934,19 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 		{
 			GameState->DeathPosTimer -= DeathPosUpdateTime;
 
-			Assert(GameState->PosForDeathAnimationCount > 0);
-			const uint32_t LastDeathPosIndex = GameState->PosForDeathAnimationCount - 1;
-			if (Length(Level->Entities[0].Pos - GameState->PosForDeathAnimation[LastDeathPosIndex]) > 0.5f)
+			if (GameState->PosForDeathAnimationCount == 0)
 			{
-				if (GameState->PosForDeathAnimationCount < ArrayCount(GameState->PosForDeathAnimation))
+				GameState->PosForDeathAnimation[GameState->PosForDeathAnimationCount++] = Level->Entities[0].Pos;
+			}
+			else
+			{
+				const uint32_t LastDeathPosIndex = GameState->PosForDeathAnimationCount - 1;
+				if (Length(Level->Entities[0].Pos - GameState->PosForDeathAnimation[LastDeathPosIndex]) > 0.5f)
 				{
-					GameState->PosForDeathAnimation[GameState->PosForDeathAnimationCount++] = Level->Entities[0].Pos;
+					if (GameState->PosForDeathAnimationCount < ArrayCount(GameState->PosForDeathAnimation))
+					{
+						GameState->PosForDeathAnimation[GameState->PosForDeathAnimationCount++] = Level->Entities[0].Pos;
+					}
 				}
 			}
 		}
@@ -1566,89 +1655,20 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		GameState->StepSoundTimer = 0.75f;
 
 #if ENGINE_RELEASE
-		SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
-		if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
+		// Load saved and set engine data
+		SGeneralSaveData GeneralSaveData = LoadGeneralSaveData();
+		if (GeneralSaveData.bValid)
 		{
-			uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
-
-			char LastLevelName[260];
-			uint32_t LastLevelNameLength = 0;
-			memcpy(&LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-			memcpy(LastLevelName, SaveFilePointer, LastLevelNameLength);
-			SaveFilePointer += LastLevelNameLength;
-
-			bool bFullscreen;
-			memcpy(&bFullscreen, SaveFilePointer, sizeof(bool));
-			SaveFilePointer += sizeof(bool);
-
-			bool bVSync;
-			memcpy(&bVSync, SaveFilePointer, sizeof(bool));
-			SaveFilePointer += sizeof(bool);
-
-			bool bVignetteEnabled;
-			memcpy(&bVignetteEnabled, SaveFilePointer, sizeof(bool));
-			SaveFilePointer += sizeof(bool);
-
-			int32_t AOQuality;
-			memcpy(&AOQuality, SaveFilePointer, sizeof(int32_t));
-			SaveFilePointer += sizeof(int32_t);
-
-			uint32_t InternalWidth;
-			memcpy(&InternalWidth, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint32_t InternalHeight;
-			memcpy(&InternalHeight, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint32_t FullscreenResolutionPercent;
-			memcpy(&FullscreenResolutionPercent, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint32_t MasterVolume;
-			memcpy(&MasterVolume, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint32_t MusicVolume;
-			memcpy(&MusicVolume, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint32_t EffectsVolume;
-			memcpy(&EffectsVolume, SaveFilePointer, sizeof(uint32_t));
-			SaveFilePointer += sizeof(uint32_t);
-
-			uint64_t WindowPlacementSize;
-			memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
-			SaveFilePointer += sizeof(uint64_t);
-			SaveFilePointer += WindowPlacementSize;
-
-			PlatformChangeVSync(bVSync);
-			EngineState->bVignetteEnabled = bVignetteEnabled;
-			EngineState->Renderer.AOQuality = EAOQuality(AOQuality);
-			EngineState->LastFullscreenInternalWidth = InternalWidth;
-			EngineState->LastFullscreenInternalHeight = InternalHeight;
-			EngineState->FullscreenResolutionPercent = FullscreenResolutionPercent;
-			EngineState->AudioState.MasterVolume = MasterVolume;
-			EngineState->AudioState.MusicVolume = MusicVolume;
-			EngineState->AudioState.EffectsVolume = EffectsVolume;
-
-			if (CompareStrings(LastLevelName, "Levels\\MainHub.ctl"))
+			if (CompareStrings(GeneralSaveData.LastLevelName, "Levels\\MainHub.ctl"))
 			{
-				SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
-				if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+				SMainHubSavedData MainHubSavedData = LoadMainHubAndSavedData(EngineState);
+				if (MainHubSavedData.bValid)
 				{
-					uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl");
+					EngineState->Camera.Pitch = MainHubSavedData.CameraPitch;
+					EngineState->Camera.Head = MainHubSavedData.CameraHead;
 
-					memcpy(&EngineState->Camera.Pitch, EndPointer, sizeof(float));
-					EndPointer += sizeof(float);
-					memcpy(&EngineState->Camera.Head, EndPointer, sizeof(float));
-					EndPointer += sizeof(float);
-
-					memcpy(&EngineState->TextsToRenderCount, EndPointer, sizeof(uint32_t));
-					EndPointer += sizeof(uint32_t);
-					memcpy(EngineState->TextsToRender, EndPointer, sizeof(EngineState->TextsToRender));
-					EndPointer += sizeof(EngineState->TextsToRender);
+					EngineState->TextsToRenderCount = MainHubSavedData.TextsToRenderCount;
+					memcpy(EngineState->TextsToRender, MainHubSavedData.TextsToRender, sizeof(EngineState->TextsToRender));
 
 					// NOTE(georgii): Delete saved menu text
 					for (uint32_t I = 0; I < EngineState->TextsToRenderCount;)
@@ -1665,18 +1685,20 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 						}
 					}
 
-					memcpy(&GameState->LastBaseLevelPos, EndPointer, sizeof(vec3));
-					EndPointer += sizeof(vec3);
-					memcpy(&GameState->LastBaseLevelGatesAngle, EndPointer, sizeof(float));
-					EndPointer += sizeof(float);
-
-					free(MainHubSaveFile.Memory);
+					GameState->LastBaseLevelPos = MainHubSavedData.LastBaseLevelPos;
+					GameState->LastBaseLevelGatesAngle = MainHubSavedData.LastBaseLevelGatesAngle;
+				}
+				else
+				{
+					LoadLevel(EngineState, &EngineState->LevelBaseState, "MainHub.ctl");
 				}
 			}
 			else
 			{
-				LoadLevel(EngineState, &EngineState->LevelBaseState, LastLevelName, false);
+				LoadLevel(EngineState, &EngineState->LevelBaseState, GeneralSaveData.LastLevelName, false);
 			}
+
+			FreeGeneralSaveData(&GeneralSaveData);
 		}
 		else
 		{
@@ -1728,12 +1750,9 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		}
 	}
 
-	char CurrentLevelName[ArrayCount(EngineState->LevelName)];
-	memcpy(CurrentLevelName, EngineState->LevelName, ArrayCount(CurrentLevelName));
-
 	if (!EngineState->bMenuOpened && !MenuState->bDisableStarted)
 	{
-		UpdateGameMode(GameState, EngineState, GameInput, CurrentLevelName);	
+		UpdateGameMode(GameState, EngineState, GameInput);	
 	}
 	else
 	{
@@ -1741,66 +1760,9 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 	}
 	
 #if ENGINE_RELEASE
-	if (CompareStrings(CurrentLevelName, "Levels\\MainHub.ctl"))
+	if (CompareStrings(EngineState->LevelName, "Levels\\MainHub.ctl"))
 	{
-		FILE* MainHubSaveFile = fopen("Saves\\MainHubSaved.ctl", "wb");
-		if (MainHubSaveFile)
-		{
-			// Save level
-			const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-			fwrite(&FileVersion, sizeof(uint32_t), 1, MainHubSaveFile);
-			fwrite((void*) &EngineState->Level, sizeof(SLevel), 1, MainHubSaveFile);
-
-			// Save some camera info
-			fwrite(&EngineState->Camera.Pitch, sizeof(float), 1, MainHubSaveFile);
-			fwrite(&EngineState->Camera.Head, sizeof(float), 1, MainHubSaveFile);
-
-			// Save text stuff
-			fwrite(&EngineState->TextsToRenderCount, sizeof(uint32_t), 1, MainHubSaveFile);
-			fwrite(EngineState->TextsToRender, sizeof(EngineState->TextsToRender), 1, MainHubSaveFile);
-
-			// Save last base level stuff
-			fwrite(&GameState->LastBaseLevelPos, sizeof(vec3), 1, MainHubSaveFile);
-			fwrite(&GameState->LastBaseLevelGatesAngle, sizeof(float), 1, MainHubSaveFile);
-
-			fclose(MainHubSaveFile);
-		}
-	}
-
-	FILE* GeneralSaveFile = fopen("Saves\\GeneralSave", "wb");
-	if (GeneralSaveFile)
-	{
-		const uint32_t LevelNameLength = StringLength(CurrentLevelName) + 1;
-		fwrite(&LevelNameLength, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(CurrentLevelName, LevelNameLength, 1, GeneralSaveFile);
-
-		bool bFullscreen = PlatformGetFullscreen();
-		bool bVSync = PlatformGetVSync();
-		bool bVignetteEnabled = EngineState->bVignetteEnabled;
-		int32_t AOQuality = EngineState->Renderer.AOQuality;
-		uint32_t Width = EngineState->LastFullscreenInternalWidth;
-		uint32_t Height = EngineState->LastFullscreenInternalHeight;
-		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
-		uint32_t MasterVolume = EngineState->AudioState.MasterVolume;
-		uint32_t MusicVolume = EngineState->AudioState.MusicVolume;
-		uint32_t EffectsVolume = EngineState->AudioState.EffectsVolume;
-
-		fwrite(&bFullscreen, sizeof(bool), 1, GeneralSaveFile);
-		fwrite(&bVSync, sizeof(bool), 1, GeneralSaveFile);
-		fwrite(&bVignetteEnabled, sizeof(bool), 1, GeneralSaveFile);
-		fwrite(&AOQuality, sizeof(int32_t), 1, GeneralSaveFile);
-		fwrite(&Width, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(&Height, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(&FullscreenResolutionPercent, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(&MasterVolume, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(&MusicVolume, sizeof(uint32_t), 1, GeneralSaveFile);
-		fwrite(&EffectsVolume, sizeof(uint32_t), 1, GeneralSaveFile);
-
-		SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
-		fwrite(&WindowPlacement.InfoSizeInBytes, sizeof(uint64_t), 1, GeneralSaveFile);
-		fwrite(WindowPlacement.InfoPointer, WindowPlacement.InfoSizeInBytes, 1, GeneralSaveFile);
-
-		fclose(GeneralSaveFile);
+		SaveMainHubSavedData(EngineState, GameState);
 	}
 #endif
 

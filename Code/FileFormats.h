@@ -779,8 +779,8 @@ bool LoadGLTF(uint32_t MaxVertexCount, SVertex* Vertices, uint32_t MaxIndexCount
 		}
 
         FreeParsedJSON(ParsedJSON);
-		free(BufferFile.Memory);
-		free(FileData.Memory);
+		FreeEntireFile(&BufferFile);
+		FreeEntireFile(&FileData);
 
         return true;
     }

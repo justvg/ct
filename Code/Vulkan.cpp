@@ -45,6 +45,53 @@ struct SSwapchain
 	VkPresentModeKHR PresentMode;
 };
 
+#ifndef ENGINE_RELEASE
+VkBool32 VKAPI_CALL DebugReportCallback(VkDebugReportFlagsEXT Flags, VkDebugReportObjectTypeEXT ObjectType, uint64_t Object, size_t Location, int32_t MessageCode, const char* LayerPrefix, const char* Message, void* UserData)
+{
+	if (Flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)
+		return VK_FALSE;
+
+	const char* Type = (Flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) ? "ERROR" : 
+					   (Flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) ? "DEBUG" :
+					   (Flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) ? "WARNING" : "INFO";
+
+	char Text[4096];
+	snprintf(Text, sizeof(Text), "\n\n%s: %s\n\n", Type, Message);
+
+	PlatformOutputDebugString(Text);
+
+	if (Flags & (VK_DEBUG_REPORT_ERROR_BIT_EXT)) 
+	{
+		SLogger::Log(Text, LoggerVerbosity_Debug);
+		Assert(!"Validation error encountered!");
+	}
+
+	return VK_FALSE;
+}
+
+VkDebugReportCallbackEXT RegisterDebugCallback(VkInstance Instance)
+{
+	VkDebugReportCallbackCreateInfoEXT CreateInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
+	CreateInfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+	CreateInfo.pfnCallback = DebugReportCallback;
+
+	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(Instance, "vkCreateDebugReportCallbackEXT");
+
+	VkDebugReportCallbackEXT Callback = 0;
+	if (vkCreateDebugReportCallbackEXT)
+	{
+		VkCheck(vkCreateDebugReportCallbackEXT(Instance, &CreateInfo, 0, &Callback));
+		Assert(Callback);
+	}
+	else
+	{
+		Assert(!"Can't get the address of vkCreateDebugReportCallbackEXT. So can't register Vulkan debug callback.");
+	}	
+
+	return Callback;
+}
+#endif
+
 VkInstance CreateInstance()
 {
 	VkApplicationInfo AppInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -134,55 +181,13 @@ VkInstance CreateInstance()
 	}		
 
 	Assert(Instance);
-	return Instance;
-}
 
 #ifndef ENGINE_RELEASE
-VkBool32 VKAPI_CALL DebugReportCallback(VkDebugReportFlagsEXT Flags, VkDebugReportObjectTypeEXT ObjectType, uint64_t Object, size_t Location, int32_t MessageCode, const char* LayerPrefix, const char* Message, void* UserData)
-{
-	if (Flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT)
-		return VK_FALSE;
-
-	const char* Type = (Flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) ? "ERROR" : 
-					   (Flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT) ? "DEBUG" :
-					   (Flags & VK_DEBUG_REPORT_WARNING_BIT_EXT) ? "WARNING" : "INFO";
-
-	char Text[4096];
-	snprintf(Text, sizeof(Text), "\n\n%s: %s\n\n", Type, Message);
-
-	PlatformOutputDebugString(Text);
-
-	if (Flags & (VK_DEBUG_REPORT_ERROR_BIT_EXT)) 
-	{
-		SLogger::Log(Text, LoggerVerbosity_Debug);
-		Assert(!"Validation error encountered!");
-	}
-
-	return VK_FALSE;
-}
-
-VkDebugReportCallbackEXT RegisterDebugCallback(VkInstance Instance)
-{
-	VkDebugReportCallbackCreateInfoEXT CreateInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
-	CreateInfo.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
-	CreateInfo.pfnCallback = DebugReportCallback;
-
-	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(Instance, "vkCreateDebugReportCallbackEXT");
-
-	VkDebugReportCallbackEXT Callback = 0;
-	if (vkCreateDebugReportCallbackEXT)
-	{
-		VkCheck(vkCreateDebugReportCallbackEXT(Instance, &CreateInfo, 0, &Callback));
-		Assert(Callback);
-	}
-	else
-	{
-		Assert(!"Can't get the address of vkCreateDebugReportCallbackEXT. So can't register Vulkan debug callback.");
-	}	
-
-	return Callback;
-}
+	RegisterDebugCallback(Instance);
 #endif
+
+	return Instance;
+}
 
 struct SVulkanVersion
 {
@@ -845,7 +850,7 @@ VkShaderModule LoadShader(VkDevice Device, const char* Path)
 	VkCheck(vkCreateShaderModule(Device, &CreateInfo, 0, &ShaderModule));
 	Assert(ShaderModule);
 
-	free(FileData.Memory);
+	FreeEntireFile(&FileData);
 
 	return ShaderModule;
 }

@@ -182,6 +182,87 @@ enum ESounds
 	Sound_Count
 };
 
+struct SDiskWriteInfo
+{
+	const char* Path;
+
+	uint64_t DataSize;
+	void* Data;
+};
+
+struct SWriteDiskThread
+{
+	uint32_t volatile EntryToRead;
+	uint32_t volatile EntryToWrite;
+
+	SDiskWriteInfo Entries[128];
+};
+
+void AddEntryToWriteDiskThread(SWriteDiskThread* ThreadData, SDiskWriteInfo DiskWriteInfo)
+{
+	uint32_t NewEntryToWrite = (ThreadData->EntryToWrite + 1) % ArrayCount(ThreadData->Entries);
+	Assert(NewEntryToWrite != ThreadData->EntryToRead);
+
+	if (NewEntryToWrite != ThreadData->EntryToRead)
+	{
+		ThreadData->Entries[ThreadData->EntryToWrite] = DiskWriteInfo;
+
+		WRITE_BARRIER;
+
+		ThreadData->EntryToWrite = NewEntryToWrite;
+	}
+	else
+	{
+		if (DiskWriteInfo.Data)
+		{
+			free(DiskWriteInfo.Data);
+			DiskWriteInfo.Data = 0;
+		}
+	}
+}
+
+void WriteDataToDiskThreadFunction(void* Data)
+{
+	Assert(Data);
+
+	// NOTE(georgii): This function assumes it runs only from one thread.
+	// 				  But actually it should work if you run it from 2 threads, but with 2 different Data pointers
+	static volatile uint32_t CalledCount = 0;
+	uint32_t ActualCallCount = PlatformInterlockedIncrement(&CalledCount);
+	Assert(ActualCallCount == 1);
+
+	if (ActualCallCount == 1)
+	{
+		if (Data)
+		{
+			SWriteDiskThread* ThreadData = (SWriteDiskThread*) Data;
+			while (true)
+			{
+				// TODO(georgii): Get rid of infinite looping here? Change to sleeping?
+				if (ThreadData->EntryToRead != ThreadData->EntryToWrite)
+				{
+					SDiskWriteInfo* DiskWriteInfo = ThreadData->Entries + ThreadData->EntryToRead;
+					WriteEntireFile(DiskWriteInfo->Path, DiskWriteInfo->Data, DiskWriteInfo->DataSize);
+
+					if (DiskWriteInfo->Data)
+					{
+						free(DiskWriteInfo->Data);
+						DiskWriteInfo->Data = 0;
+					}
+
+					WRITE_BARRIER;
+
+					PlatformInterlockedExchange(&ThreadData->EntryToRead, (ThreadData->EntryToRead + 1) % ArrayCount(ThreadData->Entries));
+				}
+				else
+				{
+					// sleep
+				}
+			}
+		}
+	}
+}
+
 struct SEngineState
 {
     bool bInitialized;
@@ -189,18 +270,17 @@ struct SEngineState
 	SGeometry Geometry;
 	SRenderer Renderer;
 
+	SWriteDiskThread WriteDiskThread;
+
 	bool bSwapchainChanged;
 	uint32_t FullscreenResolutionPercent;
-
-	uint32_t LastFullscreenInternalWidth;
-	uint32_t LastFullscreenInternalHeight;
 
 	SVoxelDraw VoxelDraws[LevelDimZ*LevelDimY*LevelDimX];
 	uint32_t VoxelVisibilities[LevelDimZ*LevelDimY*LevelDimX];
 
 	SCamera Camera;
 
-	char LevelName[260];
+	char LevelName[MaxPath];
 	SLevel LevelBaseState;
 	SLevel Level;
 
@@ -771,13 +851,13 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 
 void LoadLevel(SEngineState* EngineState, SLevel* Level, const char* LevelName, bool bAddLevelsPath = true, vec3 HeroVelocity = Vec3(0.0f))
 {
-	char Path[264] = {};
+	char Path[MaxPath] = {};
 	ConcStrings(Path, sizeof(Path), bAddLevelsPath ? "Levels\\" : "", LevelName);
 
 	SReadEntireFileResult File = ReadEntireFile(Path);
 	LoadLevel(EngineState, Level, File, Path, HeroVelocity);
 
-	free(File.Memory);
+	FreeEntireFile(&File);
 }
 
 void ReloadGameLevel(SEngineState* EngineState, bool bResetCameraPosition = true, bool bReloadGame = true)
@@ -874,8 +954,165 @@ SParsedConfigFile ParseConfigFile(const char* ConfigFileName)
 			}
 		}
 
-		free(File.Memory);
+		FreeEntireFile(&File);
 	}
 
 	return ConfigFile;
+}
+
+struct SGeneralSaveData
+{
+	bool bValid;
+
+	uint32_t LastLevelNameLength;
+	char LastLevelName[MaxPath];
+
+	bool bFullscreen;
+	bool bVSync;
+
+	bool bVignetteEnabled;
+	int32_t AOQuality;
+
+	uint32_t FullscreenResolutionPercent;
+
+	uint32_t MasterVolume;
+	uint32_t MusicVolume;
+	uint32_t EffectsVolume;
+
+	uint64_t WindowPlacementSize;
+	void* WindowPlacement;
+};
+
+SGeneralSaveData LoadGeneralSaveData()
+{
+	SGeneralSaveData GeneralSaveData;
+	GeneralSaveData.bValid = false;
+
+	SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
+	if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
+	{
+		uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
+
+		GeneralSaveData.bValid = true;
+
+		memcpy(&GeneralSaveData.LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
+		SaveFilePointer += sizeof(uint32_t);
+		memcpy(GeneralSaveData.LastLevelName, SaveFilePointer, GeneralSaveData.LastLevelNameLength);
+		SaveFilePointer += GeneralSaveData.LastLevelNameLength;
+
+		memcpy(&GeneralSaveData.bFullscreen, SaveFilePointer, sizeof(bool));
+		SaveFilePointer += sizeof(bool);
+
+		memcpy(&GeneralSaveData.bVSync, SaveFilePointer, sizeof(bool));
+		SaveFilePointer += sizeof(bool);
+
+		memcpy(&GeneralSaveData.bVignetteEnabled, SaveFilePointer, sizeof(bool));
+		SaveFilePointer += sizeof(bool);
+
+		memcpy(&GeneralSaveData.AOQuality, SaveFilePointer, sizeof(int32_t));
+		SaveFilePointer += sizeof(int32_t);
+
+		memcpy(&GeneralSaveData.FullscreenResolutionPercent, SaveFilePointer, sizeof(uint32_t));
+		SaveFilePointer += sizeof(uint32_t);
+
+		memcpy(&GeneralSaveData.MasterVolume, SaveFilePointer, sizeof(uint32_t));
+		SaveFilePointer += sizeof(uint32_t);
+
+		memcpy(&GeneralSaveData.MusicVolume, SaveFilePointer, sizeof(uint32_t));
+		SaveFilePointer += sizeof(uint32_t);
+
+		memcpy(&GeneralSaveData.EffectsVolume, SaveFilePointer, sizeof(uint32_t));
+		SaveFilePointer += sizeof(uint32_t);
+
+		memcpy(&GeneralSaveData.WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
+		SaveFilePointer += sizeof(uint64_t);
+
+		GeneralSaveData.WindowPlacement = malloc(GeneralSaveData.WindowPlacementSize);
+		memcpy(GeneralSaveData.WindowPlacement, SaveFilePointer, GeneralSaveData.WindowPlacementSize);
+		SaveFilePointer += GeneralSaveData.WindowPlacementSize;
+
+		FreeEntireFile(&GeneralSaveFile);
+	}
+
+	return GeneralSaveData;
+}
+
+void FreeGeneralSaveData(SGeneralSaveData* GeneralSaveData)
+{
+	if (GeneralSaveData->bValid)
+	{
+		if (GeneralSaveData->WindowPlacement)
+		{
+			free(GeneralSaveData->WindowPlacement);
+			GeneralSaveData->WindowPlacement = 0;
+		}
+
+		GeneralSaveData->bValid = false;
+	}
+}
+
+void SaveGeneralSaveData(SEngineState* EngineState)
+{
+	SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
+	int64_t AdditionalAllocatedSize = WindowPlacement.InfoSizeInBytes; // NOTE(georgii): Just to be sure we have enought allocated memory
+	void* WriteData = malloc(sizeof(SGeneralSaveData) + AdditionalAllocatedSize);
+
+	if (WriteData)
+	{
+		uint8_t* CurrentPointer = (uint8_t*) WriteData;
+
+		uint32_t LevelNameLength = StringLength(EngineState->LevelName) + 1;
+		bool bFullscreen = PlatformGetFullscreen();
+		bool bVSync = PlatformGetVSync();
+		bool bVignetteEnabled = EngineState->bVignetteEnabled;
+		int32_t AOQuality = EngineState->Renderer.AOQuality;
+		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
+		uint32_t MasterVolume = EngineState->AudioState.MasterVolume;
+		uint32_t MusicVolume = EngineState->AudioState.MusicVolume;
+		uint32_t EffectsVolume = EngineState->AudioState.EffectsVolume;
+
+		memcpy(CurrentPointer, &LevelNameLength, sizeof(uint32_t));
+		CurrentPointer += sizeof(uint32_t);
+
+		memcpy(CurrentPointer, EngineState->LevelName, LevelNameLength);
+		CurrentPointer += LevelNameLength;
+
+		memcpy(CurrentPointer, &bFullscreen, sizeof(bool));
+		CurrentPointer += sizeof(bool);
+
+		memcpy(CurrentPointer, &bVSync, sizeof(bool));
+		CurrentPointer += sizeof(bool);
+
+		memcpy(CurrentPointer, &bVignetteEnabled, sizeof(bool));
+		CurrentPointer += sizeof(bool);
+
+		memcpy(CurrentPointer, &AOQuality, sizeof(int32_t));
+		CurrentPointer += sizeof(int32_t);
+
+		memcpy(CurrentPointer, &FullscreenResolutionPercent, sizeof(uint32_t));
+		CurrentPointer += sizeof(uint32_t);
+
+		memcpy(CurrentPointer, &MasterVolume, sizeof(uint32_t));
+		CurrentPointer += sizeof(uint32_t);
+
+		memcpy(CurrentPointer, &MusicVolume, sizeof(uint32_t));
+		CurrentPointer += sizeof(uint32_t);
+
+		memcpy(CurrentPointer, &EffectsVolume, sizeof(uint32_t));
+		CurrentPointer += sizeof(uint32_t);
+
+		memcpy(CurrentPointer, &WindowPlacement.InfoSizeInBytes, sizeof(uint64_t));
+		CurrentPointer += sizeof(uint64_t);
+
+		memcpy(CurrentPointer, WindowPlacement.InfoPointer, WindowPlacement.InfoSizeInBytes);
+		CurrentPointer += WindowPlacement.InfoSizeInBytes;
+
+
+		SDiskWriteInfo DiskWriteInfo = {};
+		DiskWriteInfo.Path = "Saves\\GeneralSave";
+		DiskWriteInfo.DataSize = CurrentPointer - (uint8_t*) WriteData;
+		DiskWriteInfo.Data = WriteData;
+
+		AddEntryToWriteDiskThread(&EngineState->WriteDiskThread, DiskWriteInfo);
+	}
 }

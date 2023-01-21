@@ -12,15 +12,28 @@
 #include "ThirdParty\DearImGui\imgui_impl_vulkan.cpp"
 #endif
 
+#define WRITE_BARRIER _WriteBarrier()
+
 #include "Engine.cpp"
 
 #include <Windows.h>
 #include <mmsystem.h>
 
 #ifndef ENGINE_RELEASE
+static volatile bool bGlobalDearImguiInitialized = false;
 VkRenderPass InitializeDearImgui(HWND Window, VkInstance Instance, VkPhysicalDevice PhysicalDevice, VkDevice Device, VkCommandBuffer CommandBuffer,
 						 		 uint32_t FamilyIndex, VkQueue Queue, VkPipelineCache PipelineCache, const SSwapchain& Swapchain, VkFormat SwapchainFormat)
 {
+	Assert(!bGlobalDearImguiInitialized);
+
+	// Initialize DearImgui
+	IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& IO = ImGui::GetIO(); (void)IO;
+	ImGui::StyleColorsDark();
+
+	bGlobalDearImguiInitialized = true;
+
 	// Create descriptor pool for DearImgui
 	VkDescriptorPoolSize PoolSizes[] =
 	{
@@ -433,14 +446,63 @@ SWindowPlacementInfo PlatformGetWindowPlacement()
 	return PlacementInfo;
 }
 
-void PlatformSetWindowPlacement(SWindowPlacementInfo PlacementInfo)
+void WinSetInitialWindowPlacement(SWindowPlacementInfo PlacementInfo)
 {
+	Assert(!bGlobalFullscreen);
+
 	DWORD Style = GetWindowLong(GlobalWindow, GWL_STYLE);
 	SetWindowLong(GlobalWindow, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+
+	WINDOWPLACEMENT* Info = (WINDOWPLACEMENT*) PlacementInfo.InfoPointer;
+	Info->showCmd = SW_HIDE;
 	SetWindowPlacement(GlobalWindow, (const WINDOWPLACEMENT*) PlacementInfo.InfoPointer);
 	SetWindowPos(GlobalWindow, NULL, 0, 0, 0, 0,
-				SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+				 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+				 SWP_NOOWNERZORDER | SWP_FRAMECHANGED | 
+				 SWP_HIDEWINDOW | SWP_NOACTIVATE);
+}
+
+struct SCallbackData
+{
+	void* Callback;
+	void* Data;
+};
+DWORD WINAPI WinThreadProc(LPVOID Parameter)
+{
+	if (Parameter)
+	{
+		SCallbackData* CallbackData = (SCallbackData*) Parameter;
+		RunningThreadType* RunningThreadFunction = (RunningThreadType*) CallbackData->Callback;
+		void* Data = CallbackData->Data;
+		free(Parameter);
+
+		if (RunningThreadFunction)
+		{
+			RunningThreadFunction(Data);
+		}
+	}
+
+	return 0;
+}
+
+void PlatformCreateThread(RunningThreadType* RunningThreadFunction, void* Data)
+{
+	SCallbackData* CallbackData = (SCallbackData*) malloc(sizeof(SCallbackData));
+	CallbackData->Callback = RunningThreadFunction;
+	CallbackData->Data = Data;
+	
+	CreateThread(NULL, 0, WinThreadProc, CallbackData, 0, NULL);
+}
+
+void PlatformInterlockedExchange(uint32_t volatile* Target, uint32_t Value)
+{
+	InterlockedExchange(Target, Value);
+}
+
+uint32_t PlatformInterlockedIncrement(uint32_t volatile* Target)
+{
+	uint32_t Result = InterlockedIncrement(Target);
+	return Result;
 }
 
 LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
@@ -453,11 +515,6 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 		PlatformData = WindowUserPtr->PlatformData;
 		GameInput = WindowUserPtr->GameInput;
 	}
-
-#ifndef ENGINE_RELEASE
-    ImGuiIO& IO = ImGui::GetIO();
-    ImGui_ImplWin32_Data* BackendData = ImGui_ImplWin32_GetBackendData();
-#endif
 
     LRESULT Result = 0;
     switch (Message)
@@ -472,11 +529,7 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 			}
 
 			// NOTE(georgii): Handle Alt + Tab bug.
-			WinProcessKeyboardMessage(GameInput->Buttons[Button_Alt], false);
-	        
-#ifndef ENGINE_RELEASE
-			IO.AddFocusEvent(Message == WM_SETFOCUS);
-#endif
+			WinProcessKeyboardMessage(GameInput->Buttons[Button_Alt], false);	        
 		} break;
 
 		case WM_KILLFOCUS:
@@ -492,10 +545,6 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 
 			// NOTE(georgii): Handle Alt + Tab bug.
 			WinProcessKeyboardMessage(GameInput->Buttons[Button_Alt], false);
-
-#ifndef ENGINE_RELEASE
-			IO.AddFocusEvent(Message == WM_SETFOCUS);
-#endif
 		} break;
 
         case WM_DESTROY:
@@ -540,71 +589,15 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					bGlobalCursorWasJustDisabled = false;
 				}
 			}
+		} break;
 
-#ifndef ENGINE_RELEASE
-			BackendData->MouseHwnd = Window;
-			if (!BackendData->MouseTracked)
+		case WM_MOUSEHWHEEL:
+		{
+			if (GameInput)
 			{
-				TRACKMOUSEEVENT TrackEvent = { sizeof(TrackEvent), TME_LEAVE, Window, 0 };
-				TrackMouseEvent(&TrackEvent);
-				BackendData->MouseTracked = true;
+				GameInput->MouseWheelDelta += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
 			}
-#endif
 		} break;
-		
-#ifndef ENGINE_RELEASE
-		case WM_MOUSELEAVE:
-		{
-	        if (BackendData->MouseHwnd == Window)
-				BackendData->MouseHwnd = NULL;
-			BackendData->MouseTracked = false;
-		} break;
-
-		case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
-		case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
-		case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
-		case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
-		{
-			int Button = 0;
-			if ((Message == WM_LBUTTONDOWN) || (Message == WM_LBUTTONDBLCLK)) { Button = 0; }
-			if ((Message == WM_RBUTTONDOWN) || (Message == WM_RBUTTONDBLCLK)) { Button = 1; }
-			if ((Message == WM_MBUTTONDOWN) || (Message == WM_MBUTTONDBLCLK)) { Button = 2; }
-			if ((Message == WM_XBUTTONDOWN) || (Message == WM_XBUTTONDBLCLK)) { Button = (GET_XBUTTON_WPARAM(WParam) == XBUTTON1) ? 3 : 4; }
-			if (!ImGui::IsAnyMouseDown() && ::GetCapture() == NULL)
-				SetCapture(Window);
-			IO.MouseDown[Button] = true;
-		} break;
-
-		case WM_LBUTTONUP:
-		case WM_RBUTTONUP:
-		case WM_MBUTTONUP:
-		case WM_XBUTTONUP:
-		{
-			int Button = 0;
-			if (Message == WM_LBUTTONUP) { Button = 0; }
-			if (Message == WM_RBUTTONUP) { Button = 1; }
-			if (Message == WM_MBUTTONUP) { Button = 2; }
-			if (Message == WM_XBUTTONUP) { Button = (GET_XBUTTON_WPARAM(WParam) == XBUTTON1) ? 3 : 4; }
-			IO.MouseDown[Button] = false;
-			if (!ImGui::IsAnyMouseDown() && GetCapture() == Window)
-				ReleaseCapture();
-		} break;
-
-    	case WM_MOUSEWHEEL:
-		{
-        	IO.MouseWheel += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
-            
-            if (GameInput)
-            {
-                GameInput->MouseWheelDelta += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
-            }
-		} break;
-
-    	case WM_MOUSEHWHEEL:
-		{
-        	IO.MouseWheelH += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
-		} break;
-#endif
 
         case WM_SYSKEYDOWN:
 		case WM_SYSKEYUP:
@@ -738,73 +731,141 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					}
 				}
 			}
-
-#ifndef ENGINE_RELEASE
-			bool Down = (Message == WM_KEYDOWN || Message == WM_SYSKEYDOWN);
-			if (WParam < 256)
-				IO.KeysDown[WParam] = Down;
-			if (WParam == VK_CONTROL)
-				IO.KeyCtrl = Down;
-			if (WParam == VK_SHIFT)
-				IO.KeyShift = Down;
-			if (WParam == VK_MENU)
-				IO.KeyAlt = Down;
-#endif
 		} break;
 
-#ifndef ENGINE_RELEASE
-		case WM_CHAR:
-		{
-        	if ((WParam > 0) && (WParam < 0x10000))
-	            IO.AddInputCharacterUTF16((unsigned short)WParam);
-		} break;
-
-    	case WM_SETCURSOR:
-		{
-        	if ((LOWORD(LParam) == HTCLIENT) && ImGui_ImplWin32_UpdateMouseCursor())
-            	Result = 1;
-		} break;
-
-    	case WM_DEVICECHANGE:
-		{
-	        if ((UINT)WParam == DBT_DEVNODES_CHANGED)
-	            BackendData->WantUpdateHasGamepad = true;
-		} break;
-#endif
-        
         default:
         {
             Result = DefWindowProcA(Window, Message, WParam, LParam);
         } break;
     }
+
+#ifndef ENGINE_RELEASE
+	// NOTE(georgii): Handle DearImgui stuff
+	if (bGlobalDearImguiInitialized)
+	{
+		ImGuiIO& IO = ImGui::GetIO();
+		ImGui_ImplWin32_Data* BackendData = ImGui_ImplWin32_GetBackendData();
+
+		switch (Message)
+		{
+			case WM_SETFOCUS:
+			{
+				IO.AddFocusEvent(Message == WM_SETFOCUS);
+			} break;
+
+			case WM_KILLFOCUS:
+			{
+				IO.AddFocusEvent(Message == WM_SETFOCUS);
+			} break;
+
+			case WM_MOUSEMOVE:
+			{
+				BackendData->MouseHwnd = Window;
+				if (!BackendData->MouseTracked)
+				{
+					TRACKMOUSEEVENT TrackEvent = { sizeof(TrackEvent), TME_LEAVE, Window, 0 };
+					TrackMouseEvent(&TrackEvent);
+					BackendData->MouseTracked = true;
+				}
+			} break;
+
+			case WM_MOUSELEAVE:
+			{
+				if (BackendData->MouseHwnd == Window)
+					BackendData->MouseHwnd = NULL;
+				BackendData->MouseTracked = false;
+			} break;
+
+			case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
+			case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
+			case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
+			case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
+			{
+				int Button = 0;
+				if ((Message == WM_LBUTTONDOWN) || (Message == WM_LBUTTONDBLCLK)) { Button = 0; }
+				if ((Message == WM_RBUTTONDOWN) || (Message == WM_RBUTTONDBLCLK)) { Button = 1; }
+				if ((Message == WM_MBUTTONDOWN) || (Message == WM_MBUTTONDBLCLK)) { Button = 2; }
+				if ((Message == WM_XBUTTONDOWN) || (Message == WM_XBUTTONDBLCLK)) { Button = (GET_XBUTTON_WPARAM(WParam) == XBUTTON1) ? 3 : 4; }
+				if (!ImGui::IsAnyMouseDown() && ::GetCapture() == NULL)
+					SetCapture(Window);
+				IO.MouseDown[Button] = true;
+			} break;
+
+			case WM_LBUTTONUP:
+			case WM_RBUTTONUP:
+			case WM_MBUTTONUP:
+			case WM_XBUTTONUP:
+			{
+				int Button = 0;
+				if (Message == WM_LBUTTONUP) { Button = 0; }
+				if (Message == WM_RBUTTONUP) { Button = 1; }
+				if (Message == WM_MBUTTONUP) { Button = 2; }
+				if (Message == WM_XBUTTONUP) { Button = (GET_XBUTTON_WPARAM(WParam) == XBUTTON1) ? 3 : 4; }
+				IO.MouseDown[Button] = false;
+				if (!ImGui::IsAnyMouseDown() && GetCapture() == Window)
+					ReleaseCapture();
+			} break;
+
+			case WM_MOUSEWHEEL:
+			{
+				IO.MouseWheel += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
+				
+				
+			} break;
+
+			case WM_MOUSEHWHEEL:
+			{
+				IO.MouseWheelH += (float)GET_WHEEL_DELTA_WPARAM(WParam) / (float)WHEEL_DELTA;
+			} break;
+
+			case WM_SYSKEYDOWN:
+			case WM_SYSKEYUP:
+			case WM_KEYDOWN:
+			case WM_KEYUP:
+			{
+				bool Down = (Message == WM_KEYDOWN || Message == WM_SYSKEYDOWN);
+				if (WParam < 256)
+					IO.KeysDown[WParam] = Down;
+				if (WParam == VK_CONTROL)
+					IO.KeyCtrl = Down;
+				if (WParam == VK_SHIFT)
+					IO.KeyShift = Down;
+				if (WParam == VK_MENU)
+					IO.KeyAlt = Down;
+			} break;
+
+			case WM_CHAR:
+			{
+				if ((WParam > 0) && (WParam < 0x10000))
+					IO.AddInputCharacterUTF16((unsigned short)WParam);
+			} break;
+
+			case WM_SETCURSOR:
+			{
+				if ((LOWORD(LParam) == HTCLIENT) && ImGui_ImplWin32_UpdateMouseCursor())
+					Result = 1;
+			} break;
+
+			case WM_DEVICECHANGE:
+			{
+				if ((UINT)WParam == DBT_DEVNODES_CHANGED)
+					BackendData->WantUpdateHasGamepad = true;
+			} break;
+		}
+	}
+#endif
     
     return Result;
 }
 
 int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandLine, int ShowCode)
 {
-#ifdef ENGINE_RELEASE
-	SLogger::Initialize(LoggerVerbosity_Release);
-#elif defined(ENGINE_PROFILE)
-	SLogger::Initialize(LoggerVerbosity_Debug);
-#else
-	SLogger::Initialize(LoggerVerbosity_SuperDebug);
-#endif
-
     WNDCLASSA WindowClass = {};
 	WindowClass.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC;
     WindowClass.lpfnWndProc = WinMainWindowCallback;
     WindowClass.hInstance = HInstance;
     WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
     WindowClass.lpszClassName = "EngineWindowClass";
-
-#ifndef ENGINE_RELEASE
-	// Initialize DearImgui
-	IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& IO = ImGui::GetIO(); (void)IO;
-	ImGui::StyleColorsDark();
-#endif
 
     if (RegisterClassA(&WindowClass))
 	{
@@ -818,7 +879,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 			SLogger::Log("Window created.\n", LoggerVerbosity_Release);
 
 			GlobalWindow = Window;
-
 			GlobalPlatformData.Window = Window;
 			
 			SGameInput GameInput = {};
@@ -838,64 +898,11 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 			{
 				SLogger::Log("Game memory allocated.\n\n", LoggerVerbosity_Release);
 
-#if ENGINE_RELEASE
-				uint32_t InternalWidthSaved = 0;
-				uint32_t InternalHeightSaved = 0;
-
-				SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
-				if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
-				{
-					uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
-
-					uint32_t LastLevelNameLength = 0;
-					memcpy(&LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
-					SaveFilePointer += sizeof(uint32_t);
-					SaveFilePointer += LastLevelNameLength;
-
-					bool bFullscreen;
-					memcpy(&bFullscreen, SaveFilePointer, sizeof(bool));
-					SaveFilePointer += sizeof(bool);
-
-					SaveFilePointer += sizeof(bool);
-					SaveFilePointer += sizeof(bool);
-					SaveFilePointer += sizeof(int32_t);
-
-					memcpy(&InternalWidthSaved, SaveFilePointer, sizeof(uint32_t));
-					SaveFilePointer += sizeof(uint32_t);
-
-					memcpy(&InternalHeightSaved, SaveFilePointer, sizeof(uint32_t));
-					SaveFilePointer += sizeof(uint32_t);
-					
-					SaveFilePointer += sizeof(uint32_t);
-					SaveFilePointer += sizeof(uint32_t);
-					SaveFilePointer += sizeof(uint32_t);
-					SaveFilePointer += sizeof(uint32_t);
-
-					uint64_t WindowPlacementSize;
-					memcpy(&WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
-					SaveFilePointer += sizeof(uint64_t);
-
-					void *WindowPlacement = malloc(WindowPlacementSize);
-					memcpy(WindowPlacement, SaveFilePointer, WindowPlacementSize);
-					SaveFilePointer += WindowPlacementSize;
-
-					PlatformChangeFullscreen(bFullscreen);
-					if (!bFullscreen)
-					{
-						SWindowPlacementInfo WindowPlacementInfo = { WindowPlacement, WindowPlacementSize };
-						PlatformSetWindowPlacement(WindowPlacementInfo);
-					}
-					free(WindowPlacement);
-				}
-#endif
-
-				WinToggleFullscreen(Window);
+				memset(GameMemory.Storage, 0, GameMemory.StorageSize);
 
 				// NOTE(georgii): Fix for vkEnumeratePhysicalDevices bug on laptops with AMD and NVIDIA GPUs
 				// https://github.com/KhronosGroup/Vulkan-Loader/issues/552
 				SetEnvironmentVariableA("DISABLE_LAYER_AMD_SWITCHABLE_GRAPHICS_1", "1");
-
-				memset(GameMemory.Storage, 0, GameMemory.StorageSize);
 
 				SVulkanVersion VulkanVersion = GetVulkanVersion();
 				Assert((VulkanVersion.Major >= 1) && (VulkanVersion.Minor >= 1));
@@ -905,10 +912,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				SLogger::Log(VulkanVersionOutput, LoggerVerbosity_Release);
 
 				VkInstance Instance = CreateInstance();
-#ifndef ENGINE_RELEASE
-				RegisterDebugCallback(Instance);
-#endif
-
 				VkPhysicalDevice PhysicalDevice = PickPhysicalDevice(Instance);
 
 				VkPhysicalDeviceProperties PhysicalDeviceProps = {};
@@ -966,14 +969,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 				Vulkan.Width = Swapchain.Width; 
 				Vulkan.Height = Swapchain.Height;
 
-#if ENGINE_RELEASE
-				if ((InternalWidthSaved > 0) && (InternalHeightSaved > 0))
-				{
-					Vulkan.InternalWidth = InternalWidthSaved;
-					Vulkan.InternalHeight = InternalHeightSaved;
-				}
-#endif
-
 #ifndef ENGINE_RELEASE
 				VkRenderPass ImguiRenderPass = InitializeDearImgui(Window, Instance, PhysicalDevice, Device, CommandBuffers[0], GraphicsFamilyIndex, GraphicsQueue, 0, Swapchain, SwapchainFormat);
 				SLogger::Log("DearImGui initialized.\n\n", LoggerVerbosity_Debug);
@@ -990,10 +985,28 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					Vulkan.vkCmdDrawIndexedIndirectCountAMD = (PFN_vkCmdDrawIndexedIndirectCountAMD) vkGetInstanceProcAddr(Instance, "vkCmdDrawIndexedIndirectCountAMD");
 				}
 
+#if ENGINE_RELEASE
+				// Load saved and set platform data
+				SGeneralSaveData GeneralSaveData = LoadGeneralSaveData();
+				if (GeneralSaveData.bValid)
+				{
+					PlatformChangeFullscreen(GeneralSaveData.bFullscreen);
+					if (!GeneralSaveData.bFullscreen)
+					{
+						SWindowPlacementInfo WindowPlacementInfo = { GeneralSaveData.WindowPlacement, GeneralSaveData.WindowPlacementSize };
+						WinSetInitialWindowPlacement(WindowPlacementInfo);
+					}
+
+					FreeGeneralSaveData(&GeneralSaveData);
+				}
+#endif
+
+				WinToggleFullscreen(Window);
 				ShowWindow(Window, SW_SHOW);
 
 				uint32_t FrameID = 0;
 				float FrameCpuTime = 0.0f;
+				float DeltaTime = 0.0f;
 				while (bGlobalRunning)
 				{
 					BEGIN_PROFILER_BLOCK("FRAME_TIME");
@@ -1080,7 +1093,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						Vulkan.Height = Swapchain.Height;
 						Vulkan.FrameInFlight = FrameInFlight;
 
-						if (!PlatformGetFullscreen())
+						if (!PlatformGetFullscreen() || FrameID == 0)
 						{
 							Vulkan.InternalWidth = Swapchain.Width;
 							Vulkan.InternalHeight = Swapchain.Height;
@@ -1122,7 +1135,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						ImGui::NewFrame();
 	#endif
 
-						GameInput.dt = FrameCpuTime;
+						GameInput.dt = DeltaTime;
 						GameInput.FrameID = FrameID;
 						GameInput.bShowMouse = bGlobalShowMouse;
 						GameInput.PlatformMouseX = (GlobalPlatformData.MouseLastX + 0.5) - 0.5*Swapchain.Width;
@@ -1206,6 +1219,7 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();
 					float FrameCpuTimeTemp = WinGetSecondsElapsed(FrameCpuBeginTime, FrameCpuEndTime);
+					DeltaTime = FrameCpuTimeTemp;
 					// NOTE(georgii): For breakpoints and other shit
 					if (FrameCpuTimeTemp < 1.0f)
 					{
@@ -1218,6 +1232,8 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					FrameID++;
 				}
+
+				EngineFinish(&GameMemory);
 			}
 			else
 			{

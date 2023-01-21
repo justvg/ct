@@ -143,7 +143,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			if (ImGui::CollapsingHeader("Levels"))
 			{
 				const uint32_t MaxLevelCount = 64;
-				const uint32_t MaxFilenameLength = 264;
+				const uint32_t MaxFilenameLength = MaxPath;
 				char LevelNames[MaxLevelCount][MaxFilenameLength] = {};
 				
 				uint32_t LevelCount = 0;

@@ -173,9 +173,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		AddGLTFMesh(EngineState->Geometry, "Models\\cube.gltf");
 		CreateQuadMesh(EngineState->Geometry);
 		CreateSphereMesh(EngineState->Geometry);
-        
-		InitializeRenderer(&EngineState->Renderer, Vulkan, &EngineState->Geometry);
-                    
+                            
 		EngineState->Camera.OffsetFromPlayer = Vec3(0.0f, 0.8f*0.5f*1.5f, 0.0f);
         EngineState->Camera.Near = 0.01f;
         EngineState->Camera.Far = 300.0f;
@@ -184,29 +182,6 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		EngineState->FullscreenResolutionPercent = 100;
 
 		EngineState->bVignetteEnabled = true;
-
-		SParsedConfigFile ConfigFile = ParseConfigFile("Engine.cfg");
-		if (ConfigFile.ItemCount > 0)
-		{
-			for (uint32_t I = 0; I < ConfigFile.ItemCount; I++)
-			{
-				const SConfigFileItem& Item = ConfigFile.Items[I];
-
-			#ifndef ENGINE_RELEASE
-				if (CompareStrings(Item.Name, "CameraSpeed"))
-				{
-					EngineState->EditorState.CameraSpeed = Item.Value;
-				}
-			#endif
-			}
-		}
-		else
-		{
-			// NOTE(georgii): Use these values if for some reason there is no config file.
-		#ifndef ENGINE_RELEASE
-		    EngineState->EditorState.CameraSpeed = 1.0f;
-        #endif
-		}
 
 		EngineState->AudioState.MasterVolume = 50;
 		EngineState->AudioState.MusicVolume = 50;
@@ -227,6 +202,55 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 
 		EngineState->LoadedSounds[Sound_PortalSoundtrack] = LoadWAV("Sounds\\Music\\PortalSoundtrack.wav");
 
+	#ifndef ENGINE_RELEASE
+		// Load and set editor config
+		SParsedConfigFile ConfigFile = ParseConfigFile("Editor.cfg");
+		if (ConfigFile.ItemCount > 0)
+		{
+			for (uint32_t I = 0; I < ConfigFile.ItemCount; I++)
+			{
+				const SConfigFileItem& Item = ConfigFile.Items[I];
+
+				if (CompareStrings(Item.Name, "CameraSpeed"))
+				{
+					EngineState->EditorState.CameraSpeed = Item.Value;
+				}
+			}
+		}
+		else
+		{
+			// NOTE(georgii): Use these values if for some reason there is no config file.
+		    EngineState->EditorState.CameraSpeed = 1.0f;
+		}
+	#endif
+
+	#if ENGINE_RELEASE
+		// Load saved and set engine data
+		SGeneralSaveData GeneralSaveData = LoadGeneralSaveData();
+		if (GeneralSaveData.bValid)
+		{
+			PlatformChangeVSync(GeneralSaveData.bVSync);
+			EngineState->bVignetteEnabled = GeneralSaveData.bVignetteEnabled;
+			EngineState->Renderer.AOQuality = EAOQuality(GeneralSaveData.AOQuality);
+			EngineState->FullscreenResolutionPercent = GeneralSaveData.FullscreenResolutionPercent;
+			EngineState->AudioState.MasterVolume = GeneralSaveData.MasterVolume;
+			EngineState->AudioState.MusicVolume = GeneralSaveData.MusicVolume;
+			EngineState->AudioState.EffectsVolume = GeneralSaveData.EffectsVolume;
+
+			if (PlatformGetFullscreen())
+			{
+				Vulkan.InternalWidth = uint32_t(Vulkan.Width * (EngineState->FullscreenResolutionPercent / 100.0f));
+				Vulkan.InternalHeight = uint32_t(Vulkan.Height * (EngineState->FullscreenResolutionPercent / 100.0f));
+			}
+
+			FreeGeneralSaveData(&GeneralSaveData);
+		}
+	#endif
+
+		InitializeRenderer(&EngineState->Renderer, Vulkan, &EngineState->Geometry);
+
+		PlatformCreateThread(WriteDataToDiskThreadFunction, &EngineState->WriteDiskThread);
+
         EngineState->bInitialized = true;
     }
     
@@ -235,8 +259,11 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	{
 		if (EngineState->bSwapchainChanged)
 		{
-			Vulkan.InternalWidth = uint32_t(Vulkan.Width * (EngineState->FullscreenResolutionPercent / 100.0f));
-			Vulkan.InternalHeight = uint32_t(Vulkan.Height * (EngineState->FullscreenResolutionPercent / 100.0f));
+			if (PlatformGetFullscreen())
+			{
+				Vulkan.InternalWidth = uint32_t(Vulkan.Width * (EngineState->FullscreenResolutionPercent / 100.0f));
+				Vulkan.InternalHeight = uint32_t(Vulkan.Height * (EngineState->FullscreenResolutionPercent / 100.0f));
+			}
 		}
 
 		RendererHandleChanges(&EngineState->Renderer, Vulkan);
@@ -245,12 +272,6 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 		bSwapchainChanged = true;
 	}
 
-	if (PlatformGetFullscreen())
-	{
-		EngineState->LastFullscreenInternalWidth = Vulkan.InternalWidth;
-		EngineState->LastFullscreenInternalHeight = Vulkan.InternalHeight;
-	}
-	
 	if (EngineState->bReloadLevel || EngineState->bReloadLevelEditor || EngineState->bForceUpdateVoxels)
 	{
 		if (EngineState->bReloadLevel)
@@ -426,12 +447,12 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	EndTempMemoryArena(&SoundTempMemory);
     
 	// Render
-#ifndef ENGINE_RELEASE
+// #ifndef ENGINE_RELEASE
 	char FrameTimeText[64];
 	const float FrameMS = uint32_t(10000.0f * GameInput.dt) / 10.0f;
 	snprintf(FrameTimeText, sizeof(FrameTimeText), "%.1fms/f %dFPS\n\n", FrameMS, (uint32_t)(1000.0f / FrameMS));
 	AddTextOneFrame(EngineState, FrameTimeText, Vec2(-1.0f, -0.95f), 0.1f, Vec4(1.0f), TextAlignment_Left);
-#endif
+// #endif
 
 	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
 
@@ -491,6 +512,22 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	{
 		EngineState->GameTime += GameInput.dt;
 	}
+
+#if ENGINE_RELEASE
+	SaveGeneralSaveData(EngineState);
+#endif
     
 	return FinalImage;
+}
+
+void EngineFinish(SGameMemory* GameMemory)
+{
+	Assert((sizeof(SEngineState) + sizeof(SGameState)) <= GameMemory->StorageSize);
+
+    SEngineState* EngineState = (SEngineState*) GameMemory->Storage;
+    if (EngineState->bInitialized)
+    {
+		// NOTE(georgii): Wait until the thread is finished with its job
+		while (EngineState->WriteDiskThread.EntryToRead != EngineState->WriteDiskThread.EntryToWrite) { }
+	}
 }
