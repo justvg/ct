@@ -502,6 +502,13 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			vec3 SpawnPos = EngineState->Camera.Pos + 3.0f * EngineState->Camera.Dir;
 			if (ImGui::CollapsingHeader("Entities"))
 			{
+				if (ImGui::Button("Cube"))
+				{
+					SaveLevelHistory(EditorState, &EngineState->Level);
+					EditorState->SelectedEntity = AddCube(EngineState->Level, SpawnPos);
+					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedVoxelsCount = 0;
+				}
 				if (ImGui::Button("Torch"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
@@ -711,6 +718,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			}
 
 			ImGui::Checkbox("GridSnap", &EditorState->bGridMode);
+			ImGui::Checkbox("GridSnap_CenterMode", &EditorState->bGridModeCenter);
 
 			EditorDragFloat(EditorState, "CameraSpeed", &EditorState->CameraSpeed, 0.05f, 0.0f, FloatMax);
             
@@ -739,12 +747,20 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 	END_GPU_PROFILER_BLOCK("IMGUI_RENDER", Vulkan->CommandBuffer, Vulkan->FrameInFlight);
 }
 
-void EditorMoveSnap(float& MoveDeltaAccum, float& EntityPos)
+void EditorMoveSnap(const SEditorState* EditorState, float& MoveDeltaAccum, float& EntityPos)
 {
 	float NewPos = EntityPos + MoveDeltaAccum;
-	NewPos = 0.5f * roundf((NewPos + 0.5f * VoxelDim) * 2.0f) - 0.5f * VoxelDim;
+	if (EditorState->bGridModeCenter)
+	{
+		NewPos = 0.5f * roundf((NewPos + 0.5f * VoxelDim) * 2.0f) - 0.5f * VoxelDim;
+	}
+	else
+	{
+		float DeltaSign = MoveDeltaAccum;
+		NewPos = 0.5f * roundf((NewPos + DeltaSign * 0.5f * VoxelDim) * 2.0f);
+	}
 	
-	if (Absolute(NewPos - EntityPos) >= FloatEpsilon)
+	if (Absolute(NewPos - EntityPos) >= FloatEpsilon && (Absolute(MoveDeltaAccum) > FloatEpsilon))
 	{
 		EntityPos = NewPos;
 		MoveDeltaAccum = 0.0f; 
@@ -756,6 +772,13 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 	SEditorState* EditorState = &EngineState->EditorState;
 	SCamera* Camera = &EngineState->Camera;
 	SLevel* Level = &EngineState->Level;
+
+	if (!EditorState->bInitialized)
+	{
+		EditorState->bGridModeCenter = true;
+
+		EditorState->bInitialized = true;
+	}
 
 	// NOTE(georgii): This is for velocity vectors to work in editor mode.
 	for (uint32_t EntityIndex = 0; EntityIndex < Level->EntityCount; EntityIndex++)
@@ -1755,7 +1778,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								if (EditorState->bGridMode)
 								{
 									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.x;
-									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.x);
+									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.x);
 								}
 								else
 								{
@@ -1777,7 +1800,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								if (EditorState->bGridMode)
 								{
 									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.y;
-									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.y);
+									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.y);
 								}
 								else
 								{		
@@ -1799,7 +1822,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								if (EditorState->bGridMode)
 								{
 									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.z;
-									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->Pos.z);
+									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.z);
 								}
 								else
 								{
@@ -1825,7 +1848,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								if (EditorState->bGridMode)
 								{
 									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.x;
-									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.x);
+									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->TargetOffset.x);
 								}
 								else
 								{
@@ -1839,7 +1862,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 							if (EditorState->bGridMode)
 							{
 								EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.y;
-								EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.y);
+								EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->TargetOffset.y);
 							}
 							else
 							{
@@ -1858,7 +1881,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								if (EditorState->bGridMode)
 								{
 									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.z;
-									EditorMoveSnap(EditorState->MoveDeltaAccum, Entity->TargetOffset.z);
+									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->TargetOffset.z);
 								}
 								else
 								{

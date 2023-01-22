@@ -259,6 +259,25 @@ SEntity* AddWire(SLevel& Level, vec3 Pos)
 	return Entity;
 }
 
+SEntity* AddCube(SLevel& Level, vec3 Pos)
+{
+	Assert(Level.EntityCount < ArrayCount(Level.Entities));
+	SEntity* Entity = &Level.Entities[Level.EntityCount++];
+	memset(Entity, 0, sizeof(SEntity));
+
+	Entity->Type = Entity_Cube;
+	Entity->Pos = Pos;
+	Entity->Dim = Vec3(0.1f, 0.06f, 1.0f);
+	Entity->Scale = 1.0f;
+
+	Entity->Color = Vec3(0.0f, 0.0f, 0.0f);
+	Entity->Alpha = 1.0f;
+
+	Entity->MeshIndex = 1;
+
+	return Entity;
+}
+
 SEntity* AddEntityCopy(SLevel* Level, const SEntity* EntityToCopy)
 {
 	Assert(Level->EntityCount < ArrayCount(Level->Entities));

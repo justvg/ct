@@ -46,7 +46,8 @@ void main()
     vec3 Color = texture(InputTexture, TexCoords).rgb + texture(BloomTexture, TexCoords).rgb;
     
     // Exposure
-    float Exposure = texture(ExposureTexture, vec2(0.5, 0.5)).r;
+    // float Exposure = texture(ExposureTexture, vec2(0.5, 0.5)).r;
+	float Exposure = 2.0f;
     Color *= Exposure;
 
     // Tone mapping

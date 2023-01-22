@@ -48,7 +48,7 @@ void main()
 	float VoxelReflectivity = ((VoxelColorMatActive[VoxelZ][VoxelY][VoxelX] & 0xF0) >> 4) / 15.0;
 	float VoxelRoughness = ((VoxelColorMatActive[VoxelZ][VoxelY][VoxelX] & 0xE) >> 1) / 7.0;
 
-	// TODO(georgii): I think I can do this in vertex shader. I remember that in Crysis we did it in VS
+	// TODO(georgii): I think I can do this in vertex shader
 	vec4 CurrentTexCoords = ProjUnjittered * View * vec4(FragPosWS, 1.0);
 	CurrentTexCoords.xy /= CurrentTexCoords.w;
 	CurrentTexCoords.xy = CurrentTexCoords.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5);

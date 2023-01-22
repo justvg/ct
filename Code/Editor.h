@@ -42,6 +42,8 @@ enum EWallSetMode
 
 struct SEditorState
 {
+	bool bInitialized;
+
 	float CameraSpeed;
 
 	bool bIsImguiWindowHovered;
@@ -69,6 +71,7 @@ struct SEditorState
 	EEditorHelpersMode EditorHelpersMode;
 
 	bool bGridMode;
+	bool bGridModeCenter;
 	SEntity* SelectedEntity;
 	ESelectedArrowType SelectedArrow;
 	ESelectedDimHelperType SelectedDimHelper;

@@ -6,7 +6,7 @@ enum EEntityType
 	Entity_None,
 	
 	Entity_Hero,
-	Entity_Monster,
+	Entity_Cube, // NOTE(georgii): Just to place a cube mesh
 	Entity_Torch,
 	Entity_Door,
 	Entity_Gates,
@@ -16,7 +16,7 @@ enum EEntityType
 	Entity_Container,
 	Entity_Checkpoint,
 	Entity_ColorField,
-	Entity_Wire
+	Entity_Wire,
 };
 
 struct SPointLight

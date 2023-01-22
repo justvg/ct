@@ -482,15 +482,24 @@ inline uint8_t GetVoxelRoughness(const SVoxels& Voxels, uint32_t X, uint32_t Y, 
 	return Roughness;
 }
 
-void AddVoxelToLevel(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z, uint8_t Red = 255, uint8_t Green = 255, uint8_t Blue = 255, uint8_t Reflectivity = 0, uint8_t Roughness = 7)
+void AddVoxelToLevel(SEngineState* EngineState, uint32_t X, uint32_t Y, uint32_t Z)
 {
 	Assert(EngineState->VoxelsToAddCount < ArrayCount(EngineState->VoxelsToAdd));
 
-	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
+	uint8_t Reflectivity = 0;
+	uint8_t Roughness = 0;
 	if (Y == 0)
 	{
-		Reflectivity = 15;
+		Reflectivity = 12;
+		Roughness = 1;
 	}
+	else
+	{
+		Roughness = 6;
+	}
+	
+	uint32_t ID = Z*LevelDimX*LevelDimY + Y*LevelDimX + X;
+	uint8_t Red = 255, Green = 255, Blue = 255;
 	SVoxelToAdd VoxelToAdd = { ID, Red, Green, Blue, Reflectivity, Roughness };
 	EngineState->VoxelsToAdd[EngineState->VoxelsToAddCount++] = VoxelToAdd;
 }

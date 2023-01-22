@@ -11,6 +11,7 @@ layout (location = 4) out float FragLinearDepth;
 layout (location = 0) in vec3 NormalWS;
 layout (location = 1) in vec3 FragPosWS;
 layout (location = 2) in vec3 FragPrevPosWS;
+layout (location = 3) in vec3 LocalPos;
 
 layout (push_constant) uniform PushConstants
 {
@@ -46,8 +47,12 @@ layout (set = 0, binding = 0) uniform CameraBuffer
 
 void main()
 {
+	// TODO(georgii): This was kinad added for torches to have black outlines. Maybe I should add an ability to use different shaders for opaque objects.
+	vec3 UV = abs(2.0 * vec3(LocalPos.x, LocalPos.y, LocalPos.z)) - vec3(0.9);
+	float Dark = (UV.y > 0.0 && UV.z > 0.0) || (UV.x > 0.0 && UV.z > 0.0) || (UV.x > 0.0 && UV.y > 0.0) ? 0.0 : 1.0;
+
 	vec3 Normal = normalize(NormalWS);
-	vec3 Color = MeshColor.rgb;
+	vec3 Color = Dark * MeshColor.rgb;
 
 	vec4 CurrentTexCoords = ProjUnjittered * View * vec4(FragPosWS, 1.0);
 	CurrentTexCoords.xy /= CurrentTexCoords.w;
