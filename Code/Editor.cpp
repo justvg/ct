@@ -2030,6 +2030,11 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 					Renderer->DebugRenderPass.DrawDebugBox(Entity->Pos + Entity->TargetOffset, Entity->Dim, Entity->Color, QuaternionToAxisAngle(EulerToQuat(Entity->Orientation.xyz)));
 				}
 			}
+
+			if (Entity->Light.Radius > 0.0f)
+			{
+				Renderer->DebugRenderPass.DrawDebugSphere(Entity->Pos + Entity->Light.Pos, Entity->Light.Radius, Vec3(1.0f, 1.0f, 1.0f));
+			}
 		}
 
 		if (Light && Light->Type == Light_Spot)
