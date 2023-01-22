@@ -1219,10 +1219,10 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();
 					float FrameCpuTimeTemp = WinGetSecondsElapsed(FrameCpuBeginTime, FrameCpuEndTime);
-					DeltaTime = FrameCpuTimeTemp;
 					// NOTE(georgii): For breakpoints and other shit
 					if (FrameCpuTimeTemp < 1.0f)
 					{
+						DeltaTime = FrameCpuTimeTemp;
 						FrameCpuTime = 0.9f * FrameCpuTime + 0.1f * FrameCpuTimeTemp;
 					}
 

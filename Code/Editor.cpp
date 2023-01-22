@@ -993,6 +993,8 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			
 			if (EditorState->SelectedEntity || EditorState->SelectedPointLight)
 			{
+				float tHitGizmo = FloatMax;
+
 				SEntity* Entity = EditorState->SelectedEntity;
 				SPointLight* PointLight = EditorState->SelectedPointLight;
 				switch (EditorState->EditorHelpersMode)
@@ -1007,32 +1009,32 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 						float tTest = FloatMax;
 						if (IntersectRectRay(RedArrowAABB, RayStartP, RayDir, tTest))
 						{
-							if ((tTest < tHitObject) || (HitEntity == Entity))
+							if ((tTest < tHitGizmo) || (HitEntity == Entity))
 							{
 								bRedArrowHit = true;
-								tHitObject = tTest;
+								tHitGizmo = tTest;
 							}
 						}
 						
 						tTest = FloatMax;
 						if (IntersectRectRay(GreenArrowAABB, RayStartP, RayDir, tTest))
 						{
-							if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedArrowHit))
+							if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedArrowHit))
 							{
 								bRedArrowHit = false;
 								bGreenArrowHit = true;
-								tHitObject = tTest;
+								tHitGizmo = tTest;
 							}
 						}
 						
 						tTest = FloatMax;
 						if (IntersectRectRay(BlueArrowAABB, RayStartP, RayDir, tTest))
 						{
-							if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit))
+							if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit))
 							{
 								bRedArrowHit = bGreenArrowHit = false;
 								bBlueArrowHit = true;
-								tHitObject = tTest;
+								tHitGizmo = tTest;
 							}
 						}
 						
@@ -1059,35 +1061,35 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 							tTest = FloatMax;
 							if (IntersectRectRay(RedArrowAABBOffset, RayStartP, RayDir, tTest))
 							{
-								if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit))
+								if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit))
 								{
 									bRedArrowHit = bGreenArrowHit = bBlueArrowHit = false;
 									bRedArrowHitTargetOffset = true;
-									tHitObject = tTest;
+									tHitGizmo = tTest;
 								}
 							}
 							
 							tTest = FloatMax;
 							if (IntersectRectRay(GreenArrowAABBOffset, RayStartP, RayDir, tTest))
 							{
-								if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset))
+								if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset))
 								{
 									bRedArrowHit = bGreenArrowHit = bBlueArrowHit = false;
 									bRedArrowHitTargetOffset = false;
 									bGreenArrowHitTargetOffset = true;
-									tHitObject = tTest;
+									tHitGizmo = tTest;
 								}
 							}
 							
 							tTest = FloatMax;
 							if (IntersectRectRay(BlueArrowAABBOffset, RayStartP, RayDir, tTest))
 							{
-								if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset && !bGreenArrowHitTargetOffset))
+								if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset && !bGreenArrowHitTargetOffset))
 								{
 									bRedArrowHit = bGreenArrowHit = bBlueArrowHit = false;
 									bRedArrowHitTargetOffset = bGreenArrowHitTargetOffset = false;
 									bBlueArrowHitTargetOffset = true;
-									tHitObject = tTest;
+									tHitGizmo = tTest;
 								}
 							}
 						}
@@ -1113,10 +1115,10 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								float tTest = FloatMax;
 								if (IntersectRayTriangle(RayStartP, RayDir, A, B, C, tTest))
 								{
-									if ((tTest < tHitObject) || (HitEntity == Entity))
+									if ((tTest < tHitGizmo) || (HitEntity == Entity))
 									{
 										bCircleHit = true;
-										tHitObject = tTest;
+										tHitGizmo = tTest;
 									}
 								}
 							}
@@ -1151,10 +1153,10 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								float tTest = FloatMax;
 								if (IntersectOBBRay(Origin, Extents, RayStartP, RayDir, tTest) || IntersectOBBRay(OriginCube, ExtentsCube, RayStartP, RayDir, tTest))
 								{
-									if ((tTest < tHitObject) || (HitEntity == Entity))
+									if ((tTest < tHitGizmo) || (HitEntity == Entity))
 									{
 										bRedDimHelperHit = true;
-										tHitObject = tTest;
+										tHitGizmo = tTest;
 									}
 								}
 							}
@@ -1183,11 +1185,11 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								float tTest = FloatMax;
 								if (IntersectOBBRay(Origin, Extents, RayStartP, RayDir, tTest) || IntersectOBBRay(OriginCube, ExtentsCube, RayStartP, RayDir, tTest))
 								{
-									if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedDimHelperHit))
+									if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedDimHelperHit))
 									{
 										bRedDimHelperHit = false;
 										bGreenDimHelperHit = true;
-										tHitObject = tTest;
+										tHitGizmo = tTest;
 									}
 								}
 							}
@@ -1216,11 +1218,11 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 								float tTest = FloatMax;
 								if (IntersectOBBRay(Origin, Extents, RayStartP, RayDir, tTest) || IntersectOBBRay(OriginCube, ExtentsCube, RayStartP, RayDir, tTest))
 								{
-									if ((tTest < tHitObject) || ((HitEntity == Entity) && !bRedDimHelperHit && !bGreenDimHelperHit))
+									if ((tTest < tHitGizmo) || ((HitEntity == Entity) && !bRedDimHelperHit && !bGreenDimHelperHit))
 									{
 										bRedDimHelperHit = bGreenDimHelperHit = false;
 										bBlueDimHelperHit = true;
-										tHitObject = tTest;
+										tHitGizmo = tTest;
 									}
 								}
 							}

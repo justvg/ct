@@ -233,7 +233,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 		{
 			if ((RenderEntities[J].Alpha == 1.0f) && (RenderEntities[J + 1].Alpha == 1.0f))
 			{
-				if (RenderEntities[J].DistanceToCam > RenderEntities[J + 1].DistanceToCam)
+				if ((RenderEntities[J].DistanceToCam > RenderEntities[J + 1].DistanceToCam) && (RenderEntities[J].Type != Entity_Hero))
 				{
 					SEntity Temp = RenderEntities[J];
 					RenderEntities[J] = RenderEntities[J + 1];
