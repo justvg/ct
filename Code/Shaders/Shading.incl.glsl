@@ -180,26 +180,46 @@ float GetAttenuation(float Distance, float Range)
 	return Attenuation;
 }
 
-struct SPointLight
+struct SLight
 {
 	vec3 Pos;
 	float Radius;
-	vec4 Color;
+	vec3 Color;
+    uint LightType;
+
+    // NOTE(georgii): These are for specular lights
+	vec3 Direction;
+	float Cutoff;
 };
 
-vec3 CalculatePointLight(SPointLight PointLight, vec3 FragPosWS, vec3 Normal)
+vec3 CalculateLight(SLight Light, vec3 FragPosWS, vec3 Normal)
 {
     vec3 Result = vec3(0.0, 0.0, 0.0);
 
     const float PenumbraSize = 0.05;
-    const float LightRange = (1.0 + PenumbraSize) * PointLight.Radius;
-    const vec3 LightPos = PointLight.Pos + PenumbraSize * (2.0 * BlueNoiseVec3() - 1.0);
+    const float LightRange = (1.0 + PenumbraSize) * Light.Radius;
+    const vec3 LightPos = Light.Pos + PenumbraSize * (2.0 * BlueNoiseVec3() - 1.0);
     const float DistanceToLight = length(LightPos - FragPosWS);
     if ((DistanceToLight >= 0.01) && (DistanceToLight <= LightRange))
     {
         vec3 LightVec = (LightPos - FragPosWS) / DistanceToLight;
         
         float Incoming = max(dot(LightVec, Normal), 0.0);
+
+        // SpotLight
+        if (Light.LightType == 1)
+        {
+            const vec3 SpotLightDir = normalize(Light.Direction);
+            const float SpotCutoff = Light.Cutoff;
+
+            const float SpotCutoffCos = cos((SpotCutoff / 180.0) * 3.14159265358979323846);
+            const float AngleToFragCos = dot(-LightVec, SpotLightDir);
+            if (AngleToFragCos <= SpotCutoffCos)
+                return Result;
+
+            Incoming *= (AngleToFragCos - SpotCutoffCos) / (1.0 - SpotCutoffCos);
+        }
+
         if (Incoming > 0)
         {
             float Attenuation = GetAttenuation(DistanceToLight, LightRange);
@@ -215,7 +235,7 @@ vec3 CalculatePointLight(SPointLight PointLight, vec3 FragPosWS, vec3 Normal)
             float HitDist = RaytraceDirectionalVox(StartPos, LightVec, DistanceToLight);
             float Shadow = (HitDist == DistanceToLight) ? 1.0 : 0.0;
 
-            Result = Shadow * Attenuation * Incoming * PointLight.Color.rgb;
+            Result = Shadow * Attenuation * Incoming * Light.Color.rgb;
         }
     }
 

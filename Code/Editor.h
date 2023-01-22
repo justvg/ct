@@ -78,7 +78,7 @@ struct SEditorState
 	bool bCircleSelected;
 	float MoveDeltaAccum;
 
-	SPointLight* SelectedPointLight;
+	SLight* SelectedLight;
 
 	SLevel NewLevel; // NOTE(georgii): Memory for new level creation
 

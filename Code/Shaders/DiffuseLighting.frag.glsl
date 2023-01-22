@@ -11,7 +11,7 @@ layout (location = 1) in vec3 CameraVector;
 layout (push_constant) uniform PushConstants
 {
 	uint FrameNumber;
-	uint PointLightCount;
+	uint LightCount;
 };
 
 layout (set = 0, binding = 0) uniform CameraBuffer
@@ -46,7 +46,7 @@ layout (set = 0, binding = 3) uniform LightBuffer
 
 layout (set = 0, binding = 4) readonly buffer PointsLights
 {
-	SPointLight PointLight[];
+	SLight Light[];
 };
 
 layout (set = 0, binding = 5) uniform sampler2D NormalsTexture;
@@ -68,11 +68,11 @@ void main()
 	vec3 FragPosWS = CameraPosition.xyz + LinearDepth * normalize(CameraVector) * Viewport.w;
 
 	vec3 Ambient = CalculateAmbient(FragPosWS, Normal);
-	vec3 PointLightsColor = vec3(0.0, 0.0, 0.0);
-	for (uint I = 0; I < PointLightCount; I++)
+	vec3 LightsColor = vec3(0.0, 0.0, 0.0);
+	for (uint I = 0; I < LightCount; I++)
 	{
-		PointLightsColor += CalculatePointLight(PointLight[I], FragPosWS, Normal);
+		LightsColor += CalculateLight(Light[I], FragPosWS, Normal);
 	}
 
-	FragAmbient = Ambient + PointLightsColor;
+	FragAmbient = Ambient + LightsColor;
 }

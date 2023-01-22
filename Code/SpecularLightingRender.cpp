@@ -1,8 +1,8 @@
 struct SSpecularLightingPass
 {
 public:
-    static SSpecularLightingPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage* VelocityImages, const SImage& AlbedoImage, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage);
-    void Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged);
+    static SSpecularLightingPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* LightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage* VelocityImages, const SImage& AlbedoImage, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage);
+    void Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t LightCount, uint32_t FrameID, bool bSwapchainChanged);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage* VelocityImages, const SImage& AlbedoImage, const SImage& CompositeImage);
 
 private:
@@ -41,11 +41,11 @@ private:
 struct SSpecularLightingPushConstants
 {
     uint32_t FrameNumber;
-	uint32_t PointLightCount;
+	uint32_t LightCount;
 };
 
 SSpecularLightingPass SSpecularLightingPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, 
-													const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage* VelocityImages, const SImage& AlbedoImage, 
+													const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* LightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, VkSampler LinearEdgeSampler, const SImage& MaterialImage, const SImage& DiffuseImage, const SImage* VelocityImages, const SImage& AlbedoImage, 
 													const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SImage& CompositeImage)
 {
     VkDescriptorSetLayoutBinding CameraBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -56,9 +56,9 @@ SSpecularLightingPass SSpecularLightingPass::Create(const SVulkanContext& Vulkan
     VkDescriptorSetLayoutBinding LinearDepthBinding = CreateDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding DiffuseBinding = CreateDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding MaterialBinding = CreateDescriptorSetLayoutBinding(7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkDescriptorSetLayoutBinding PointLightsBinding = CreateDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayoutBinding LightsBinding = CreateDescriptorSetLayoutBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
     
-    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, VoxelsBinding, NoiseBinding, LightBinding, NormalsBinding, LinearDepthBinding, DiffuseBinding, MaterialBinding, PointLightsBinding };
+    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, VoxelsBinding, NoiseBinding, LightBinding, NormalsBinding, LinearDepthBinding, DiffuseBinding, MaterialBinding, LightsBinding };
     VkDescriptorSetLayout DescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(DescrSetLayoutBindings), DescrSetLayoutBindings);
 
     VkDescriptorSet DescrSets[FramesInFlight] = {};
@@ -73,7 +73,7 @@ SSpecularLightingPass SSpecularLightingPass::Create(const SVulkanContext& Vulkan
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, LinearDepthImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, DiffuseImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, MaterialImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, PointLightsBuffers[I], PointLightsBuffers[I].Size);
+    	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LightsBuffers[I], LightsBuffers[I].Size);
 	}
 
     VkRenderPass RenderPass = CreateRenderPass(Vulkan.Device, SpecularLightImage.Format);
@@ -148,7 +148,7 @@ SSpecularLightingPass SSpecularLightingPass::Create(const SVulkanContext& Vulkan
     return SpecularLightingPass;
 }
 
-void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged)
+void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& SpecularLightImage, const SImage* SpecularLightHistoryImages, const SBuffer& QuadVertexBuffer, uint32_t LightCount, uint32_t FrameID, bool bSwapchainChanged)
 {
 	const uint32_t TargetIndex = FrameID % 2;
     const uint32_t PrevIndex = (TargetIndex + 1) % 2;
@@ -166,7 +166,7 @@ void SSpecularLightingPass::Render(const SVulkanContext& Vulkan, const SImage& S
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[FrameID % 2], 0, 0);
 
-	SSpecularLightingPushConstants PushConstants = { FrameID % 8, PointLightCount };
+	SSpecularLightingPushConstants PushConstants = { FrameID % 8, LightCount };
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSpecularLightingPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;

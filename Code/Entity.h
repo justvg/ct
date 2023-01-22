@@ -19,11 +19,26 @@ enum EEntityType
 	Entity_Wire,
 };
 
-struct SPointLight
+enum ELightType
+{
+	Light_Point,
+	Light_Spot
+};
+struct SLight
 {
 	vec3 Pos;
 	float Radius;
-	vec4 Color;
+	vec3 Color;
+	uint32_t Type;
+
+	// NOTE(georgii): These are for spot lights
+	union
+	{
+		// NOTE(georgii): In CPU we use rotation, in GPU - direction
+		vec3 Rotation;
+		vec3 Direction;
+	};
+	float Cutoff;
 };
 
 struct SEntity
@@ -65,20 +80,14 @@ struct SEntity
 	vec3 PrevPos;
 	vec4 PrevOrientation; // NOTE(georgii): Euler angles. W is unused for now.
 
-	union
-	{
-		SPointLight PointLight;
+	SLight Light;
 
-		// NOTE(georgii): Stuff for message toggler
-		struct
-		{
-			vec2 MessagePos;
-			float MessageScale;
-			float MessageLifeTime;
-			float MessageTimeToAppear;
-			float MessageTimeToStartAppear;
-		};
-	};
+	// NOTE(georgii): Stuff for message toggler
+	vec2 MessagePos;
+	float MessageScale;
+	float MessageLifeTime;
+	float MessageTimeToAppear;
+	float MessageTimeToStartAppear;
 
 	// Gameplay colors
 	vec3 AnimationColor;
@@ -131,7 +140,7 @@ struct SEntity
 
 	union
 	{
-		char TargetLevelName[32];
+		char TargetLevelName[64];
 		char MessageText[64];
 	};
 

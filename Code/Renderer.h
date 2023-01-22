@@ -91,7 +91,7 @@ struct SRenderer
 	SCameraBuffer CameraBufferData;
 	SBuffer CameraBuffers[FramesInFlight];
 	SBuffer LightBuffers[FramesInFlight];
-	SBuffer PointLightsBuffers[FramesInFlight];
+	SBuffer LightsBuffers[FramesInFlight];
 	SBuffer HUDProjectionBuffers[FramesInFlight];
 
 	SVoxelCullingComputePass CullingVoxComputePass;

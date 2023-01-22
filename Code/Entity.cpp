@@ -43,9 +43,9 @@ SEntity* AddTorch(SLevel& Level, vec3 Pos, vec3 Dim, vec3 Color)
 	Entity->Color = Color;
 	Entity->MeshIndex = 1;
 
-	Entity->PointLight.Pos = Vec3(0.0f, 0.0f, 0.0f);
-	Entity->PointLight.Radius = 1.0f;
-	Entity->PointLight.Color = Vec4(Entity->Color, 0.0f);
+	Entity->Light.Pos = Vec3(0.0f, 0.0f, 0.0f);
+	Entity->Light.Radius = 1.0f;
+	Entity->Light.Color = Entity->Color;
 
 	return Entity;	
 }
@@ -65,9 +65,9 @@ SEntity* AddContainer(SLevel& Level, vec3 Pos)
 
 	Entity->MeshIndex = 1;
 
-	Entity->PointLight.Pos = Vec3(0.0f, 0.0f, 0.0f);
-	Entity->PointLight.Radius = 1.0f;
-	Entity->PointLight.Color = Vec4(Entity->Color, 0.0f);
+	Entity->Light.Pos = Vec3(0.0f, 0.0f, 0.0f);
+	Entity->Light.Radius = 1.0f;
+	Entity->Light.Color = Entity->Color;
 
 	return Entity;	
 }

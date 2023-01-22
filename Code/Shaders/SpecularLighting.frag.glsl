@@ -12,7 +12,7 @@ layout (location = 1) in vec3 CameraVector;
 layout (push_constant) uniform PushConstants
 {
 	uint FrameNumber;
-	uint PointLightCount;
+	uint LightCount;
 };
 
 layout (set = 0, binding = 0) uniform CameraBuffer
@@ -52,7 +52,7 @@ layout (set = 0, binding = 7) uniform sampler2D MaterialTexture;
 
 layout (set = 0, binding = 8) readonly buffer PointsLights
 {
-	SPointLight PointLight[];
+	SLight Light[];
 };
 
 void main()
@@ -128,13 +128,13 @@ void main()
 			float VoxelColorB = ((VoxelColorMatActive[VoxelZ][VoxelY][VoxelX] >> 8) & 0xFF) / 255.0;
 
 			vec3 Ambient = CalculateAmbient(HitPos, HitNormal);
-			vec3 PointLightsColor = vec3(0.0, 0.0, 0.0);
-			for (uint I = 0; I < PointLightCount; I++)
+			vec3 LightsColor = vec3(0.0, 0.0, 0.0);
+			for (uint I = 0; I < LightCount; I++)
 			{
-				PointLightsColor += CalculatePointLight(PointLight[I], HitPos, HitNormal);
+				LightsColor += CalculateLight(Light[I], HitPos, HitNormal);
 			}
 
-			FragSpecular.rgb = vec3(VoxelColorR, VoxelColorG, VoxelColorB) * (Ambient + PointLightsColor);
+			FragSpecular.rgb = vec3(VoxelColorR, VoxelColorG, VoxelColorB) * (Ambient + LightsColor);
 			FragSpecular.rgb = mix(FragSpecular.rgb, SampledDiffuse.rgb, uint(bTransparent) * ScreenPosFactor);
 		}
 		else

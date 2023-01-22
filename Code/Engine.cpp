@@ -352,72 +352,76 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	LightBufferGPU->AmbientConstant = Vec4(Level->AmbientConstant, 0.0f);
     
 	const SCameraBuffer& CameraBufferData = EngineState->Renderer.CameraBufferData;
-	SPointLight* PointLightsGPU = (SPointLight*) EngineState->Renderer.PointLightsBuffers[Vulkan.FrameInFlight].Data;
-	uint32_t PointLightCount = 0;
-	for (uint32_t I = 0; I < Level->PointLightCount; I++)
+	SLight* LightsGPU = (SLight*) EngineState->Renderer.LightsBuffers[Vulkan.FrameInFlight].Data;
+	uint32_t LightCount = 0;
+	for (uint32_t I = 0; I < Level->LightCount; I++)
 	{
-		PointLightsGPU[PointLightCount++] = Level->PointLights[I];
+		LightsGPU[LightCount] = Level->Lights[I];
+		LightsGPU[LightCount].Direction = RotateByQuaternion(Vec3(0.0f, 0.0f, 1.0f), EulerToQuat(Level->Lights[I].Rotation));
+
+		LightCount++;
 	}
     
 	for (uint32_t I = 0; I < Level->EntityCount; I++)
 	{
 		const SEntity* Entity = Level->Entities + I;
-        
-		if (Entity->Type != Entity_MessageToggler)
+		
+		if (Entity->Light.Radius > 0.0f)
 		{
-			if (Entity->PointLight.Radius > 0.0f)
+			Assert(LightCount < ArrayCount(Level->Lights));
+			
+			LightsGPU[LightCount] = Entity->Light;
+			LightsGPU[LightCount].Pos = Entity->Pos + Entity->Light.Pos;
+
+			if (Entity->Light.Type == Light_Spot)
 			{
-				Assert(PointLightCount < ArrayCount(Level->PointLights));
-				
-				PointLightsGPU[PointLightCount].Pos = Entity->Pos + Entity->PointLight.Pos;
-				PointLightsGPU[PointLightCount].Radius = Entity->PointLight.Radius;
-				PointLightsGPU[PointLightCount].Color = Entity->PointLight.Color;
-				
-				if ((Entity->Type == Entity_Torch) || (Entity->Type == Entity_Container))
-				{
-					PointLightsGPU[PointLightCount].Color.rgb = Entity->Color;
-				}
-				
-				if (LengthSq(PointLightsGPU[PointLightCount].Color.rgb) > 0.0f)
-				{
-					PointLightCount++;
-				}
+				LightsGPU[LightCount].Direction = RotateByQuaternion(Vec3(0.0f, 0.0f, 1.0f), EulerToQuat(Entity->Light.Rotation));
+			}
+			
+			if ((Entity->Type == Entity_Torch) || (Entity->Type == Entity_Container))
+			{
+				LightsGPU[LightCount].Color = Entity->Color;
+			}
+			
+			if (LengthSq(LightsGPU[LightCount].Color) > 0.0f)
+			{
+				LightCount++;
 			}
 		}
 	}
 
-	uint32_t PointLightInFrustumCount = 0;
-	bool PointLightsCulling[ArrayCount(Level->PointLights)];
-	for (uint32_t I = 0; I < PointLightCount; I++)
+	uint32_t LightInFrustumCount = 0;
+	bool LightsCulling[ArrayCount(Level->Lights)];
+	for (uint32_t I = 0; I < LightCount; I++)
 	{
 		bool bInsideFrustum = true;
 		for (uint32_t J = 0; (J < ArrayCount(CameraBufferData.Frustums)) && bInsideFrustum; J++)
 		{
-			bInsideFrustum = Dot(Vec4(PointLightsGPU[I].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -PointLightsGPU[I].Radius;
+			bInsideFrustum = Dot(Vec4(LightsGPU[I].Pos, -1.0f), CameraBufferData.Frustums[J]) >= -LightsGPU[I].Radius;
 		}
 
-		PointLightsCulling[I] = bInsideFrustum;
+		LightsCulling[I] = bInsideFrustum;
 		if (bInsideFrustum)
 		{
-			PointLightInFrustumCount++;
+			LightInFrustumCount++;
 		}
 	}
 
 	// Bubble sort
-	for (uint32_t I = 0; I < PointLightCount; I++)
+	for (uint32_t I = 0; I < LightCount; I++)
 	{
 		bool bSwapped = false;
-		for (uint32_t J = 0; J < PointLightCount - 1 - I; J++)
+		for (uint32_t J = 0; J < LightCount - 1 - I; J++)
 		{
-			if (!PointLightsCulling[J] && PointLightsCulling[J + 1])
+			if (!LightsCulling[J] && LightsCulling[J + 1])
 			{
-				bool TempBool = PointLightsCulling[J];
-				PointLightsCulling[J] = PointLightsCulling[J + 1];
-				PointLightsCulling[J + 1] = TempBool;
+				bool TempBool = LightsCulling[J];
+				LightsCulling[J] = LightsCulling[J + 1];
+				LightsCulling[J + 1] = TempBool;
 
-				SPointLight TempLight = PointLightsGPU[J];
-				PointLightsGPU[J] = PointLightsGPU[J + 1];
-				PointLightsGPU[J + 1] = TempLight;
+				SLight TempLight = LightsGPU[J];
+				LightsGPU[J] = LightsGPU[J + 1];
+				LightsGPU[J + 1] = TempLight;
 
 				bSwapped = true;
 			}
@@ -457,7 +461,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
 
 	STempMemoryArena RenderTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, PointLightInFrustumCount, PointLightCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged, MousePos);
+	VkImage FinalImage = RenderScene(EngineState, &EngineState->Renderer, Vulkan, Level, LightInFrustumCount, LightCount, GameInput.FrameID, &RenderTempMemory, EngineState->GameTime, bSwapchainChanged, MousePos);
 	EndTempMemoryArena(&RenderTempMemory);
 
 	// Update text stuff

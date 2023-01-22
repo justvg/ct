@@ -73,8 +73,8 @@ struct SLevel
 	uint32_t EntityCount;
 	SEntity Entities[128];
 
-	uint32_t PointLightCount;
-	SPointLight PointLights[128];
+	uint32_t LightCount;
+	SLight Lights[128];
 
 	vec3 AmbientColor;
 	vec3 AmbientConstant;
@@ -539,16 +539,35 @@ void MarkVoxelForChangingRoughness(SEngineState* EngineState, uint32_t X, uint32
 	EngineState->VoxelsToChangeRoughness[EngineState->VoxelsToChangeRoughnessCount++] = VoxelChangeRoughness;
 }
 
-SPointLight* AddPointLight(SLevel& Level, vec3 Pos, float Radius, vec4 Color)
+SLight* AddPointLight(SLevel& Level, vec3 Pos, float Radius, vec3 Color)
 {
-	Assert(Level.PointLightCount < ArrayCount(Level.PointLights));
-	SPointLight* PointLight = &Level.PointLights[Level.PointLightCount++];
+	Assert(Level.LightCount < ArrayCount(Level.Lights));
+	SLight* Light = &Level.Lights[Level.LightCount++];
+	memset(Light, 0, sizeof(Light));
 
-	PointLight->Pos = Pos;
-	PointLight->Radius = Radius;
-	PointLight->Color = Color;
+	Light->Pos = Pos;
+	Light->Radius = Radius;
+	Light->Color = Color;
+	Light->Type = Light_Point;
 
-	return PointLight;
+	return Light;
+}
+
+SLight* AddSpotLight(SLevel& Level, vec3 Pos, float Radius, vec3 Color)
+{
+	Assert(Level.LightCount < ArrayCount(Level.Lights));
+	SLight* Light = &Level.Lights[Level.LightCount++];
+	memset(Light, 0, sizeof(Light));
+
+	Light->Pos = Pos;
+	Light->Radius = Radius;
+	Light->Color = Color;
+	Light->Type = Light_Spot;
+
+	Light->Rotation = Vec3(90.0f, 0.0f, 0.0f);
+	Light->Cutoff = 50.0f;
+
+	return Light;
 }
 
 struct SRaytraceVoxelsResult
@@ -761,9 +780,25 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 				memcpy(&Level->Entities[I].PrevOrientation, LevelMemory, sizeof(vec4));
 				LevelMemory += sizeof(vec4);
 
-				AlignAddress(&LevelMemory, GetAlignmentOf(SPointLight));
-				memcpy(&Level->Entities[I].PointLight, LevelMemory, sizeof(SPointLight));
-				LevelMemory += sizeof(SPointLight);
+				AlignAddress(&LevelMemory, GetAlignmentOf(SLight));
+				memcpy(&Level->Entities[I].Light, LevelMemory, sizeof(SLight));
+				LevelMemory += sizeof(SLight);
+
+				AlignAddress(&LevelMemory, GetAlignmentOf(vec2));
+				memcpy(&Level->Entities[I].MessagePos, LevelMemory, sizeof(vec2));
+				LevelMemory += sizeof(vec2);
+				AlignAddress(&LevelMemory, GetAlignmentOf(float));
+				memcpy(&Level->Entities[I].MessageScale, LevelMemory, sizeof(float));
+				LevelMemory += sizeof(float);
+				AlignAddress(&LevelMemory, GetAlignmentOf(float));
+				memcpy(&Level->Entities[I].MessageLifeTime, LevelMemory, sizeof(float));
+				LevelMemory += sizeof(float);
+				AlignAddress(&LevelMemory, GetAlignmentOf(float));
+				memcpy(&Level->Entities[I].MessageTimeToAppear, LevelMemory, sizeof(float));
+				LevelMemory += sizeof(float);
+				AlignAddress(&LevelMemory, GetAlignmentOf(float));
+				memcpy(&Level->Entities[I].MessageTimeToStartAppear, LevelMemory, sizeof(float));
+				LevelMemory += sizeof(float);
 
 				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 				memcpy(&Level->Entities[I].AnimationColor, LevelMemory, sizeof(vec3));
@@ -823,14 +858,14 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 
 			// Load point lights
 			AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-			memcpy(&Level->PointLightCount, LevelMemory, sizeof(uint32_t));
+			memcpy(&Level->LightCount, LevelMemory, sizeof(uint32_t));
 			LevelMemory += sizeof(uint32_t);
 
-			Assert(Level->PointLightCount < ArrayCount(Level->PointLights));
+			Assert(Level->LightCount < ArrayCount(Level->Lights));
 
-			AlignAddress(&LevelMemory, GetAlignmentOf(SPointLight));
-			memcpy(Level->PointLights, LevelMemory, sizeof(Level->PointLights));
-			LevelMemory += sizeof(Level->PointLights);
+			AlignAddress(&LevelMemory, GetAlignmentOf(SLight));
+			memcpy(Level->Lights, LevelMemory, sizeof(Level->Lights));
+			LevelMemory += sizeof(Level->Lights);
 
 			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 			memcpy(&Level->AmbientColor, LevelMemory, sizeof(Level->AmbientColor));

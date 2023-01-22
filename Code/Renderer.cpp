@@ -97,16 +97,16 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	{
 		Renderer->CameraBuffers[I] = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SCameraBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 		Renderer->LightBuffers[I] = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SLightBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-		Renderer->PointLightsBuffers[I] = CreateBuffer(Vulkan.MemoryAllocator, ArrayCount(SLevel::PointLights) * sizeof(SPointLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		Renderer->LightsBuffers[I] = CreateBuffer(Vulkan.MemoryAllocator, ArrayCount(SLevel::Lights) * sizeof(SLight), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 		Renderer->HUDProjectionBuffers[I] = CreateBuffer(Vulkan.MemoryAllocator, sizeof(SHUDProjectionBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	}
 	Renderer->CullingVoxComputePass = SVoxelCullingComputePass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelDrawBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, Renderer->VoxelVisibilityBuffer, Renderer->MaxReductionSampler, Renderer->DepthPyramidImage);
 	Renderer->GBufferVoxelRenderPass = SGBufferVoxelRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelDrawBuffer, Renderer->VoxelsBuffer, Renderer->AlbedoImage, Renderer->NormalsImage, Renderer->MaterialImage, Renderer->VelocityImages, Renderer->LinearDepthImage, Renderer->DepthImage);
 	Renderer->GBufferRenderPass = SGBufferRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->AlbedoImage, Renderer->NormalsImage, Renderer->MaterialImage, Renderer->VelocityImages, Renderer->LinearDepthImage, Renderer->DepthImage);
 	Renderer->DownscaleComputePass = SDownscaleComputePass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearDepthImage, Renderer->DepthPyramidMipCount, Renderer->DepthPyramidMipViews, Renderer->PointEdgeSampler, Renderer->MaxReductionSampler);
-	Renderer->DiffuseLightingPass = SDiffuseLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->PointLightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->DiffuseImage);
+	Renderer->DiffuseLightingPass = SDiffuseLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->LightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->DiffuseImage);
 	Renderer->TransparentRenderPass = STransparentRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->DiffuseImage, Renderer->DepthImage);
-	Renderer->SpecularLightingPass = SSpecularLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->PointLightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->CompositeImage);
+	Renderer->SpecularLightingPass = SSpecularLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->LightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->CompositeImage);
 	Renderer->FirstPersonRenderPass = SFirstPersonRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->CompositeImage, Renderer->VelocityImages);
 	Renderer->ExposureRenderPass = SExposureRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->CompositeImage, Renderer->LinearEdgeSamplerMips, Renderer->BrightnessImage, Renderer->BrightnessMipViews, Renderer->PointEdgeSampler, Renderer->ExposureImages);
 	Renderer->BloomRenderPass = SBloomRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
@@ -180,7 +180,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	UploadBuffer(Vulkan.Device, Vulkan.CommandPool, Vulkan.CommandBuffer, Vulkan.GraphicsQueue, Renderer->CubeIB, Renderer->StagingBuffers[0], CubeIndices, sizeof(CubeIndices));
 }
 
-VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t PointLightInFrustumCount, uint32_t PointLightCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float GameTime, bool bSwapchainChanged, vec2 MousePos)
+VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulkanContext& Vulkan, SLevel* Level, uint32_t LightInFrustumCount, uint32_t LightCount, uint32_t FrameID, STempMemoryArena* MemoryArena, float GameTime, bool bSwapchainChanged, vec2 MousePos)
 {
 	// Rendering
 	BEGIN_PROFILER_BLOCK("RENDERING");
@@ -367,7 +367,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	}
 
 	// Calculate diffuse lighting
-	Renderer->DiffuseLightingPass.Render(Vulkan, Renderer->DiffuseLightImage, Renderer->DiffuseLightHistoryImages, Renderer->QuadVB, Renderer->AOQuality, PointLightInFrustumCount, FrameID, bSwapchainChanged);
+	Renderer->DiffuseLightingPass.Render(Vulkan, Renderer->DiffuseLightImage, Renderer->DiffuseLightHistoryImages, Renderer->QuadVB, Renderer->AOQuality, LightInFrustumCount, FrameID, bSwapchainChanged);
 
 	// Render transparent objects
 	if (!EngineState->bHideEntities)
@@ -379,7 +379,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	vkCmdPipelineBarrier(Vulkan.CommandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &DiffuseRenderEndBarrier);
 
 	// Calculate specular lighting
-	Renderer->SpecularLightingPass.Render(Vulkan, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->QuadVB, PointLightCount, FrameID, bSwapchainChanged);
+	Renderer->SpecularLightingPass.Render(Vulkan, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->QuadVB, LightCount, FrameID, bSwapchainChanged);
 
 	// Render first person
 	if (EngineState->EngineMode == EngineMode_Game)

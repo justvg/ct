@@ -33,7 +33,7 @@ layout (set = 0, binding = 6) uniform sampler2D AlbedoTexture;
 layout (push_constant) uniform PushConstants
 {
     uint FrameNumber;
-	uint PointLightCount;
+	uint LightCount;
 };
 
 #include "BlueNoise.incl.glsl"

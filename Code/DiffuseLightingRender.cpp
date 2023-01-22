@@ -1,8 +1,8 @@
 struct SDiffuseLightingPass
 {
 public:
-    static SDiffuseLightingPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, const SImage* VelocityImages, VkSampler LinearEdgeSampler, const SImage& AlbedoImage, const SImage* DiffuseLightHistoryImages, const SImage& DiffuseLightImage, const SImage& DiffuseImage);
-    void Render(const SVulkanContext& Vulkan, const SImage& DiffuseLightImage, const SImage* DiffuseLightHistoryImages, const SBuffer& QuadVertexBuffer, EAOQuality AOQuality, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged);
+    static SDiffuseLightingPass Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool, const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* LightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, const SImage* VelocityImages, VkSampler LinearEdgeSampler, const SImage& AlbedoImage, const SImage* DiffuseLightHistoryImages, const SImage& DiffuseLightImage, const SImage& DiffuseImage);
+    void Render(const SVulkanContext& Vulkan, const SImage& DiffuseLightImage, const SImage* DiffuseLightHistoryImages, const SBuffer& QuadVertexBuffer, EAOQuality AOQuality, uint32_t LightCount, uint32_t FrameID, bool bSwapchainChanged);
 	void UpdateAfterResize(const SVulkanContext& Vulkan, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, const SImage* DiffuseLightHistoryImages, const SImage& DiffuseLightImage, const SImage* VelocityImages, VkSampler LinearEdgeSampler, const SImage& AlbedoImage, const SImage& DiffuseImage);
 
 private:
@@ -41,22 +41,22 @@ private:
 struct SDiffuseLightingPushConstants
 {
     uint32_t FrameNumber;
-	uint32_t PointLightCount;
+	uint32_t LightCount;
 };
 
 SDiffuseLightingPass SDiffuseLightingPass::Create(const SVulkanContext& Vulkan, VkDescriptorPool DescrPool,
-                                                  const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* PointLightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, const SImage* VelocityImages, 
+                                                  const SBuffer* CameraBuffers, const SBuffer& VoxelsBuffer, VkSampler NoiseSampler, const SImage& NoiseTexture, const SBuffer* LightsBuffers, const SBuffer* LightBuffers, VkSampler PointEdgeSampler, const SImage& NormalsImage, const SImage& LinearDepthImage, const SImage* VelocityImages, 
                                                   VkSampler LinearEdgeSampler, const SImage& AlbedoImage, const SImage* DiffuseLightHistoryImages, const SImage& DiffuseLightImage, const SImage& DiffuseImage)
 {
     VkDescriptorSetLayoutBinding CameraBinding = CreateDescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding VoxelsBinding = CreateDescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding NoiseBinding = CreateDescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding LightBinding = CreateDescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    VkDescriptorSetLayoutBinding PointLightsBinding = CreateDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkDescriptorSetLayoutBinding LightsBinding = CreateDescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding NormalsBinding = CreateDescriptorSetLayoutBinding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     VkDescriptorSetLayoutBinding LinearDepthBinding = CreateDescriptorSetLayoutBinding(6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
     
-    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, VoxelsBinding, NoiseBinding, LightBinding, PointLightsBinding, NormalsBinding, LinearDepthBinding };
+    VkDescriptorSetLayoutBinding DescrSetLayoutBindings[] = { CameraBinding, VoxelsBinding, NoiseBinding, LightBinding, LightsBinding, NormalsBinding, LinearDepthBinding };
     VkDescriptorSetLayout DescrSetLayout = CreateDescriptorSetLayout(Vulkan.Device, ArrayCount(DescrSetLayoutBindings), DescrSetLayoutBindings);
 
     VkDescriptorSet DescrSets[FramesInFlight] = {};
@@ -67,7 +67,7 @@ SDiffuseLightingPass SDiffuseLightingPass::Create(const SVulkanContext& Vulkan, 
     	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VoxelsBuffer, VoxelsBuffer.Size);
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, NoiseSampler, NoiseTexture.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, LightBuffers[I], LightBuffers[I].Size);
-    	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, PointLightsBuffers[I], PointLightsBuffers[I].Size);
+    	UpdateDescriptorSetBuffer(Vulkan.Device, DescrSets[I], 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LightsBuffers[I], LightsBuffers[I].Size);
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, LinearEdgeSampler, NormalsImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     	UpdateDescriptorSetImage(Vulkan.Device, DescrSets[I], 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, PointEdgeSampler, LinearDepthImage.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
@@ -148,7 +148,7 @@ SDiffuseLightingPass SDiffuseLightingPass::Create(const SVulkanContext& Vulkan, 
     return DiffuseLightingPass;
 }
 
-void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& DiffuseLightImage, const SImage* DiffuseLightHistoryImages, const SBuffer& QuadVertexBuffer, EAOQuality AOQuality, uint32_t PointLightCount, uint32_t FrameID, bool bSwapchainChanged)
+void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& DiffuseLightImage, const SImage* DiffuseLightHistoryImages, const SBuffer& QuadVertexBuffer, EAOQuality AOQuality, uint32_t LightCount, uint32_t FrameID, bool bSwapchainChanged)
 {
 	const uint32_t TargetIndex = FrameID % 2;
     const uint32_t PrevIndex = (TargetIndex + 1) % 2;
@@ -166,7 +166,7 @@ void SDiffuseLightingPass::Render(const SVulkanContext& Vulkan, const SImage& Di
 
 	vkCmdBindDescriptorSets(Vulkan.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipelineLayout, 0, 1, &DescrSets[TargetIndex], 0, 0);
 
-	SDiffuseLightingPushConstants PushConstants = { FrameID % 8, PointLightCount };
+	SDiffuseLightingPushConstants PushConstants = { FrameID % 8, LightCount };
 	vkCmdPushConstants(Vulkan.CommandBuffer, PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SDiffuseLightingPushConstants), &PushConstants);
 
 	VkDeviceSize Offset = 0;

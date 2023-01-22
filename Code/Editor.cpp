@@ -362,12 +362,12 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 		}
         
 		ImVec2 SelectedObjectWindowSize = {};
-		if (EditorState->SelectedEntity || EditorState->SelectedPointLight)
+		if (EditorState->SelectedEntity || EditorState->SelectedLight)
 		{
 			if (ImGui::Begin("Selected Object", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
 			{
 				SEntity* Entity = EditorState->SelectedEntity;
-				SPointLight* PointLight = EditorState->SelectedPointLight;
+				SLight* Light = EditorState->SelectedLight;
                 
 				bool bValueChanged = false;
 				if (Entity)
@@ -401,8 +401,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 					{
 						case Entity_Torch:
 						{
-							bValueChanged |= EditorDragFloat3(EditorState, "LightOffset", &Entity->PointLight.Pos.x, 0.05f);
-							bValueChanged |= EditorDragFloat(EditorState, "LightRadius", &Entity->PointLight.Radius, 0.05f, 0.0f, FloatMax);
+							bValueChanged |= EditorDragFloat3(EditorState, "LightOffset", &Entity->Light.Pos.x, 0.05f);
+							bValueChanged |= EditorDragFloat(EditorState, "LightRadius", &Entity->Light.Radius, 0.05f, 0.0f, FloatMax);
 
 							bValueChanged |= EditorColorEdit3(EditorState, "TargetColor", &Entity->TargetColor);
 
@@ -473,9 +473,16 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				}
 				else
 				{
-					bValueChanged |= EditorDragFloat3(EditorState, "Position", &PointLight->Pos.x, 0.05f);
-					bValueChanged |= EditorDragFloat(EditorState, "Radius", &PointLight->Radius, 0.05f, 0.0f, FloatMax);
-					bValueChanged |= EditorColorEdit3(EditorState, "Color", &PointLight->Color.xyz);
+					ImGui::Text(Light->Type == Light_Point ? "Point light" : "Spot light");
+					bValueChanged |= EditorDragFloat3(EditorState, "Position", &Light->Pos.x, 0.05f);
+					bValueChanged |= EditorDragFloat(EditorState, "Radius", &Light->Radius, 0.05f, 0.0f, FloatMax);
+					bValueChanged |= EditorColorEdit3(EditorState, "Color", &Light->Color);
+
+					if (Light->Type == Light_Spot)
+					{
+						bValueChanged |= EditorDragFloat3(EditorState, "Rotation", &Light->Rotation.x, 0.05f);
+						bValueChanged |= EditorDragFloat(EditorState, "Cutoff", &Light->Cutoff, 0.05f, 5.0f, 90.0f);
+					}
 				}
                 
 				if (bValueChanged && !EditorState->bImGuiChangeStarted)
@@ -506,49 +513,49 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddCube(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Torch"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddTorch(EngineState->Level, SpawnPos, Vec3(0.5f), Vec3(0.0f, 1.0f, 0.0f));
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Wire"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddWire(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Container"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddContainer(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Door"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddDoor(EngineState->Level, SpawnPos, Vec3(1.5f, 2.0f, 0.2f), Quat(0, 0, 0, 1), Vec3(0.0f), Vec3(1.0f, 1.0f, 1.0f), Vec3(0.0f, 2.0f, 0.0f));
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Turret"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddTurret(EngineState->Level, SpawnPos, Vec3(1.0f), Quat(0, 0, 0, 1), Vec3(0.8f, 0.8f, 0.8f), Vec3(0.0f, 0.0f, 1.0f), 1.0f);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Gates"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddGates(EngineState->Level, SpawnPos, Vec3(2.0f, 3.5f, 0.1f), Quat(0, 0, 0, 1));
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 
 					if (!CompareStrings(EngineState->LevelName, "Levels\\MainHub.ctl"))
@@ -560,21 +567,21 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddMessageToggler(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("Checkpoint"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddCheckpoint(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 				if (ImGui::Button("ColorField"))
 				{
 					SaveLevelHistory(EditorState, &EngineState->Level);
 					EditorState->SelectedEntity = AddColorField(EngineState->Level, SpawnPos);
-					EditorState->SelectedPointLight = 0;
+					EditorState->SelectedLight = 0;
 					EditorState->SelectedVoxelsCount = 0;
 				}
 			}
@@ -582,7 +589,14 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			if (ImGui::Button("PointLight"))
 			{
 				SaveLevelHistory(EditorState, &EngineState->Level);
-				EditorState->SelectedPointLight = AddPointLight(EngineState->Level, SpawnPos, 1.0f, Vec4(1.0f, 1.0f, 1.0f, 1.0f));
+				EditorState->SelectedLight = AddPointLight(EngineState->Level, SpawnPos, 1.0f, Vec3(1.0f, 1.0f, 1.0f));
+				EditorState->SelectedEntity = 0;
+				EditorState->SelectedVoxelsCount = 0;
+			}
+			if (ImGui::Button("SpotLight"))
+			{
+				SaveLevelHistory(EditorState, &EngineState->Level);
+				EditorState->SelectedLight = AddSpotLight(EngineState->Level, SpawnPos, 1.0f, Vec3(1.0f, 1.0f, 1.0f));
 				EditorState->SelectedEntity = 0;
 				EditorState->SelectedVoxelsCount = 0;
 			}
@@ -590,7 +604,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			if (ImGui::Button("SelectAllBlocks"))
 			{
 				EditorState->SelectedEntity = 0;
-				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
 				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
@@ -617,7 +631,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			if (ImGui::Button("Select Y=0 Blocks"))
 			{
 				EditorState->SelectedEntity = 0;
-				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
 				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
@@ -659,7 +673,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				}
 
 				EditorState->SelectedEntity = 0;
-				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
 				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
@@ -686,7 +700,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			if (ImGui::Button("SelectY"))
 			{
 				EditorState->SelectedEntity = 0;
-				EditorState->SelectedPointLight = 0;
+				EditorState->SelectedLight = 0;
 				EditorState->SelectedArrow = SelectedArrow_None;
 				EditorState->MoveDeltaAccum = 0.0f;
 				EditorState->bCircleSelected = false;
@@ -943,7 +957,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		float tHitObject = FloatMax;
 		int32_t HitEntityIndex = -1;
 		SEntity *HitEntity = 0;
-		SPointLight *HitPointLight = 0;
+		SLight *HitLight = 0;
 		if (!EditorState->bIsImguiWindowHovered)
 		{
 			if (!EngineState->bHideEntities)
@@ -973,12 +987,12 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				}
 			}
 			
-			for (uint32_t I = 0; I < Level->PointLightCount; I++)
+			for (uint32_t I = 0; I < Level->LightCount; I++)
 			{
-				SPointLight* PointLight = Level->PointLights + I;
+				SLight* Light = Level->Lights + I;
 				
 				float tTest;
-				if (IntersectSphereRay(PointLight->Pos, 0.1f, RayStartP, RayDir, tTest))
+				if (IntersectSphereRay(Light->Pos, 0.1f, RayStartP, RayDir, tTest))
 				{
 					if (tTest < tHitObject)
 					{
@@ -986,22 +1000,22 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 						HitEntityIndex = -1;
 						
 						tHitObject = tTest;
-						HitPointLight = PointLight;
+						HitLight = Light;
 					}
 				}
 			}
 			
-			if (EditorState->SelectedEntity || EditorState->SelectedPointLight)
+			if (EditorState->SelectedEntity || EditorState->SelectedLight)
 			{
 				float tHitGizmo = FloatMax;
 
 				SEntity* Entity = EditorState->SelectedEntity;
-				SPointLight* PointLight = EditorState->SelectedPointLight;
+				SLight* Light = EditorState->SelectedLight;
 				switch (EditorState->EditorHelpersMode)
 				{
 					case EditorHelpersMode_Translation:
 					{
-						vec3 Pos = Entity ? Entity->Pos : PointLight->Pos;
+						vec3 Pos = Entity ? Entity->Pos : Light->Pos;
 						Rect RedArrowAABB = RectOffset(RectRectOrientation(SDebugRenderPass::GetArrowAABB(), Quat(Vec3(0.0f, 1.0f, 0.0f), 90.0f)), Pos);
 						Rect GreenArrowAABB = RectOffset(RectRectOrientation(SDebugRenderPass::GetArrowAABB(), Quat(Vec3(1.0f, 0.0f, 0.0f), -90.0f)), Pos);
 						Rect BlueArrowAABB = RectOffset(RectRectOrientation(SDebugRenderPass::GetArrowAABB(), Quat(Vec3(0.0f, 0.0f, 0.0f), 0.0f)), Pos);
@@ -1234,11 +1248,11 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		
 		bool bNoHelpersHit = !bRedArrowHit && !bGreenArrowHit && !bBlueArrowHit && !bRedArrowHitTargetOffset && !bGreenArrowHitTargetOffset && !bBlueArrowHitTargetOffset && !bCircleHit && !bRedDimHelperHit && !bGreenDimHelperHit && !bBlueDimHelperHit;
 		SRaytraceVoxelsResult RaytraceResult = RaytraceVoxels(Level, RayStartP, RayDir, 100.0f, true);
-		if (!EngineState->bHideVoxels && ((RaytraceResult.bHit && (RaytraceResult.Distance < tHitObject) && bNoHelpersHit) || (!HitEntity && !HitPointLight && bNoHelpersHit)))
+		if (!EngineState->bHideVoxels && ((RaytraceResult.bHit && (RaytraceResult.Distance < tHitObject) && bNoHelpersHit) || (!HitEntity && !HitLight && bNoHelpersHit)))
 		{
 			HitEntity = 0;
 			HitEntityIndex = -1;
-			HitPointLight = 0;
+			HitLight = 0;
 			bRedArrowHit = bGreenArrowHit = bBlueArrowHit = false;
 			bRedArrowHitTargetOffset = bGreenArrowHitTargetOffset = bBlueArrowHitTargetOffset = false;
 			bCircleHit = false;
@@ -1583,7 +1597,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 					else
 					{
 						EditorState->SelectedEntity = HitEntity;
-						EditorState->SelectedPointLight = HitPointLight;
+						EditorState->SelectedLight = HitLight;
 						EditorState->BuildingVoxelsToAddCount = 0;
 						EditorState->SelectedVoxelsCount = 0;
 						EditorState->bSelectDoor = false;
@@ -1596,7 +1610,7 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 	if ((EditorState->BuildingVoxelsToAddCount > 0) || (EditorState->SelectedVoxelsCount > 0))
 	{
 		EditorState->SelectedEntity = 0;
-		EditorState->SelectedPointLight = 0;
+		EditorState->SelectedLight = 0;
 		EditorState->SelectedArrow = SelectedArrow_None;
 		EditorState->MoveDeltaAccum = 0.0f;
 		EditorState->bCircleSelected = false;
@@ -1704,17 +1718,17 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 		Renderer->DebugRenderPass.DrawDebugBox(Pos, Vec3(VoxelDim), Vec3(1.0f, 0.0f, 0.0f));
 	}
 	
-	// Handle editor entity/pointlight stuff
-	if (EditorState->SelectedEntity || EditorState->SelectedPointLight)
+	// Handle editor entity/light stuff
+	if (EditorState->SelectedEntity || EditorState->SelectedLight)
 	{
 		SEntity* Entity = EditorState->SelectedEntity;
-		SPointLight* PointLight = EditorState->SelectedPointLight;
+		SLight* Light = EditorState->SelectedLight;
 		
 		switch (EditorState->EditorHelpersMode)
 		{
 			case EditorHelpersMode_Translation:
 			{
-				vec3 Pos = Entity ? Entity->Pos : PointLight->Pos;
+				vec3 Pos = Entity ? Entity->Pos : Light->Pos;
 				Renderer->DebugRenderPass.DrawDebugArrow(Pos, Vec3(1.0f), (bRedArrowHit || (EditorState->SelectedArrow == SelectedArrow_Red)) ? Vec3(1.0f, 0.8f, 0.8f) : Vec3(1.0f, 0.0f, 0.0f), Vec4(Vec3(0.0f, 1.0f, 0.0f), 90.0f));
 				Renderer->DebugRenderPass.DrawDebugArrow(Pos, Vec3(1.0f), (bGreenArrowHit || (EditorState->SelectedArrow == SelectedArrow_Green)) ? Vec3(0.8f, 1.0f, 0.8f) : Vec3(0.0f, 1.0f, 0.0f), Vec4(Vec3(1.0f, 0.0f, 0.0f), -90.0f));
 				Renderer->DebugRenderPass.DrawDebugArrow(Pos, Vec3(1.0f), (bBlueArrowHit || (EditorState->SelectedArrow == SelectedArrow_Blue)) ? Vec3(0.8f, 0.8f, 1.0f) : Vec3(0.0f, 0.0f, 1.0f));
@@ -1775,67 +1789,70 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 					{
 						case SelectedArrow_Red:
 						{
-							if (Entity)
+							Assert((Entity && !Light) || (!Entity && Light));
+
+							const float MoveDelta = 0.01f * WorldPosDelta.x;
+							float& Position = Entity ? Entity->Pos.x : Light->Pos.x;
+
+							if (EditorState->bGridMode)
 							{
-								if (EditorState->bGridMode)
-								{
-									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.x;
-									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.x);
-								}
-								else
-								{
-									Entity->Pos.x += 0.01f * WorldPosDelta.x;
-								}
-								Entity->BasePos = Entity->Pos;
+								EditorState->MoveDeltaAccum += MoveDelta;
+								EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Position);
 							}
 							else
 							{
-								Assert(PointLight);
-								PointLight->Pos.x += 0.01f * WorldPosDelta.x;
+								Position += MoveDelta;
+							}
+
+							if (Entity)
+							{
+								Entity->BasePos = Entity->Pos;
 							}
 						} break;
 						
 						case SelectedArrow_Green:
 						{
-							if (Entity)
+							Assert((Entity && !Light) || (!Entity && Light));
+
+							const float MoveDelta = 0.01f * WorldPosDelta.y;
+							float& Position = Entity ? Entity->Pos.y : Light->Pos.y;
+
+							if (EditorState->bGridMode)
 							{
-								if (EditorState->bGridMode)
-								{
-									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.y;
-									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.y);
-								}
-								else
-								{		
-									Entity->Pos.y += 0.01f * WorldPosDelta.y;
-								}
-								Entity->BasePos = Entity->Pos;
+								EditorState->MoveDeltaAccum += MoveDelta;
+								EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Position);
 							}
 							else
 							{
-								Assert(PointLight);
-								PointLight->Pos.y += 0.01f * WorldPosDelta.y;
+								Position += MoveDelta;
+							}
+
+							if (Entity)
+							{
+								Entity->BasePos = Entity->Pos;
 							}
 						} break;
 						
 						case SelectedArrow_Blue:
 						{
-							if (Entity)
+							Assert((Entity && !Light) || (!Entity && Light));
+
+							const float MoveDelta = 0.01f * WorldPosDelta.z;
+							float& Position = Entity ? Entity->Pos.z : Light->Pos.z;
+
+							if (EditorState->bGridMode)
 							{
-								if (EditorState->bGridMode)
-								{
-									EditorState->MoveDeltaAccum += 0.01f * WorldPosDelta.z;
-									EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Entity->Pos.z);
-								}
-								else
-								{
-									Entity->Pos.z += 0.01f * WorldPosDelta.z;
-								}
-								Entity->BasePos = Entity->Pos;
+								EditorState->MoveDeltaAccum += MoveDelta;
+								EditorMoveSnap(EditorState, EditorState->MoveDeltaAccum, Position);
 							}
 							else
 							{
-								Assert(PointLight);
-								PointLight->Pos.z += 0.01f * WorldPosDelta.z;
+								Position += MoveDelta;
+							}
+
+							if (Entity)
+							{
+								Entity->BasePos = Entity->Pos;
 							}
 						} break;
 						
@@ -2014,6 +2031,12 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 				}
 			}
 		}
+
+		if (Light && Light->Type == Light_Spot)
+		{
+			vec4 Rotation = QuaternionToAxisAngle(EulerToQuat(Light->Rotation));
+			Renderer->DebugRenderPass.DrawDebugArrow(Light->Pos, Vec3(1.0f), Vec3(1.0f), Rotation);
+		}
 		
 		if (WasDown(GameInput->Buttons[Button_Delete]))
 		{
@@ -2024,23 +2047,23 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			}
 			else
 			{
-				Assert(PointLight);
-				*PointLight = Level->PointLights[--Level->PointLightCount];
+				Assert(Light);
+				*Light = Level->Lights[--Level->LightCount];
 			}
 			
 			EditorState->SelectedEntity = 0;
-			EditorState->SelectedPointLight = 0;
+			EditorState->SelectedLight = 0;
 		}
 	}
 	
-	for (uint32_t I = 0; I < Level->PointLightCount; I++)
+	for (uint32_t I = 0; I < Level->LightCount; I++)
 	{
-		const SPointLight* PointLight = Level->PointLights + I;
+		const SLight* Light = Level->Lights + I;
 		
-		Renderer->DebugRenderPass.DrawDebugSphere(PointLight->Pos, 0.1f, Vec3(1.0f, 1.0f, 1.0f));
-		if (PointLight == EditorState->SelectedPointLight)
+		Renderer->DebugRenderPass.DrawDebugSphere(Light->Pos, 0.1f, Vec3(1.0f, 1.0f, 1.0f));
+		if (Light == EditorState->SelectedLight)
 		{
-			Renderer->DebugRenderPass.DrawDebugSphere(PointLight->Pos, PointLight->Radius, PointLight->Color.rgb);
+			Renderer->DebugRenderPass.DrawDebugSphere(Light->Pos, Light->Radius, Light->Color);
 		}				
 	}
 	
