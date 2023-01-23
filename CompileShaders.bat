@@ -29,6 +29,7 @@ set DebugFlags=
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Portal.frag.glsl" -o Content\Shaders\Portal.frag.spv
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\SpecularLighting.frag.glsl" -o Content\Shaders\SpecularLighting.frag.spv
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\SpecularLightingDenoise.frag.glsl" -o Content\Shaders\SpecularLightingDenoise.frag.spv
+%VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Fog.frag.glsl" -o Content\Shaders\Fog.frag.spv
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\TAA.frag.glsl" -o Content\Shaders\TAA.frag.spv
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Tonemapping.frag.glsl" -o Content\Shaders\Tonemapping.frag.spv
 %VULKAN_SDK%\Bin\glslangValidator -V %DebugFlags% "Code\Shaders\Voxel.vert.glsl" -o Content\Shaders\Voxel.vert.spv

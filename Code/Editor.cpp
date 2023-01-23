@@ -189,6 +189,13 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 
 							EditorState->NewLevel.AmbientColor = Vec3(0.0f / 255.0f, 0.0f / 255.0f, 0.0f / 255.0f);
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
+
+							EditorState->NewLevel.FogInscatteringColor = Vec3(0.0f, 0.0f, 0.0f);
+							EditorState->NewLevel.FogDensity = 3.0f;
+							EditorState->NewLevel.FogHeightFalloff = 600.0f;
+							EditorState->NewLevel.MinFogOpacity = 0.0f;
+							EditorState->NewLevel.FogHeight = 0.25f;
+							EditorState->NewLevel.FogCutoffDistance = 0.0f;
                             
 							AddHero(EditorState->NewLevel, Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim));
 							EngineState->Camera.Pos = Vec3(XCenter * VoxelDim, 1.5f, ZCenter * VoxelDim) + Vec3(5.0f, 6.0f, -5.0f);
@@ -505,6 +512,13 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			bool bValueChanged = false;
 			bValueChanged |= EditorColorEdit3(EditorState, "AmbientColor", &EngineState->Level.AmbientColor);
 			bValueChanged |= EditorColorEdit3(EditorState, "AmbientConstant", &EngineState->Level.AmbientConstant);
+
+			bValueChanged |= EditorColorEdit3(EditorState, "FogInscatteringColor", &EngineState->Level.FogInscatteringColor);
+			bValueChanged |= EditorDragFloat(EditorState, "FogDensity", &EngineState->Level.FogDensity, 0.05f, 0.0f, 1000.0f);
+			bValueChanged |= EditorDragFloat(EditorState, "FogHeightFalloff", &EngineState->Level.FogHeightFalloff, 0.05f, 0.0f, 2000.0f);
+			bValueChanged |= EditorDragFloat(EditorState, "MinFogOpacity", &EngineState->Level.MinFogOpacity, 0.05f, 0.0f, 1.0f);
+			bValueChanged |= EditorDragFloat(EditorState, "FogHeight", &EngineState->Level.FogHeight, 0.05f);
+			bValueChanged |= EditorDragFloat(EditorState, "FogCutoffDistance", &EngineState->Level.FogCutoffDistance, 0.05f, 0.0f);
 			
 			vec3 SpawnPos = EngineState->Camera.Pos + 3.0f * EngineState->Camera.Dir;
 			if (ImGui::CollapsingHeader("Entities"))

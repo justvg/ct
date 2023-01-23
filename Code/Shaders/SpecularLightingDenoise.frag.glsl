@@ -1,7 +1,5 @@
 #version 450
 
-#extension GL_GOOGLE_include_directive: require
-
 layout (location = 0) out vec4 FragSpecular;
 layout (location = 1) out vec3 FragColor;
 

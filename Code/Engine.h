@@ -44,22 +44,6 @@ enum EAOQuality
 	AOQuality_Count
 };
 
-#include "VoxelCulling.cpp"
-#include "GBufferVoxelRender.cpp"
-#include "GBufferRender.cpp"
-#include "Downscale.cpp"
-#include "DiffuseLightingRender.cpp"
-#include "TransparentRender.cpp"
-#include "SpecularLightingRender.cpp"
-#include "FirstPersonRender.cpp"
-#include "Exposure.cpp"
-#include "PostProcessingBloom.cpp"
-#include "PostProcessingTAA.cpp"
-#include "PostProcessingTonemapping.cpp"
-#include "HUDRender.cpp"
-#include "DebugRender.cpp"
-#include "Renderer.h"
-
 struct SVoxels
 {
 	// NOTE(georgii): 24 most significant bits - color, next 4 bits - reflectivity, next 3 bits - roughness, the least significant bit - active or not
@@ -78,7 +62,31 @@ struct SLevel
 
 	vec3 AmbientColor;
 	vec3 AmbientConstant;
+
+	vec3 FogInscatteringColor;
+	float FogDensity;
+	float FogHeightFalloff;
+	float MinFogOpacity;
+	float FogHeight;
+	float FogCutoffDistance;
 };
+
+#include "VoxelCulling.cpp"
+#include "GBufferVoxelRender.cpp"
+#include "GBufferRender.cpp"
+#include "Downscale.cpp"
+#include "DiffuseLightingRender.cpp"
+#include "TransparentRender.cpp"
+#include "SpecularLightingRender.cpp"
+#include "FogRender.cpp"
+#include "FirstPersonRender.cpp"
+#include "Exposure.cpp"
+#include "PostProcessingBloom.cpp"
+#include "PostProcessingTAA.cpp"
+#include "PostProcessingTonemapping.cpp"
+#include "HUDRender.cpp"
+#include "DebugRender.cpp"
+#include "Renderer.h"
 
 #include "Editor.h"
 
@@ -873,6 +881,25 @@ uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFi
 			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
 			memcpy(&Level->AmbientConstant, LevelMemory, sizeof(Level->AmbientConstant));
 			LevelMemory += sizeof(Level->AmbientConstant);
+
+			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
+			memcpy(&Level->FogInscatteringColor, LevelMemory, sizeof(Level->FogInscatteringColor));
+			LevelMemory += sizeof(Level->FogInscatteringColor);
+			AlignAddress(&LevelMemory, GetAlignmentOf(float));
+			memcpy(&Level->FogDensity, LevelMemory, sizeof(Level->FogDensity));
+			LevelMemory += sizeof(Level->FogDensity);
+			AlignAddress(&LevelMemory, GetAlignmentOf(float));
+			memcpy(&Level->FogHeightFalloff, LevelMemory, sizeof(Level->FogHeightFalloff));
+			LevelMemory += sizeof(Level->FogHeightFalloff);
+			AlignAddress(&LevelMemory, GetAlignmentOf(float));
+			memcpy(&Level->MinFogOpacity, LevelMemory, sizeof(Level->MinFogOpacity));
+			LevelMemory += sizeof(Level->MinFogOpacity);
+			AlignAddress(&LevelMemory, GetAlignmentOf(float));
+			memcpy(&Level->FogHeight, LevelMemory, sizeof(Level->FogHeight));
+			LevelMemory += sizeof(Level->FogHeight);
+			AlignAddress(&LevelMemory, GetAlignmentOf(float));
+			memcpy(&Level->FogCutoffDistance, LevelMemory, sizeof(Level->FogCutoffDistance));
+			LevelMemory += sizeof(Level->FogCutoffDistance);
 
 			EndPointer = LevelMemory;
 		}

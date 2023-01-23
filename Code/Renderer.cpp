@@ -107,6 +107,7 @@ void InitializeRenderer(SRenderer* Renderer, const SVulkanContext& Vulkan, const
 	Renderer->DiffuseLightingPass = SDiffuseLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->LightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->DiffuseImage);
 	Renderer->TransparentRenderPass = STransparentRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->DiffuseImage, Renderer->DepthImage);
 	Renderer->SpecularLightingPass = SSpecularLightingPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->VoxelsBuffer, Renderer->PointRepeatSampler, Renderer->BlueNoiseTexture, Renderer->LightsBuffers, Renderer->LightBuffers, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->CompositeImage);
+	Renderer->FogRenderPass = SFogRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->PointEdgeSampler, Renderer->LinearDepthImage, Renderer->CompositeImage);
 	Renderer->FirstPersonRenderPass = SFirstPersonRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->CameraBuffers, Renderer->CompositeImage, Renderer->VelocityImages);
 	Renderer->ExposureRenderPass = SExposureRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->CompositeImage, Renderer->LinearEdgeSamplerMips, Renderer->BrightnessImage, Renderer->BrightnessMipViews, Renderer->PointEdgeSampler, Renderer->ExposureImages);
 	Renderer->BloomRenderPass = SBloomRenderPass::Create(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
@@ -381,6 +382,9 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	// Calculate specular lighting
 	Renderer->SpecularLightingPass.Render(Vulkan, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->QuadVB, LightCount, FrameID, bSwapchainChanged);
 
+	// Calculate fog
+	Renderer->FogRenderPass.Render(Vulkan, Renderer->QuadVB, *Level, FrameID);
+
 	// Render first person
 	if (EngineState->EngineMode == EngineMode_Game)
 	{
@@ -403,6 +407,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	}
 
 	// Get scene exposure
+	// TODO(georgii): Delete this not to waste ms?
 	Renderer->ExposureRenderPass.Render(Vulkan, Renderer->QuadVB, Renderer->BrightnessImage, Renderer->ExposureImages, FrameID);
     
 	// TAA
@@ -667,6 +672,7 @@ void RendererHandleChanges(SRenderer* Renderer, const SVulkanContext& Vulkan)
 	Renderer->DiffuseLightingPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->DiffuseLightHistoryImages, Renderer->DiffuseLightImage, Renderer->VelocityImages, Renderer->LinearEdgeSampler, Renderer->AlbedoImage, Renderer->DiffuseImage);
 	Renderer->TransparentRenderPass.UpdateAfterResize(Vulkan, Renderer->DiffuseImage, Renderer->DepthImage);
 	Renderer->SpecularLightingPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->NormalsImage, Renderer->LinearDepthImage, Renderer->LinearEdgeSampler, Renderer->MaterialImage, Renderer->DiffuseImage, Renderer->SpecularLightImage, Renderer->SpecularLightHistoryImages, Renderer->VelocityImages, Renderer->AlbedoImage, Renderer->CompositeImage);
+	Renderer->FogRenderPass.UpdateAfterResize(Vulkan, Renderer->PointEdgeSampler, Renderer->LinearDepthImage, Renderer->CompositeImage);
 	Renderer->FirstPersonRenderPass.UpdateAfterResize(Vulkan, Renderer->CompositeImage, Renderer->VelocityImages);
 	Renderer->ExposureRenderPass.UpdateAfterResize(Vulkan, Renderer->LinearEdgeSampler, Renderer->CompositeImage);
 	Renderer->BloomRenderPass.UpdateAfterResize(Vulkan, Renderer->DescriptorPool, Renderer->LinearEdgeSampler, Renderer->HistoryImages, Renderer->PointEdgeSampler, Renderer->BloomImage, Renderer->BloomMipViews, Renderer->LinearBorderZeroSampler);
