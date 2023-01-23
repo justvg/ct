@@ -857,19 +857,19 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			Camera->Pos += SpeedScale * 0.5f * Camera->Dir * GameInput->MouseWheelDelta;
 			if (GameInput->Buttons[Button_W].IsDown)
 			{
-				Camera->Pos += SpeedScale * 0.3f * Camera->Dir;
+				Camera->Pos += SpeedScale * 0.3f * Camera->Dir * GameInput->dt;
 			}
 			if (GameInput->Buttons[Button_S].IsDown)
 			{
-				Camera->Pos -= SpeedScale * 0.3f * Camera->Dir;
+				Camera->Pos -= SpeedScale * 0.3f * Camera->Dir * GameInput->dt;
 			} 
 			if (GameInput->Buttons[Button_D].IsDown)
 			{
-				Camera->Pos += SpeedScale * 0.3f * Camera->Right;
+				Camera->Pos += SpeedScale * 0.3f * Camera->Right * GameInput->dt;
 			} 
 			if (GameInput->Buttons[Button_A].IsDown)
 			{
-				Camera->Pos -= SpeedScale * 0.3f * Camera->Right;
+				Camera->Pos -= SpeedScale * 0.3f * Camera->Right * GameInput->dt;
 			}
 
 
