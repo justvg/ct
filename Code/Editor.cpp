@@ -190,9 +190,9 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 							EditorState->NewLevel.AmbientColor = Vec3(0.0f / 255.0f, 0.0f / 255.0f, 0.0f / 255.0f);
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
 
-							EditorState->NewLevel.FogInscatteringColor = Vec3(0.0f, 0.0f, 0.0f);
-							EditorState->NewLevel.FogDensity = 3.0f;
-							EditorState->NewLevel.FogHeightFalloff = 600.0f;
+							EditorState->NewLevel.FogInscatteringColor = Vec3(1.0f, 1.0f, 1.0f);
+							EditorState->NewLevel.FogDensity = 2.0f;
+							EditorState->NewLevel.FogHeightFalloff = 800.0f;
 							EditorState->NewLevel.MinFogOpacity = 0.0f;
 							EditorState->NewLevel.FogHeight = 0.25f;
 							EditorState->NewLevel.FogCutoffDistance = 0.0f;

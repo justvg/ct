@@ -58,7 +58,8 @@ void main()
 	vec3 WorldPositionRelativeToCamera = LinearDepth * ToPix * Viewport.w;
 
 	// min and max exponent values for IEEE floating points (http://en.wikipedia.org/wiki/IEEE_floating_point)
-	const float CollapsedFogParameterPower = clamp(-FogHeightFalloff * (CameraPosition.y - FogHeight), -126.0 + 1.0, +127.0 - 1.0);
+	const float CollapsedFogParameterPower = clamp(-FogHeightFalloff * (WorldPositionRelativeToCamera.y - FogHeight), -126.0 + 1.0, +127.0 - 1.0);
+	// const float CollapsedFogParameterPower = clamp(-FogHeightFalloff * (CameraPosition.y - FogHeight), -126.0 + 1.0, +127.0 - 1.0);
 	const float RayLength = length(WorldPositionRelativeToCamera);
 	const float RayOriginTerms = FogDensity * pow(2.0f, CollapsedFogParameterPower);
 	const float RayDirectionY = WorldPositionRelativeToCamera.y;
