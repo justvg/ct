@@ -19,6 +19,6 @@ IF NOT EXIST Binaries mkdir Binaries
 pushd Binaries
 
 cl %CommonCompilerFlags% "..\Code\WinMain.cpp" -FmWinMain.map /link -PDB:WinMain.pdb %CommonLinkerFlags% 
-@REM cl %CommonCompilerFlags% "..\Code\FileVersioner.cpp" -FmFileVersioner.map /link -PDB:FileVersioner.pdb %CommonLinkerFlags% 
+cl %CommonCompilerFlags% "..\Code\FileVersioner.cpp" -FmFileVersioner.map /link -PDB:FileVersioner.pdb %CommonLinkerFlags% 
 
 popd

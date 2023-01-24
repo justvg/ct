@@ -47,7 +47,7 @@ void SaveLevel(const SLevel& Level, FILE* File)
 {
     // Save file version
     const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-    fwrite(&FileVersion, sizeof(uint32_t), 1, File);
+    fwrite(&FileVersion, sizeof(FileVersion), 1, File);
 
     // Save voxels
     fwrite(&Level.Voxels, sizeof(Level.Voxels), 1, File);
@@ -146,7 +146,7 @@ void LoadLevel(SLevel& Level, FILE* File)
 {
     // Load file version
     uint32_t FileVersion;
-    fread(&FileVersion, sizeof(uint32_t), 1, File);
+    fread(&FileVersion, sizeof(FileVersion), 1, File);
 
     // Load voxels
     fread(&Level.Voxels, sizeof(Level.Voxels), 1, File);
@@ -219,7 +219,7 @@ void LoadLevel(SLevel& Level, FILE* File)
     fread(&Level.FogCutoffDistance, sizeof(Level.FogCutoffDistance), 1, File);
 }
 
-bool LoadLevel(SLevel& Level, char* Path)
+bool LoadLevel(SLevel& Level, const char* Path)
 {
     memset(&Level, 0, sizeof(SLevel));
 
