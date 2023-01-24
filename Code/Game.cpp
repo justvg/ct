@@ -29,74 +29,65 @@ SMainHubSavedData LoadMainHubAndSavedData(SEngineState* EngineState)
 {
 	SMainHubSavedData MainHubSavedData = {};
 
-	SReadEntireFileResult MainHubSaveFile = ReadEntireFile("Saves\\MainHubSaved.ctl");
-	if (MainHubSaveFile.Memory && MainHubSaveFile.Size)
+	FILE* File = fopen("Saves\\MainHubSaved.ctl", "rb");
+	if (File)
 	{
 		MainHubSavedData.bValid = true;
 
-		uint8_t* EndPointer = LoadLevel(EngineState, &EngineState->LevelBaseState, MainHubSaveFile, "Levels\\MainHub.ctl");
-
-		memcpy(&MainHubSavedData.CameraPitch, EndPointer, sizeof(float));
-		EndPointer += sizeof(float);
-		memcpy(&MainHubSavedData.CameraHead, EndPointer, sizeof(float));
-		EndPointer += sizeof(float);
-
-		memcpy(&MainHubSavedData.TextsToRenderCount, EndPointer, sizeof(uint32_t));
-		EndPointer += sizeof(uint32_t);
-		memcpy(MainHubSavedData.TextsToRender, EndPointer, sizeof(EngineState->TextsToRender));
-		EndPointer += sizeof(EngineState->TextsToRender);
-
-		memcpy(&MainHubSavedData.LastBaseLevelPos, EndPointer, sizeof(vec3));
-		EndPointer += sizeof(vec3);
-		memcpy(&MainHubSavedData.LastBaseLevelGatesAngle, EndPointer, sizeof(float));
-		EndPointer += sizeof(float);
-
-		FreeEntireFile(&MainHubSaveFile);
+		LoadLevel(EngineState, &EngineState->LevelBaseState, File, "Levels\\MainHub.ctl");
+		fread(&MainHubSavedData.CameraPitch, sizeof(MainHubSavedData.CameraPitch), 1, File);
+		fread(&MainHubSavedData.CameraHead, sizeof(MainHubSavedData.CameraHead), 1, File);
+		fread(&MainHubSavedData.TextsToRenderCount, sizeof(MainHubSavedData.TextsToRenderCount), 1, File);
+		fread(MainHubSavedData.TextsToRender, MainHubSavedData.TextsToRenderCount * sizeof(SText), 1, File);
+		fread(&MainHubSavedData.LastBaseLevelPos, sizeof(MainHubSavedData.LastBaseLevelPos), 1, File);
+		fread(&MainHubSavedData.LastBaseLevelGatesAngle, sizeof(MainHubSavedData.LastBaseLevelGatesAngle), 1, File);
 	}
 
 	return MainHubSavedData;
 }
 
+void SaveMainHubSavedDataInternal(void* Data)
+{
+	FILE* File = fopen("Saves\\MainHubSaved.ctl", "wb");
+	if (File && Data)
+	{
+		// Save level
+		const SLevel* Level = (const SLevel*) Data;
+		SaveLevel(*Level, File);
+
+		// Save main hub data
+		const SMainHubSavedData* MainHubSavedData = (const SMainHubSavedData*) ((uint8_t*) Data + sizeof(SLevel));
+		fwrite(&MainHubSavedData->CameraPitch, sizeof(MainHubSavedData->CameraPitch), 1, File);
+		fwrite(&MainHubSavedData->CameraHead, sizeof(MainHubSavedData->CameraHead), 1, File);
+		fwrite(&MainHubSavedData->TextsToRenderCount, sizeof(MainHubSavedData->TextsToRenderCount), 1, File);
+		fwrite(MainHubSavedData->TextsToRender, MainHubSavedData->TextsToRenderCount * sizeof(SText), 1, File);
+		fwrite(&MainHubSavedData->LastBaseLevelPos, sizeof(MainHubSavedData->LastBaseLevelPos), 1, File);
+		fwrite(&MainHubSavedData->LastBaseLevelGatesAngle, sizeof(MainHubSavedData->LastBaseLevelGatesAngle), 1, File);
+
+		fclose(File);
+	}
+}
+
 void SaveMainHubSavedData(SEngineState* EngineState, const SGameState* GameState)
 {
-	// NOTE(georgii): FileVersion + Level + MainHubSaveData
-	void* WriteData = malloc(sizeof(uint32_t) + sizeof(SLevel) + sizeof(SMainHubSavedData));
-
-	if (WriteData)
+	void* Data = malloc(sizeof(SLevel) + sizeof(SMainHubSavedData));
+	if (Data)
 	{
-		uint8_t* CurrentPointer = (uint8_t*) WriteData;
-
 		// Save level
-		const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-		memcpy(CurrentPointer, &FileVersion, sizeof(FileVersion));
-		CurrentPointer += sizeof(FileVersion);
+		memcpy(Data, &EngineState->Level, sizeof(SLevel));
 
-		memcpy(CurrentPointer, &EngineState->Level, sizeof(SLevel));
-		CurrentPointer += sizeof(SLevel);
-
-		// Save some camera info
-		memcpy(CurrentPointer, &EngineState->Camera.Pitch, sizeof(EngineState->Camera.Pitch));
-		CurrentPointer += sizeof(EngineState->Camera.Pitch);
-		memcpy(CurrentPointer, &EngineState->Camera.Head, sizeof(EngineState->Camera.Head));
-		CurrentPointer += sizeof(EngineState->Camera.Head);
-
-		// Save text stuff
-		memcpy(CurrentPointer, &EngineState->TextsToRenderCount, sizeof(EngineState->TextsToRenderCount));
-		CurrentPointer += sizeof(EngineState->TextsToRenderCount);
-		memcpy(CurrentPointer, EngineState->TextsToRender, sizeof(EngineState->TextsToRender));
-		CurrentPointer += sizeof(EngineState->TextsToRender);
-
-		// Save last base level stuff
-		memcpy(CurrentPointer, &GameState->LastBaseLevelPos, sizeof(GameState->LastBaseLevelPos));
-		CurrentPointer += sizeof(GameState->LastBaseLevelPos);
-		memcpy(CurrentPointer, &GameState->LastBaseLevelGatesAngle, sizeof(GameState->LastBaseLevelGatesAngle));
-		CurrentPointer += sizeof(GameState->LastBaseLevelGatesAngle);
-
+		// Save main hub data
+		SMainHubSavedData* MainHubSavedData = (SMainHubSavedData*) ((uint8_t*) Data + sizeof(SLevel));
+		MainHubSavedData->CameraPitch = EngineState->Camera.Pitch;
+		MainHubSavedData->CameraHead = EngineState->Camera.Head;
+		MainHubSavedData->TextsToRenderCount = EngineState->TextsToRenderCount;
+		memcpy(MainHubSavedData->TextsToRender, EngineState->TextsToRender, MainHubSavedData->TextsToRenderCount * sizeof(SText));
+		MainHubSavedData->LastBaseLevelPos = GameState->LastBaseLevelPos;
+		MainHubSavedData->LastBaseLevelGatesAngle = GameState->LastBaseLevelGatesAngle;
 
 		SDiskWriteInfo DiskWriteInfo = {};
-		DiskWriteInfo.Path = "Saves\\MainHubSaved.ctl";
-		DiskWriteInfo.DataSize = CurrentPointer - (uint8_t*) WriteData;
-		DiskWriteInfo.Data = WriteData;
+		DiskWriteInfo.Data = Data;
+		DiskWriteInfo.WriteFunction = SaveMainHubSavedDataInternal;
 
 		AddEntryToWriteDiskThread(&EngineState->WriteDiskThread, DiskWriteInfo);
 	}
@@ -1659,7 +1650,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 		SGeneralSaveData GeneralSaveData = LoadGeneralSaveData();
 		if (GeneralSaveData.bValid)
 		{
-			if (CompareStrings(GeneralSaveData.LastLevelName, "Levels\\MainHub.ctl"))
+			if (CompareStrings(GeneralSaveData.LevelName, "Levels\\MainHub.ctl"))
 			{
 				SMainHubSavedData MainHubSavedData = LoadMainHubAndSavedData(EngineState);
 				if (MainHubSavedData.bValid)
@@ -1695,7 +1686,7 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			}
 			else
 			{
-				LoadLevel(EngineState, &EngineState->LevelBaseState, GeneralSaveData.LastLevelName, false);
+				LoadLevel(EngineState, &EngineState->LevelBaseState, GeneralSaveData.LevelName, false);
 			}
 
 			FreeGeneralSaveData(&GeneralSaveData);

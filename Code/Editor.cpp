@@ -13,20 +13,6 @@ void SaveLevelHistory(SEditorState* EditorState, const SLevel* Level)
 	EditorState->LevelHistoryHead = HeadNextIndex;
 }
 
-void SaveLevelEditor(const SLevel& Level, const char* Path)
-{
-	const uint32_t FileVersion = LEVEL_MAX_FILE_VERSION;
-
-	FILE* File = fopen(Path, "wb");
-	Assert(File);
-	if (File)
-	{
-		fwrite(&FileVersion, sizeof(uint32_t), 1, File);
-		fwrite((void*) &Level, sizeof(SLevel), 1, File);
-		fclose(File);
-	}
-}
-
 bool EditorDragFloat(SEditorState* EditorState, const char* Name, float* Ptr, float Speed, float Min = 0.0f, float Max = 0.0f)
 {
 	bool bValueChanged = ImGui::DragFloat(Name, Ptr, Speed, Min, Max);
@@ -191,7 +177,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 							EditorState->NewLevel.AmbientConstant = Vec3(1.0f / 255.0f, 1.0f / 255.0f, 1.0f / 255.0f);
 
 							EditorState->NewLevel.FogInscatteringColor = Vec3(1.0f, 1.0f, 1.0f);
-							EditorState->NewLevel.FogDensity = 2.0f;
+							EditorState->NewLevel.FogDensity = 0.4f;
 							EditorState->NewLevel.FogHeightFalloff = 800.0f;
 							EditorState->NewLevel.MinFogOpacity = 0.0f;
 							EditorState->NewLevel.FogHeight = 0.25f;
@@ -202,7 +188,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 							EngineState->Camera.Pitch = -45.0f;
 							EngineState->Camera.Head = -45.0f;
 
-							SaveLevelEditor(EditorState->NewLevel, NewLevelPath);
+							SaveLevel(EditorState->NewLevel, NewLevelPath);
 							LoadLevel(EngineState, &EngineState->LevelBaseState, NewLevelName);
 							NewLevelName[0] = 0;
 							EditorState->NewLevel = {};
@@ -244,7 +230,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			ImGui::SameLine();
 			if (ImGui::Button("SaveLevel"))
 			{
-				SaveLevelEditor(EngineState->Level, EngineState->LevelName);
+				SaveLevel(EngineState->Level, EngineState->LevelName);
 				EngineState->LevelBaseState = EngineState->Level;
 			}
             

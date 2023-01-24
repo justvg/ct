@@ -44,32 +44,7 @@ enum EAOQuality
 	AOQuality_Count
 };
 
-struct SVoxels
-{
-	// NOTE(georgii): 24 most significant bits - color, next 4 bits - reflectivity, next 3 bits - roughness, the least significant bit - active or not
-	uint32_t ColorMatActive[LevelDimZ][LevelDimY][LevelDimX];
-};
-
-struct SLevel
-{
-	SVoxels Voxels;
-
-	uint32_t EntityCount;
-	SEntity Entities[128];
-
-	uint32_t LightCount;
-	SLight Lights[128];
-
-	vec3 AmbientColor;
-	vec3 AmbientConstant;
-
-	vec3 FogInscatteringColor;
-	float FogDensity;
-	float FogHeightFalloff;
-	float MinFogOpacity;
-	float FogHeight;
-	float FogCutoffDistance;
-};
+#include "Level.h"
 
 #include "VoxelCulling.cpp"
 #include "GBufferVoxelRender.cpp"
@@ -190,12 +165,12 @@ enum ESounds
 	Sound_Count
 };
 
+typedef void WriteDiskFunction(void* Data);
 struct SDiskWriteInfo
 {
-	const char* Path;
-
-	uint64_t DataSize;
 	void* Data;
+
+	WriteDiskFunction* WriteFunction;
 };
 
 struct SWriteDiskThread
@@ -250,7 +225,7 @@ void WriteDataToDiskThreadFunction(void* Data)
 				if (ThreadData->EntryToRead != ThreadData->EntryToWrite)
 				{
 					SDiskWriteInfo* DiskWriteInfo = ThreadData->Entries + ThreadData->EntryToRead;
-					WriteEntireFile(DiskWriteInfo->Path, DiskWriteInfo->Data, DiskWriteInfo->DataSize);
+					DiskWriteInfo->WriteFunction(DiskWriteInfo->Data);
 
 					if (DiskWriteInfo->Data)
 					{
@@ -696,239 +671,37 @@ SDepthPyramidInfoResult GetDepthPyramidInfo(uint32_t SourceImageWidth, uint32_t 
 	return Result;
 }
 
-#define LEVEL_MAX_FILE_VERSION 1
-
-uint8_t* LoadLevel(SEngineState* EngineState, SLevel* Level, const SReadEntireFileResult& File, char* Path, vec3 HeroVelocity = Vec3(0.0f))
+void PostLoadLevel(SEngineState* EngineState, SLevel* Level, const char* Path, vec3 HeroVelocity = Vec3(0.0f))
 {
-	memset(Level, 0, sizeof(SLevel));
-
-	uint8_t* EndPointer = (uint8_t*) File.Memory;
-	if (File.Memory)
-	{
-		uint32_t FileVersion = *(uint32_t*) File.Memory;
-
-		if (FileVersion == LEVEL_MAX_FILE_VERSION)
-		{
-			uint8_t* LevelMemory = (uint8_t*) File.Memory + sizeof(uint32_t);
-
-			// Load voxels
-			memcpy(&Level->Voxels, LevelMemory, sizeof(Level->Voxels));
-			LevelMemory += sizeof(Level->Voxels);
-
-			// Load entities
-			AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-			memcpy(&Level->EntityCount, LevelMemory, sizeof(uint32_t));
-			LevelMemory += sizeof(uint32_t);
-
-			Assert(Level->EntityCount < ArrayCount(Level->Entities));
-
-			for (uint32_t I = 0; I < Level->EntityCount; I++)
-			{
-				AlignAddress(&LevelMemory, GetAlignmentOf(SEntity));
-				memcpy(&Level->Entities[I].Type, LevelMemory, sizeof(EEntityType));
-				LevelMemory += sizeof(EEntityType);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].Pos, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].Velocity, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].Dim, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec4));
-				memcpy(&Level->Entities[I].Orientation, LevelMemory, sizeof(vec4));
-				LevelMemory += sizeof(vec4);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].LampBaseOffset, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].LampOffset, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec2));
-				memcpy(&Level->Entities[I].LampRotationOffset, LevelMemory, sizeof(vec2)); 
-				LevelMemory += sizeof(vec2);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].PrevLampOffset, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].Scale, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].Speed, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].Drag, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].JumpPower, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-				memcpy(&Level->Entities[I].DoorIndex, LevelMemory, sizeof(uint32_t));
-				LevelMemory += sizeof(uint32_t);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].Alpha, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].Color, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].PrevPos, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec4));
-				memcpy(&Level->Entities[I].PrevOrientation, LevelMemory, sizeof(vec4));
-				LevelMemory += sizeof(vec4);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(SLight));
-				memcpy(&Level->Entities[I].Light, LevelMemory, sizeof(SLight));
-				LevelMemory += sizeof(SLight);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec2));
-				memcpy(&Level->Entities[I].MessagePos, LevelMemory, sizeof(vec2));
-				LevelMemory += sizeof(vec2);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].MessageScale, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].MessageLifeTime, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].MessageTimeToAppear, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].MessageTimeToStartAppear, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].AnimationColor, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].TargetColor, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].TimeToDisappear, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].TimeToDisappearCurrent, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].BasePos, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-				AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-				memcpy(&Level->Entities[I].TargetOffset, LevelMemory, sizeof(vec3));
-				LevelMemory += sizeof(vec3);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(bool));
-				memcpy(&Level->Entities[I].bCollisionWithHeroStarted, LevelMemory, sizeof(bool));
-				LevelMemory += sizeof(bool);
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				memcpy(&Level->Entities[I].CollisionWithHeroTimePassed, LevelMemory, sizeof(float));
-				LevelMemory += sizeof(float);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-				memcpy(&Level->Entities[I].MeshIndex, LevelMemory, sizeof(uint32_t));
-				LevelMemory += sizeof(uint32_t);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(char));
-				memcpy(&Level->Entities[I].TargetLevelName, LevelMemory, sizeof(SEntity::MessageText));
-				LevelMemory += sizeof(SEntity::MessageText);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(bool));
-				memcpy(&Level->Entities[I].bGoBack, LevelMemory, sizeof(bool));
-				LevelMemory += sizeof(bool);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(bool));
-				memcpy(&Level->Entities[I].bForceClose, LevelMemory, sizeof(bool));
-				LevelMemory += sizeof(bool);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(bool));
-				memcpy(&Level->Entities[I].bRemoved, LevelMemory, sizeof(bool));
-				LevelMemory += sizeof(bool);
-
-				AlignAddress(&LevelMemory, GetAlignmentOf(float));
-				Level->Entities[I].DistanceToCam = 0.0f;
-				LevelMemory += sizeof(float);
-			}
-
-			AlignAddress(&LevelMemory, GetAlignmentOf(SEntity));
-			LevelMemory += sizeof(SEntity) * (ArrayCount(Level->Entities) - Level->EntityCount);
-
-			// Load point lights
-			AlignAddress(&LevelMemory, GetAlignmentOf(uint32_t));
-			memcpy(&Level->LightCount, LevelMemory, sizeof(uint32_t));
-			LevelMemory += sizeof(uint32_t);
-
-			Assert(Level->LightCount < ArrayCount(Level->Lights));
-
-			AlignAddress(&LevelMemory, GetAlignmentOf(SLight));
-			memcpy(Level->Lights, LevelMemory, sizeof(Level->Lights));
-			LevelMemory += sizeof(Level->Lights);
-
-			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-			memcpy(&Level->AmbientColor, LevelMemory, sizeof(Level->AmbientColor));
-			LevelMemory += sizeof(Level->AmbientColor);
-			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-			memcpy(&Level->AmbientConstant, LevelMemory, sizeof(Level->AmbientConstant));
-			LevelMemory += sizeof(Level->AmbientConstant);
-
-			AlignAddress(&LevelMemory, GetAlignmentOf(vec3));
-			memcpy(&Level->FogInscatteringColor, LevelMemory, sizeof(Level->FogInscatteringColor));
-			LevelMemory += sizeof(Level->FogInscatteringColor);
-			AlignAddress(&LevelMemory, GetAlignmentOf(float));
-			memcpy(&Level->FogDensity, LevelMemory, sizeof(Level->FogDensity));
-			LevelMemory += sizeof(Level->FogDensity);
-			AlignAddress(&LevelMemory, GetAlignmentOf(float));
-			memcpy(&Level->FogHeightFalloff, LevelMemory, sizeof(Level->FogHeightFalloff));
-			LevelMemory += sizeof(Level->FogHeightFalloff);
-			AlignAddress(&LevelMemory, GetAlignmentOf(float));
-			memcpy(&Level->MinFogOpacity, LevelMemory, sizeof(Level->MinFogOpacity));
-			LevelMemory += sizeof(Level->MinFogOpacity);
-			AlignAddress(&LevelMemory, GetAlignmentOf(float));
-			memcpy(&Level->FogHeight, LevelMemory, sizeof(Level->FogHeight));
-			LevelMemory += sizeof(Level->FogHeight);
-			AlignAddress(&LevelMemory, GetAlignmentOf(float));
-			memcpy(&Level->FogCutoffDistance, LevelMemory, sizeof(Level->FogCutoffDistance));
-			LevelMemory += sizeof(Level->FogCutoffDistance);
-
-			EndPointer = LevelMemory;
-		}
-
 #ifndef ENGINE_RELEASE
-		EngineState->LevelGameStartState = *Level;
+	EngineState->LevelGameStartState = *Level;
 #endif
 
-		memcpy(EngineState->LevelName, Path, StringLength(Path) + 1);
+	memcpy(EngineState->LevelName, Path, StringLength(Path) + 1);
 
-		Assert(Level->Entities[0].Type == Entity_Hero);
-		Level->Entities[0].Velocity = HeroVelocity;
+	Assert(Level->Entities[0].Type == Entity_Hero);
+	Level->Entities[0].Velocity = HeroVelocity;
 
-		EngineState->bReloadLevel = true;
-		EngineState->bReloadGame = true;
-	}
-
-	return EndPointer;
+	EngineState->bReloadLevel = true;
+	EngineState->bReloadGame = true;
 }
 
-void LoadLevel(SEngineState* EngineState, SLevel* Level, const char* LevelName, bool bAddLevelsPath = true, vec3 HeroVelocity = Vec3(0.0f))
+void LoadLevel(SEngineState* EngineState, SLevel* Level, char* LevelName, bool bAddLevelsPath = true, vec3 HeroVelocity = Vec3(0.0f))
 {
 	char Path[MaxPath] = {};
 	ConcStrings(Path, sizeof(Path), bAddLevelsPath ? "Levels\\" : "", LevelName);
 
-	SReadEntireFileResult File = ReadEntireFile(Path);
-	LoadLevel(EngineState, Level, File, Path, HeroVelocity);
+	if (LoadLevel(*Level, Path))
+	{
+		PostLoadLevel(EngineState, Level, Path, HeroVelocity);
+	}
+}
 
-	FreeEntireFile(&File);
+void LoadLevel(SEngineState* EngineState, SLevel* Level, FILE* File, const char* Path)
+{
+	memset(Level, 0, sizeof(SLevel));
+	LoadLevel(*Level, File);
+	PostLoadLevel(EngineState, Level, Path);
 }
 
 void ReloadGameLevel(SEngineState* EngineState, bool bResetCameraPosition = true, bool bReloadGame = true)
@@ -1035,8 +808,8 @@ struct SGeneralSaveData
 {
 	bool bValid;
 
-	uint32_t LastLevelNameLength;
-	char LastLevelName[MaxPath];
+	uint32_t LevelNameLength;
+	char LevelName[MaxPath];
 
 	bool bFullscreen;
 	bool bVSync;
@@ -1056,53 +829,29 @@ struct SGeneralSaveData
 
 SGeneralSaveData LoadGeneralSaveData()
 {
-	SGeneralSaveData GeneralSaveData;
-	GeneralSaveData.bValid = false;
+	SGeneralSaveData GeneralSaveData = {};
 
-	SReadEntireFileResult GeneralSaveFile = ReadEntireFile("Saves\\GeneralSave");
-	if (GeneralSaveFile.Memory && GeneralSaveFile.Size)
+	FILE* File = fopen("Saves\\GeneralSave", "rb");
+	if (File)
 	{
-		uint8_t* SaveFilePointer = (uint8_t*) GeneralSaveFile.Memory;
-
 		GeneralSaveData.bValid = true;
 
-		memcpy(&GeneralSaveData.LastLevelNameLength, SaveFilePointer, sizeof(uint32_t));
-		SaveFilePointer += sizeof(uint32_t);
-		memcpy(GeneralSaveData.LastLevelName, SaveFilePointer, GeneralSaveData.LastLevelNameLength);
-		SaveFilePointer += GeneralSaveData.LastLevelNameLength;
-
-		memcpy(&GeneralSaveData.bFullscreen, SaveFilePointer, sizeof(bool));
-		SaveFilePointer += sizeof(bool);
-
-		memcpy(&GeneralSaveData.bVSync, SaveFilePointer, sizeof(bool));
-		SaveFilePointer += sizeof(bool);
-
-		memcpy(&GeneralSaveData.bVignetteEnabled, SaveFilePointer, sizeof(bool));
-		SaveFilePointer += sizeof(bool);
-
-		memcpy(&GeneralSaveData.AOQuality, SaveFilePointer, sizeof(int32_t));
-		SaveFilePointer += sizeof(int32_t);
-
-		memcpy(&GeneralSaveData.FullscreenResolutionPercent, SaveFilePointer, sizeof(uint32_t));
-		SaveFilePointer += sizeof(uint32_t);
-
-		memcpy(&GeneralSaveData.MasterVolume, SaveFilePointer, sizeof(uint32_t));
-		SaveFilePointer += sizeof(uint32_t);
-
-		memcpy(&GeneralSaveData.MusicVolume, SaveFilePointer, sizeof(uint32_t));
-		SaveFilePointer += sizeof(uint32_t);
-
-		memcpy(&GeneralSaveData.EffectsVolume, SaveFilePointer, sizeof(uint32_t));
-		SaveFilePointer += sizeof(uint32_t);
-
-		memcpy(&GeneralSaveData.WindowPlacementSize, SaveFilePointer, sizeof(uint64_t));
-		SaveFilePointer += sizeof(uint64_t);
+		fread(&GeneralSaveData.LevelNameLength, sizeof(GeneralSaveData.LevelNameLength), 1, File);
+		fread(GeneralSaveData.LevelName, GeneralSaveData.LevelNameLength, 1, File);
+		fread(&GeneralSaveData.bFullscreen, sizeof(GeneralSaveData.bFullscreen), 1, File);
+		fread(&GeneralSaveData.bVSync, sizeof(GeneralSaveData.bVSync), 1, File);
+		fread(&GeneralSaveData.bVignetteEnabled, sizeof(GeneralSaveData.bVignetteEnabled), 1, File);
+		fread(&GeneralSaveData.AOQuality, sizeof(GeneralSaveData.AOQuality), 1, File);
+		fread(&GeneralSaveData.FullscreenResolutionPercent, sizeof(GeneralSaveData.FullscreenResolutionPercent), 1, File);
+		fread(&GeneralSaveData.MasterVolume, sizeof(GeneralSaveData.MasterVolume), 1, File);
+		fread(&GeneralSaveData.MusicVolume, sizeof(GeneralSaveData.MusicVolume), 1, File);
+		fread(&GeneralSaveData.EffectsVolume, sizeof(GeneralSaveData.EffectsVolume), 1, File);
+		fread(&GeneralSaveData.WindowPlacementSize, sizeof(GeneralSaveData.WindowPlacementSize), 1, File);
 
 		GeneralSaveData.WindowPlacement = malloc(GeneralSaveData.WindowPlacementSize);
-		memcpy(GeneralSaveData.WindowPlacement, SaveFilePointer, GeneralSaveData.WindowPlacementSize);
-		SaveFilePointer += GeneralSaveData.WindowPlacementSize;
+		fread(GeneralSaveData.WindowPlacement, GeneralSaveData.WindowPlacementSize, 1, File);
 
-		FreeEntireFile(&GeneralSaveFile);
+		fclose(File);
 	}
 
 	return GeneralSaveData;
@@ -1122,67 +871,55 @@ void FreeGeneralSaveData(SGeneralSaveData* GeneralSaveData)
 	}
 }
 
+void SaveGeneralSaveDataInternal(void* Data)
+{
+	FILE* File = fopen("Saves\\GeneralSave", "wb");
+	Assert(File);
+	if (Data && File)
+	{
+		SGeneralSaveData* GeneralSaveData = (SGeneralSaveData*) Data;
+
+		fwrite(&GeneralSaveData->LevelNameLength, sizeof(GeneralSaveData->LevelNameLength), 1, File);
+		fwrite(GeneralSaveData->LevelName, GeneralSaveData->LevelNameLength, 1, File);
+		fwrite(&GeneralSaveData->bFullscreen, sizeof(GeneralSaveData->bFullscreen), 1, File);
+		fwrite(&GeneralSaveData->bVSync, sizeof(GeneralSaveData->bVSync), 1, File);
+		fwrite(&GeneralSaveData->bVignetteEnabled, sizeof(GeneralSaveData->bVignetteEnabled), 1, File);
+		fwrite(&GeneralSaveData->AOQuality, sizeof(GeneralSaveData->AOQuality), 1, File);
+		fwrite(&GeneralSaveData->FullscreenResolutionPercent, sizeof(GeneralSaveData->FullscreenResolutionPercent), 1, File);
+		fwrite(&GeneralSaveData->MasterVolume, sizeof(GeneralSaveData->MasterVolume), 1, File);
+		fwrite(&GeneralSaveData->MusicVolume, sizeof(GeneralSaveData->MusicVolume), 1, File);
+		fwrite(&GeneralSaveData->EffectsVolume, sizeof(GeneralSaveData->EffectsVolume), 1, File);
+		fwrite(&GeneralSaveData->WindowPlacementSize, sizeof(GeneralSaveData->WindowPlacementSize), 1, File);
+		fwrite(&GeneralSaveData->WindowPlacement, GeneralSaveData->WindowPlacementSize, 1, File);
+
+		fclose(File);
+	}
+}
+
 void SaveGeneralSaveData(SEngineState* EngineState)
 {
 	SWindowPlacementInfo WindowPlacement = PlatformGetWindowPlacement();
-	int64_t AdditionalAllocatedSize = WindowPlacement.InfoSizeInBytes; // NOTE(georgii): Just to be sure we have enought allocated memory
-	void* WriteData = malloc(sizeof(SGeneralSaveData) + AdditionalAllocatedSize);
+	int64_t Size = sizeof(SGeneralSaveData) + WindowPlacement.InfoSizeInBytes - sizeof(SGeneralSaveData::WindowPlacement);
+	SGeneralSaveData* GeneralSaveData = (SGeneralSaveData*) malloc(Size);
 
-	if (WriteData)
+	if (GeneralSaveData)
 	{
-		uint8_t* CurrentPointer = (uint8_t*) WriteData;
-
-		uint32_t LevelNameLength = StringLength(EngineState->LevelName) + 1;
-		bool bFullscreen = PlatformGetFullscreen();
-		bool bVSync = PlatformGetVSync();
-		bool bVignetteEnabled = EngineState->bVignetteEnabled;
-		int32_t AOQuality = EngineState->Renderer.AOQuality;
-		uint32_t FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
-		uint32_t MasterVolume = EngineState->AudioState.MasterVolume;
-		uint32_t MusicVolume = EngineState->AudioState.MusicVolume;
-		uint32_t EffectsVolume = EngineState->AudioState.EffectsVolume;
-
-		memcpy(CurrentPointer, &LevelNameLength, sizeof(uint32_t));
-		CurrentPointer += sizeof(uint32_t);
-
-		memcpy(CurrentPointer, EngineState->LevelName, LevelNameLength);
-		CurrentPointer += LevelNameLength;
-
-		memcpy(CurrentPointer, &bFullscreen, sizeof(bool));
-		CurrentPointer += sizeof(bool);
-
-		memcpy(CurrentPointer, &bVSync, sizeof(bool));
-		CurrentPointer += sizeof(bool);
-
-		memcpy(CurrentPointer, &bVignetteEnabled, sizeof(bool));
-		CurrentPointer += sizeof(bool);
-
-		memcpy(CurrentPointer, &AOQuality, sizeof(int32_t));
-		CurrentPointer += sizeof(int32_t);
-
-		memcpy(CurrentPointer, &FullscreenResolutionPercent, sizeof(uint32_t));
-		CurrentPointer += sizeof(uint32_t);
-
-		memcpy(CurrentPointer, &MasterVolume, sizeof(uint32_t));
-		CurrentPointer += sizeof(uint32_t);
-
-		memcpy(CurrentPointer, &MusicVolume, sizeof(uint32_t));
-		CurrentPointer += sizeof(uint32_t);
-
-		memcpy(CurrentPointer, &EffectsVolume, sizeof(uint32_t));
-		CurrentPointer += sizeof(uint32_t);
-
-		memcpy(CurrentPointer, &WindowPlacement.InfoSizeInBytes, sizeof(uint64_t));
-		CurrentPointer += sizeof(uint64_t);
-
-		memcpy(CurrentPointer, WindowPlacement.InfoPointer, WindowPlacement.InfoSizeInBytes);
-		CurrentPointer += WindowPlacement.InfoSizeInBytes;
-
+		GeneralSaveData->LevelNameLength = StringLength(EngineState->LevelName) + 1;
+		memcpy(GeneralSaveData->LevelName, EngineState->LevelName, GeneralSaveData->LevelNameLength);
+		GeneralSaveData->bFullscreen = PlatformGetFullscreen();
+		GeneralSaveData->bVSync = PlatformGetVSync();
+		GeneralSaveData->bVignetteEnabled = EngineState->bVignetteEnabled;
+		GeneralSaveData->AOQuality = EngineState->Renderer.AOQuality;
+		GeneralSaveData->FullscreenResolutionPercent = EngineState->FullscreenResolutionPercent;
+		GeneralSaveData->MasterVolume = EngineState->AudioState.MasterVolume;
+		GeneralSaveData->MusicVolume = EngineState->AudioState.MusicVolume;
+		GeneralSaveData->EffectsVolume = EngineState->AudioState.EffectsVolume;
+		GeneralSaveData->WindowPlacementSize = WindowPlacement.InfoSizeInBytes;
+		memcpy(&GeneralSaveData->WindowPlacement, WindowPlacement.InfoPointer, WindowPlacement.InfoSizeInBytes);
 
 		SDiskWriteInfo DiskWriteInfo = {};
-		DiskWriteInfo.Path = "Saves\\GeneralSave";
-		DiskWriteInfo.DataSize = CurrentPointer - (uint8_t*) WriteData;
-		DiskWriteInfo.Data = WriteData;
+		DiskWriteInfo.Data = GeneralSaveData;
+		DiskWriteInfo.WriteFunction = SaveGeneralSaveDataInternal;
 
 		AddEntryToWriteDiskThread(&EngineState->WriteDiskThread, DiskWriteInfo);
 	}
