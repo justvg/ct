@@ -104,6 +104,7 @@ struct SGameState
 	float LampTime;
 	float StepSoundTimer;
 	float StepSoundTime;
+	float StepHandMovementTime;
 };
 
 void StartDeathAnimation(SGameState* GameState, vec3 DeathPos)

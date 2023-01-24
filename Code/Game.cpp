@@ -565,18 +565,26 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					{
 						Entity->LampOffset.z -= 0.15f;
 					}
-					Entity->LampOffset += 15.0f * (Entity->LampBaseOffset - Entity->LampOffset) * GameInput->dt;
-					
+
 					SMoveEntityInfo MoveInfo = { !EngineState->bFlyMode, EngineState->bFlyMode, true, true, HeroControl.Acceleration };
 					MoveEntity(GameState, EngineState, Entity, Level, MoveInfo, GameInput->dt);
 
 					if (Length(Vec3(Entity->Velocity.x, 0.0f, Entity->Velocity.z)) > 0.2f)
 					{
+						Entity->LampOffset.y += 0.001f * Sin(5.0f * GameState->StepHandMovementTime);
+						GameState->StepHandMovementTime += GameInput->dt;
+
 						if (GameState->StepSoundTime >= GameState->StepSoundTimer)
 						{
 							ChangePitch(PlaySound(&EngineState->AudioState, false, RandomU32(Sound_Footstep0, Sound_Footstep4), false), RandomFloat(0.75f, 1.0f));
 						}
 					}
+					else
+					{
+						GameState->StepHandMovementTime = 0.0f;
+					}
+
+					Entity->LampOffset += 15.0f * (Entity->LampBaseOffset - Entity->LampOffset) * GameInput->dt;
 				} break;
 				
 				case Entity_Torch:
