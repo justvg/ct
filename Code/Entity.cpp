@@ -16,7 +16,6 @@ SEntity* AddHero(SLevel& Level, vec3 Pos)
 
 	Entity->Speed = 10.0f;
 	Entity->Drag = 2.0f;
-	Entity->JumpPower = 7.0f;
 
 	Entity->LampBaseOffset = Vec3(0.7f, 0.6f, 0.65f);
 	Entity->LampOffset = Entity->LampBaseOffset;

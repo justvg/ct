@@ -70,7 +70,6 @@ void SaveLevel(const SLevel& Level, FILE* File)
         fwrite(&Entity->Scale, sizeof(Entity->Scale), 1, File);
         fwrite(&Entity->Speed, sizeof(Entity->Speed), 1, File);
         fwrite(&Entity->Drag, sizeof(Entity->Drag), 1, File);
-        fwrite(&Entity->JumpPower, sizeof(Entity->JumpPower), 1, File);
         fwrite(&Entity->DoorIndex, sizeof(Entity->DoorIndex), 1, File);
         fwrite(&Entity->Alpha, sizeof(Entity->Alpha), 1, File);
         fwrite(&Entity->Color, sizeof(Entity->Color), 1, File);
@@ -169,7 +168,6 @@ void LoadLevel(SLevel& Level, FILE* File)
         fread(&Entity->Scale, sizeof(Entity->Scale), 1, File);
         fread(&Entity->Speed, sizeof(Entity->Speed), 1, File);
         fread(&Entity->Drag, sizeof(Entity->Drag), 1, File);
-        fread(&Entity->JumpPower, sizeof(Entity->JumpPower), 1, File);
         fread(&Entity->DoorIndex, sizeof(Entity->DoorIndex), 1, File);
         fread(&Entity->Alpha, sizeof(Entity->Alpha), 1, File);
         fread(&Entity->Color, sizeof(Entity->Color), 1, File);

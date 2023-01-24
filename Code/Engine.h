@@ -129,7 +129,6 @@ struct SText
 struct SHeroControl
 {
 	vec3 Acceleration;
-	bool bJump;
 
 	bool bUseLamp;
 };

@@ -215,10 +215,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	}
 #endif
 	
-	if (WasDown(GameInput->Buttons[Button_Space]))
-	{
-		HeroControl.bJump = true;
-	}
 	if ((WasDown(GameInput->Buttons[Button_MouseLeft]) || WasDown(GameInput->Buttons[Button_MouseRight])) && !GameInput->bShowMouse)
 	{
 		if (GameState->LampTime >= GameState->LampTimer)
@@ -549,90 +545,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 			{
 				case Entity_Hero:
 				{
-					if (HeroControl.bJump)
-					{
-						bool bCanJump = false;
-						float MaxDistance = 0.1f;
-						
-						uint32_t BroadPhaseRadius = 5;
-						uint32_t EntityX = uint32_t(Entity->Pos.x / VoxelDim);
-						uint32_t EntityY = uint32_t(Entity->Pos.y / VoxelDim);
-						uint32_t EntityZ = uint32_t(Entity->Pos.z / VoxelDim);
-						
-						uint32_t StartX = (EntityX > BroadPhaseRadius) ? EntityX - BroadPhaseRadius : 0;
-						uint32_t StartY = (EntityY > BroadPhaseRadius) ? EntityY - BroadPhaseRadius : 0;
-						uint32_t StartZ = (EntityZ > BroadPhaseRadius) ? EntityZ - BroadPhaseRadius : 0;
-						
-						uint32_t EndX = (EntityX < LevelDimX - BroadPhaseRadius) ? EntityX + BroadPhaseRadius : LevelDimX - 1;
-						uint32_t EndY = (EntityY < LevelDimY - BroadPhaseRadius) ? EntityY + BroadPhaseRadius : LevelDimY - 1;
-						uint32_t EndZ = (EntityZ < LevelDimZ - BroadPhaseRadius) ? EntityZ + BroadPhaseRadius : LevelDimZ - 1;
-						
-						for (uint32_t Z = StartZ; (Z <= EndZ) && !bCanJump; Z++)
-						{
-							for (uint32_t Y = StartY; (Y <= EndY) && !bCanJump; Y++)
-							{
-								for (uint32_t X = StartX; (X <= EndX) && !bCanJump; X++)
-								{
-									if (IsVoxelActive(Level->Voxels, X, Y, Z))
-									{
-										Rect VoxelAABB = RectMinDim(VoxelDim * Vec3i(X, Y, Z), Vec3(VoxelDim));
-										
-										float tTest = 0.0f;
-										if (IntersectRectRay(VoxelAABB, Entity->Pos + Vec3(0.0f, -0.5f*Entity->Dim.y, 0.0f), Vec3(0.0f, -1.0f, 0.0f), tTest))
-										{
-											if (tTest < MaxDistance)
-											{
-												bCanJump = true;
-												break;
-											}
-										}
-										
-										if (IntersectRectRay(VoxelAABB, Entity->Pos + 0.5f*Vec3(Entity->Dim.x, -Entity->Dim.y, Entity->Dim.z), Vec3(0.0f, -1.0f, 0.0f), tTest))
-										{
-											if (tTest < MaxDistance)
-											{
-												bCanJump = true;
-												break;
-											}
-										}
-										
-										if (IntersectRectRay(VoxelAABB, Entity->Pos + 0.5f*Vec3(Entity->Dim.x, -Entity->Dim.y, -Entity->Dim.z), Vec3(0.0f, -1.0f, 0.0f), tTest))
-										{
-											if (tTest < MaxDistance)
-											{
-												bCanJump = true;
-												break;
-											}
-										}
-										
-										if (IntersectRectRay(VoxelAABB, Entity->Pos + 0.5f*Vec3(-Entity->Dim.x, -Entity->Dim.y, Entity->Dim.z), Vec3(0.0f, -1.0f, 0.0f), tTest))
-										{
-											if (tTest < MaxDistance)
-											{
-												bCanJump = true;
-												break;
-											}
-										}
-										
-										if (IntersectRectRay(VoxelAABB, Entity->Pos + 0.5f*Vec3(-Entity->Dim.x, -Entity->Dim.y, -Entity->Dim.z), Vec3(0.0f, -1.0f, 0.0f), tTest))
-										{
-											if (tTest < MaxDistance)
-											{
-												bCanJump = true;
-												break;
-											}
-										}
-									}
-								}
-							}
-						}
-						
-						if (bCanJump)
-						{
-							Entity->Velocity.y = GameState->HeroJumpPower;
-						}
-					}
-
 					if (Entity->bChangeColorAnimation)
 					{
 						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
@@ -1617,10 +1529,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 				{
 					GameState->HeroDrag = Item.Value;
 				}
-				else if (CompareStrings(Item.Name, "HeroJumpPower"))
-				{
-					GameState->HeroJumpPower = Item.Value;
-				}
 				else if (CompareStrings(Item.Name, "HeroLampDistance"))
 				{
 					GameState->HeroLampDistance = Item.Value;
@@ -1632,7 +1540,6 @@ void UpdateGame(SGameState* GameState, SEngineState* EngineState, const SGameInp
 			// NOTE(georgii): Use these values if for some reason there is no config file.
 			GameState->HeroSpeed = 11.0f;
 			GameState->HeroDrag = 3.1f;
-			GameState->HeroJumpPower = 4.5f;
 			GameState->HeroLampDistance = 8.0f;
 		}
 

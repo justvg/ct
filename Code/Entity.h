@@ -65,7 +65,6 @@ struct SEntity
 
 	float Speed;
 	float Drag;
-	float JumpPower;
 
 	union
 	{

@@ -93,7 +93,6 @@ struct SGameState
 	// NOTE(georgii): Don't wanna resave every level when I change these params for hero, so I just store them in SEngineState.
 	float HeroSpeed;
 	float HeroDrag;
-	float HeroJumpPower;
 	float HeroLampDistance;
 
 	SMenuState MenuState;
