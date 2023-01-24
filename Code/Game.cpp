@@ -700,12 +700,12 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					{
 						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
 						{
-							Entity->ColorScale = Lerp(1.0f, 150.0f, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
+							Entity->ColorScale = Lerp(1.0f, 200.0f, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
 							Entity->TimeToChangeColorCurrent += GameInput->dt;
 						}
 						else
 						{
-							Entity->ColorScale = 150.0f;
+							Entity->ColorScale = 200.0f;
 							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
 							Entity->bChangeColorAnimation = false;
 						}

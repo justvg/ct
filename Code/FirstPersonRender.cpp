@@ -100,7 +100,7 @@ void SFirstPersonRenderPass::Render(const SVulkanContext& Vulkan, const SEntity&
         case Entity_Hero:
         {
             PushConstants.Scale = Vec4(Vec3(Entity.Scale), 0.0f);
-            PushConstants.Color.rgb *= 200.0f;
+            PushConstants.Color.rgb *= 400.0f;
         } break;
     }
 

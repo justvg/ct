@@ -146,7 +146,7 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 
 			case Entity_Torch:
 			{
-				PushConstants.Color.rgb *= 150.0f;
+				PushConstants.Color.rgb *= 200.0f;
 			} break;
 
 			case Entity_Wire:
@@ -159,7 +159,7 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 
 			case Entity_Fireball:
 			{
-				PushConstants.Color.rgb *= 150.0f;
+				PushConstants.Color.rgb *= 200.0f;
 			} break;
 
 			case Entity_MessageToggler:

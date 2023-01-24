@@ -42,15 +42,15 @@ layout (set = 0, binding = 3) uniform LightBuffer
 	vec4 AmbientConstant; // w - unused
 };
 
+layout (set = 0, binding = 5) uniform sampler2D NormalsTexture;
+layout (set = 0, binding = 6) uniform sampler2D LinearDepthTexture;
+
 #include "Shading.incl.glsl"
 
 layout (set = 0, binding = 4) readonly buffer PointsLights
 {
 	SLight Light[];
 };
-
-layout (set = 0, binding = 5) uniform sampler2D NormalsTexture;
-layout (set = 0, binding = 6) uniform sampler2D LinearDepthTexture;
 
 void main()
 {

@@ -135,6 +135,43 @@ vec3 SampleHemisphere(vec2 V)
 	return normalize(vec3(X, Y, sqrt(max(0.0, 1.0 - V.x))));
 }
 
+bool BlockedInScreenspace(vec3 Pos, vec3 Dir)
+{
+    const float InvFar = 1.0f / Viewport.w;
+	const float Thickness = VoxelDim * InvFar;
+
+    vec3 NewPosWS = Pos + Dir * (VoxelDim * 0.35 * BlueNoiseFloat());
+    for (int I = 0; I < 2; I++)
+    {
+        vec4 NewPosHS = Proj * View * vec4(NewPosWS, 1.0);
+        vec2 NewTexCoords = vec2(0.5, -0.5) * (NewPosHS.xy / NewPosHS.w) + vec2(0.5);
+
+        float NewDepth = length(NewPosWS - CameraPosition.xyz) * InvFar;    
+        float ActualDepth = texture(LinearDepthTexture, NewTexCoords).r;
+
+        if ((NewDepth > ActualDepth) && (NewDepth < ActualDepth + Thickness))
+            return true;
+
+        NewPosWS += Dir * (VoxelDim * 0.35 * BlueNoiseFloat());
+    }
+
+	return false;
+}
+
+float TraceAmbient(vec3 Pos, vec3 Dir, vec3 Normal, float MaxDistance)
+{
+    if (BlockedInScreenspace(Pos, Dir))
+		return 0.0;
+
+    vec3 Jitter = BlueNoiseVec3() - vec3(0.5);
+    Jitter -= Normal * dot(Normal, Jitter);
+    Jitter = normalize(Jitter) * VoxelDim * (0.5 * BlueNoiseFloat());
+    Pos += Jitter;
+
+    float HitDist = RaytraceDirectional(Pos, Dir, MaxDistance, 0.6 * VoxelDim);
+    return HitDist;
+}
+
 vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
 {
     vec3 Ambient = vec3(0.0, 0.0, 0.0);
@@ -150,12 +187,7 @@ vec3 CalculateAmbient(vec3 FragPosWS, vec3 Normal)
         vec3 DirTS = SampleHemisphere(BlueNoiseVec2());
         vec3 Dir = Tangent*DirTS.x + Bitangent*DirTS.y + Normal*DirTS.z;
 
-        vec3 Jitter = BlueNoiseVec3() - vec3(0.5);
-        Jitter -= Normal * dot(Normal, Jitter);
-        Jitter = normalize(Jitter) * VoxelDim * (0.5 * BlueNoiseFloat());
-        StartPos += Jitter;
-
-        float HitDist = RaytraceDirectional(StartPos, Dir, MaxDistance, 0.6 * VoxelDim);
+        float HitDist = TraceAmbient(StartPos, Dir, Normal, MaxDistance);
         float t = clamp(HitDist / MaxDistance, 0.0, 1.0);
         t = pow(t, 2.0);
 

@@ -43,12 +43,12 @@ layout (set = 0, binding = 3) uniform LightBuffer
 	vec4 AmbientConstant; // w - unused
 };
 
-#include "Shading.incl.glsl"
-
 layout (set = 0, binding = 4) uniform sampler2D NormalsTexture;
 layout (set = 0, binding = 5) uniform sampler2D LinearDepthTexture;
 layout (set = 0, binding = 6) uniform sampler2D DiffuseTexture;
 layout (set = 0, binding = 7) uniform sampler2D MaterialTexture;
+
+#include "Shading.incl.glsl"
 
 layout (set = 0, binding = 8) readonly buffer PointsLights
 {
