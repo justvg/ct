@@ -731,6 +731,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedVoxelsCount = 0;
 			}
 
+			ImGui::Checkbox("HideFog", &EngineState->bHideFog);
 			ImGui::Checkbox("GridSnap", &EditorState->bGridMode);
 			ImGui::Checkbox("GridSnap_CenterMode", &EditorState->bGridModeCenter);
 

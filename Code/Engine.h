@@ -306,6 +306,7 @@ struct SEngineState
 	bool bFlyMode;
 	bool bHideEntities;
 	bool bHideVoxels;
+	bool bHideFog;
 	bool bReloadLevelEditor;
 
 	SLevel LevelGameStartState;

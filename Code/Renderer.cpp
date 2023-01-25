@@ -334,7 +334,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->IndirectBuffer, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, false, bSwapchainChanged);
     
 	// Render voxels visibile last frame and frustum culled in this frame to GBuffer
-	Renderer->GBufferVoxelRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), Level->AmbientColor, FrameID, !EngineState->bHideVoxels);
+	Renderer->GBufferVoxelRenderPass.RenderEarly(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), Level->AmbientColor, FrameID, !EngineState->bHideVoxels || (EngineState->EngineMode == EngineMode_Game));
     
 	// Downscale linear depth buffer
 	Renderer->DownscaleComputePass.Dispatch(Vulkan, Renderer->LinearDepthImage, Renderer->DepthPyramidImage, Renderer->DepthPyramidMipCount);
@@ -343,10 +343,10 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->CullingVoxComputePass.Dispatch(Vulkan, Renderer->IndirectBuffer, Renderer->CountBuffer, Renderer->DepthPyramidImage, ArrayCount(EngineState->VoxelDraws), FrameID, true, bSwapchainChanged);
     
 	// Render voxels visible this frame that are not already rendered
-	Renderer->GBufferVoxelRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), FrameID, !EngineState->bHideVoxels);
+	Renderer->GBufferVoxelRenderPass.RenderLate(Vulkan, Renderer->VertexBuffer, Renderer->IndexBuffer, Renderer->IndirectBuffer, Renderer->CountBuffer, ArrayCount(EngineState->VoxelDraws), FrameID, !EngineState->bHideVoxels || (EngineState->EngineMode == EngineMode_Game));
     
 	// Render entities to GBuffer
-	if (!EngineState->bHideEntities)
+	if (!EngineState->bHideEntities || (EngineState->EngineMode == EngineMode_Game))
 	{
 		Renderer->GBufferRenderPass.Render(Vulkan, RenderEntities, EntityCountOpaque, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, FrameID, EngineState->EngineMode == EngineMode_Game, GameTime);
 	}
@@ -371,10 +371,13 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 	Renderer->DiffuseLightingPass.Render(Vulkan, Renderer->DiffuseLightImage, Renderer->DiffuseLightHistoryImages, Renderer->QuadVB, Renderer->AOQuality, LightInFrustumCount, FrameID, bSwapchainChanged);
 
 	// Calculate fog
-	Renderer->FogRenderPass.Render(Vulkan, Renderer->QuadVB, *Level, FrameID);
+	if (!EngineState->bHideFog || (EngineState->EngineMode == EngineMode_Game))
+	{
+		Renderer->FogRenderPass.Render(Vulkan, Renderer->QuadVB, *Level, FrameID);
+	}
 
 	// Render transparent objects
-	if (!EngineState->bHideEntities)
+	if (!EngineState->bHideEntities || (EngineState->EngineMode == EngineMode_Game))
 	{
 		Renderer->TransparentRenderPass.Render(Vulkan, RenderEntities + EntityCountOpaque, EntityCountTransparent, EngineState->Geometry, Renderer->VertexBuffer, Renderer->IndexBuffer, FrameID, GameTime);
 	}
