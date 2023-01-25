@@ -19,6 +19,11 @@ float RaytraceDirectionalVox(vec3 Pos, vec3 Dir, float MaxDistance)
         return MaxDistance;
     }
 
+    if (IsVoxelActive(X, Y, Z) > 0)
+    {
+        return 0.0;
+    }
+
     vec3 DirSign = sign(Dir);
     vec3 SignPositive = step(vec3(0.0), DirSign);
     vec3 InvDir = vec3(1.0) / (abs(Dir) + vec3(0.00001));
@@ -235,10 +240,10 @@ vec3 CalculateLight(SLight Light, vec3 FragPosWS, vec3 Normal)
     if ((DistanceToLight >= 0.01) && (DistanceToLight <= LightRange))
     {
         vec3 LightVec = (LightPos - FragPosWS) / DistanceToLight;
-        
         float Incoming = max(dot(LightVec, Normal), 0.0);
 
         // SpotLight
+        [[branch]]
         if (Light.LightType == 1)
         {
             const vec3 SpotLightDir = normalize(Light.Direction);
@@ -256,16 +261,19 @@ vec3 CalculateLight(SLight Light, vec3 FragPosWS, vec3 Normal)
         {
             float Attenuation = GetAttenuation(DistanceToLight, LightRange);
 
-			vec3 StartPos = FragPosWS;
-			vec3 Jitter = BlueNoiseVec3() - vec3(0.5);
+            // Calculate jitter
+			vec3 Jitter = BlueNoiseVec3();
 			Jitter -= Normal * dot(Normal, Jitter);
 			Jitter = normalize(Jitter) * VoxelDim * (0.5 * BlueNoiseFloat());
-			StartPos += Jitter;
-			StartPos += LightVec * VoxelDim * 0.5;
-			StartPos += Normal * VoxelDim * (0.6 * (1.0 - Incoming));
 
-            float HitDist = RaytraceDirectionalVox(StartPos, LightVec, DistanceToLight);
-            float Shadow = (HitDist == DistanceToLight) ? 1.0 : 0.0;
+            // Apply offsets
+			FragPosWS += 0.5 * Jitter;
+			FragPosWS += LightVec * VoxelDim * 0.5;
+			FragPosWS += Normal * VoxelDim * (0.6 * (1.0 - Incoming));
+
+            float NewDistanceToLight = length(LightPos - FragPosWS);
+            float HitDist = RaytraceDirectionalVox(FragPosWS, (LightPos - FragPosWS) / NewDistanceToLight, NewDistanceToLight);
+            float Shadow = (HitDist == NewDistanceToLight) ? 1.0 : 0.0;
 
             Result = Shadow * Attenuation * Incoming * Light.Color.rgb;
         }
