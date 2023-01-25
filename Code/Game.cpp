@@ -175,6 +175,11 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 		EngineState->bFlyMode = !EngineState->bFlyMode;
 	}
 
+	// if (WasDown(GameInput->Buttons[Button_V]))
+	// {
+	// 	PlatformChangeVSync(!PlatformGetVSync());
+	// }
+
 	// NOTE(georgii): Teleport between checkpoints.
 	if (WasDown(GameInput->Buttons[Button_F2]))
 	{
@@ -571,7 +576,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 
 					if (Length(Vec3(Entity->Velocity.x, 0.0f, Entity->Velocity.z)) > 0.2f)
 					{
-						Entity->LampOffset.y += 0.001f * Sin(5.0f * GameState->StepHandMovementTime);
+						Entity->LampOffset.y += GameInput->dt * 0.1f * Sin(5.0f * GameState->StepHandMovementTime);
 						GameState->StepHandMovementTime += GameInput->dt;
 
 						if (GameState->StepSoundTime >= GameState->StepSoundTimer)
