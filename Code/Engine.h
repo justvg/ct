@@ -46,6 +46,7 @@ enum EAOQuality
 
 #include "Level.h"
 
+const float StandartColorBoost = 100.0f;
 #include "VoxelCulling.cpp"
 #include "GBufferVoxelRender.cpp"
 #include "GBufferRender.cpp"

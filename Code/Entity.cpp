@@ -277,6 +277,30 @@ SEntity* AddCube(SLevel& Level, vec3 Pos)
 	return Entity;
 }
 
+SEntity* AddColorParticle(SLevel& Level, vec3 Pos, vec3 Color, vec3 TargetPos, float TimeToMove, bool bTargetHero)
+{
+	Assert(Level.EntityCount < ArrayCount(Level.Entities));
+	SEntity* Entity = &Level.Entities[Level.EntityCount++];
+	memset(Entity, 0, sizeof(SEntity));
+
+	Entity->Type = Entity_ColorParticle;
+	Entity->Pos = Pos;
+	Entity->BasePos = Pos;
+	Entity->TargetPos = TargetPos;
+	Entity->Dim = Vec3(1.0f);
+	Entity->Scale = 0.15f;
+
+	Entity->Color = Color;
+	Entity->Alpha = 1.0f;
+
+	Entity->MeshIndex = 3;
+
+	Entity->TimeToMove = TimeToMove;
+	Entity->bTargetHero = bTargetHero;
+
+	return Entity;
+}
+
 SEntity* AddEntityCopy(SLevel* Level, const SEntity* EntityToCopy)
 {
 	Assert(Level->EntityCount < ArrayCount(Level->Entities));
@@ -293,11 +317,89 @@ bool HasTargetPos(const SEntity* Entity)
 	return bResult;
 }
 
+bool CanAnimateColor(const SEntity* Entity)
+{
+	bool bResult = (Entity->Type == Entity_Hero) || 
+				   (Entity->Type == Entity_Torch) || 
+				   (Entity->Type == Entity_Wire) || 
+				   (Entity->Type == Entity_ColorParticle);
+
+	return bResult;
+}
+
+bool ShouldAnimateColorScale(const SEntity* Entity)
+{
+	bool bResult = (Entity->Type == Entity_Wire);
+
+	return bResult;
+}
+
+void AnimateEntityColor(SEntity* Entity, vec3 TargetColor, float TimeToChangeColor)
+{
+	const bool bCanAnimateColor = CanAnimateColor(Entity);
+	Assert(bCanAnimateColor);
+
+	if (bCanAnimateColor)
+	{
+		Entity->bChangeColorAnimation = true;
+		Entity->AnimationColor = TargetColor;
+		Entity->TimeToChangeColor = TimeToChangeColor;
+		Entity->TimeToChangeColorCurrent = 0.0f;
+	}
+}
+
+void StopEntityColorAnimation(SEntity* Entity)
+{
+	const bool bCanAnimateColor = CanAnimateColor(Entity);
+	Assert(bCanAnimateColor);
+
+	if (bCanAnimateColor)
+	{
+		if (ShouldAnimateColorScale(Entity))
+		{
+			Entity->ColorScale = Entity->AnimationColor.r;
+		}
+		else
+		{
+			Entity->Color = Entity->AnimationColor;
+		}
+
+		Entity->bChangeColorAnimation = false;
+		Entity->AnimationColor = Vec3(0.0f);
+		Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
+	}
+}
+
+void UpdateColorAnimation(SEntity* Entity, float DeltaTime)
+{
+	Entity->TimeToChangeColorCurrent += DeltaTime;
+	float t = Clamp(Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor, 0.0f, 1.0f);
+
+	if (ShouldAnimateColorScale(Entity))
+	{
+		Entity->ColorScale = Lerp(Entity->ColorScale, Entity->AnimationColor.x, t);
+	}
+	else
+	{
+		Entity->Color = Lerp(Entity->Color, Entity->AnimationColor, t);
+	}
+}
+
 bool CanCollide(const SEntity* A, const SEntity* B)
 {
 	bool bResult = true;
 
-	// Add tests here
+	if (A->Type > B->Type)
+	{
+		const SEntity* Temp = A;
+		A = B;
+		B = Temp;
+	}
+
+	if ((A->Type == Entity_ColorParticle || (B->Type == Entity_ColorParticle)))
+	{
+		bResult = false;
+	}
 
 	return bResult;
 }
@@ -322,9 +424,13 @@ bool BlockOnCollision(const SEntity* A, const SEntity* B)
 			bResult = A->Alpha > 0.05f;
 		}
 	}
+	else if ((A->Type == Entity_ColorParticle || (B->Type == Entity_ColorParticle)))
+	{
+		bResult = false;
+	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Door))
 	{
-		bResult = B->Alpha > 0.05f;
+		bResult = B->Alpha > 0.1f;
 	}
 	else if ((A->Type == Entity_Hero) && (B->Type == Entity_Gates))
 	{

@@ -17,6 +17,7 @@ enum EEntityType
 	Entity_Checkpoint,
 	Entity_ColorField,
 	Entity_Wire,
+	Entity_ColorParticle
 };
 
 enum ELightType
@@ -94,6 +95,12 @@ struct SEntity
 	{
 		vec3 TargetColor;
 		vec3 FireballColor;
+
+		struct
+		{
+			float TimeToMove;
+			float TimeToMoveCurrent;
+		};
 	};
 
 	union
@@ -120,7 +127,12 @@ struct SEntity
 		bool bClosedGates; // NOTE(georgii): Should be set for gates that are closed.
 	};
 	vec3 BasePos;
-	vec3 TargetOffset;
+
+	union
+	{
+		vec3 TargetOffset;
+		vec3 TargetPos;
+	};
 
 	union
 	{
@@ -153,6 +165,7 @@ struct SEntity
 
     union
     {
+		bool bTargetHero; // NOTE(georgii): Used for ColorParticle to know whom to follow - Hero or not.
 	    bool bForceClose; // NOTE(georgii): Used to force door to close. Currently only checkpoints do that.
         uint8_t CheckpointIndex; // NOTE(georgii): Used for checkpoint to easily teleport between them during development.
 		bool bFinishedLevel; // NOTE(georgii): Should be set for gates of the levels that are finished.

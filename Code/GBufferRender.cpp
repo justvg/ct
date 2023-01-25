@@ -146,20 +146,22 @@ void SGBufferRenderPass::Render(const SVulkanContext& Vulkan, SEntity* Entities,
 
 			case Entity_Torch:
 			{
-				PushConstants.Color.rgb *= 200.0f;
+				PushConstants.Color.rgb *= StandartColorBoost;
+			} break;
+
+			case Entity_ColorParticle:
+			{
+				PushConstants.Color.rgb *= StandartColorBoost;
 			} break;
 
 			case Entity_Wire:
 			{
-				if (Entity.bActive)
-				{
-					PushConstants.Color.rgb *= Max(Entity.ColorScale, 1.0f);
-				}
+				PushConstants.Color.rgb *= Max(Entity.ColorScale, 1.0f);
 			} break;
 
 			case Entity_Fireball:
 			{
-				PushConstants.Color.rgb *= 200.0f;
+				PushConstants.Color.rgb *= StandartColorBoost;
 			} break;
 
 			case Entity_MessageToggler:

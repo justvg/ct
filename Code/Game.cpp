@@ -229,6 +229,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 		}
 	}
 
+	const float StandartTimeToChangeColor = 0.5f;
 	if (GameState->bReload)
 	{
 		for (uint32_t I = 0; I < Level->EntityCount; I++)
@@ -271,9 +272,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 								if (IntersectRects(TestAABB, WireAABB))
 								{
 									WireEntity->bActive = true;
-									WireEntity->bChangeColorAnimation = true;
-									WireEntity->TimeToChangeColor = 0.5f;
-									WireEntity->TimeToChangeColorCurrent = 0.0f;
+									AnimateEntityColor(WireEntity, Vec3(StandartColorBoost), StandartTimeToChangeColor);
 
 									TestEntity = WireEntity;
 									TestAABB = WireAABB;
@@ -377,16 +376,13 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 							ChangePitch(SuccessColorSound, RandomFloat(0.75f, 1.25f));
 							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.1f));
 
-							HitEntity->bChangeColorAnimation = true;
-							HitEntity->AnimationColor = Vec3(0.0f);
-							HitEntity->TimeToChangeColor = 0.5f;
-							HitEntity->TimeToChangeColorCurrent = 0.0f;
+							AnimateEntityColor(HitEntity, Vec3(0.0f), StandartTimeToChangeColor);
+							AnimateEntityColor(HeroEntity, ResultColor, StandartTimeToChangeColor);
 
-							HeroEntity->bChangeColorAnimation = true;
-							HeroEntity->AnimationColor = ResultColor;
-							HeroEntity->TimeToChangeColor = 0.5f;
-							HeroEntity->TimeToChangeColorCurrent = 0.0f;
-
+							vec3 HeroLampPos = HeroEntity->Pos + (HeroEntity->LampOffset.x * HeroEntity->Dim.x * Camera->Right) + (HeroEntity->LampOffset.z * Camera->Dir) + (HeroEntity->LampOffset.y * Camera->Up);
+							SEntity* ColorParticleEntity = AddColorParticle(*Level, HitEntity->Pos, Vec3(0.0f), HeroLampPos, StandartTimeToChangeColor, true);
+							AnimateEntityColor(ColorParticleEntity, HitEntity->Color, StandartTimeToChangeColor);
+							
 							const SMesh& TorchMesh = EngineState->Geometry.Meshes[HitEntity->MeshIndex];
 							Rect TorchAABB = RectCenterDimOrientation(HitEntity->Pos, Hadamard(HitEntity->Dim, TorchMesh.Dim), EulerToQuat(HitEntity->Orientation.xyz));
 		
@@ -407,6 +403,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 										if (IntersectRects(TestAABB, WireAABB))
 										{
 											WireEntity->bActive = false;
+											AnimateEntityColor(WireEntity, Vec3(0.0f), StandartTimeToChangeColor);
 
 											TestEntity = WireEntity;
 											TestAABB = WireAABB;
@@ -438,15 +435,12 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 							ChangePitch(SuccessColorSound, RandomFloat(0.75f, 1.25f));
 							ChangeVolume(SuccessColorSound, 0.0f, Vec2(0.1f));
 
-							HitEntity->bChangeColorAnimation = true;
-							HitEntity->AnimationColor = ResultColor;
-							HitEntity->TimeToChangeColor = 0.5f;
-							HitEntity->TimeToChangeColorCurrent = 0.0f;
-							
-							HeroEntity->bChangeColorAnimation = true;
-							HeroEntity->AnimationColor = Vec3(0.0f);
-							HeroEntity->TimeToChangeColor = 0.5f;
-							HeroEntity->TimeToChangeColorCurrent = 0.0f;
+							AnimateEntityColor(HitEntity, ResultColor, StandartTimeToChangeColor);
+							AnimateEntityColor(HeroEntity, Vec3(0.0f), StandartTimeToChangeColor);
+
+							vec3 HeroLampPos = HeroEntity->Pos + (HeroEntity->LampOffset.x * HeroEntity->Dim.x * Camera->Right) + (HeroEntity->LampOffset.z * Camera->Dir) + (HeroEntity->LampOffset.y * Camera->Up);
+							SEntity* ColorParticleEntity = AddColorParticle(*Level, HeroLampPos, Vec3(0.0f), HitEntity->Pos, StandartTimeToChangeColor, false);
+							AnimateEntityColor(ColorParticleEntity, HeroEntity->Color, StandartTimeToChangeColor);
 
 							if (IsEqual(ResultColor, HitEntity->TargetColor))
 							{
@@ -471,9 +465,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 											if (IntersectRects(TestAABB, WireAABB))
 											{
 												WireEntity->bActive = true;
-												WireEntity->bChangeColorAnimation = true;
-												WireEntity->TimeToChangeColor = 0.5f;
-												WireEntity->TimeToChangeColorCurrent = 0.0f;
+												AnimateEntityColor(WireEntity, Vec3(StandartColorBoost), StandartTimeToChangeColor);
 
 												TestEntity = WireEntity;
 												TestAABB = WireAABB;
@@ -517,13 +509,9 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						if ((ResultColor.r <= 1.0f) && (ResultColor.g <= 1.0f) && (ResultColor.b <= 1.0f))
 						{
 							HitEntity->Color = Vec3(0.0f);
-
-							HeroEntity->bChangeColorAnimation = true;
-							HeroEntity->AnimationColor = ResultColor;
-							HeroEntity->TimeToChangeColor = 0.5f;
-							HeroEntity->TimeToChangeColorCurrent = 0.0f;
-
 							HitEntity->bRemoved = true;
+
+							AnimateEntityColor(HeroEntity, ResultColor, StandartTimeToChangeColor);
 						}
 					}
 				} break;
@@ -545,26 +533,23 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 
 			Entity->PrevPos = Entity->Pos;
 			Entity->PrevOrientation = Entity->Orientation;
+
+			if (CanAnimateColor(Entity) && Entity->bChangeColorAnimation)
+			{
+				if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
+				{
+					UpdateColorAnimation(Entity, GameInput->dt);
+				}
+				else
+				{
+					StopEntityColorAnimation(Entity);
+				}
+			}
 			
 			switch (Entity->Type)
 			{
 				case Entity_Hero:
 				{
-					if (Entity->bChangeColorAnimation)
-					{
-						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
-						{
-							Entity->Color = Lerp(Entity->Color, Entity->AnimationColor, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
-							Entity->TimeToChangeColorCurrent += GameInput->dt;
-						}
-						else
-						{
-							Entity->Color = Entity->AnimationColor;
-							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
-							Entity->bChangeColorAnimation = false;
-						}
-					}
-					
 					Entity->PrevLampOffset = Entity->LampOffset;
 					if (HeroControl.bUseLamp)
 					{
@@ -592,42 +577,6 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 					Entity->LampOffset += 15.0f * (Entity->LampBaseOffset - Entity->LampOffset) * GameInput->dt;
 				} break;
 				
-				case Entity_Torch:
-				{
-					if (Entity->bChangeColorAnimation)
-					{
-						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
-						{
-							Entity->Color = Lerp(Entity->Color, Entity->AnimationColor, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
-							Entity->TimeToChangeColorCurrent += GameInput->dt;
-						}
-						else
-						{
-							Entity->Color = Entity->AnimationColor;
-							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
-							Entity->bChangeColorAnimation = false;
-						}
-					}
-				} break;
-
-				case Entity_Wire:
-				{
-					if (Entity->bChangeColorAnimation)
-					{
-						if (Entity->TimeToChangeColorCurrent < Entity->TimeToChangeColor)
-						{
-							Entity->ColorScale = Lerp(1.0f, 200.0f, Entity->TimeToChangeColorCurrent / Entity->TimeToChangeColor);
-							Entity->TimeToChangeColorCurrent += GameInput->dt;
-						}
-						else
-						{
-							Entity->ColorScale = 200.0f;
-							Entity->TimeToChangeColorCurrent = Entity->TimeToChangeColor = 0.0f;
-							Entity->bChangeColorAnimation = false;
-						}
-					}
-				} break;
-
 				case Entity_Door:
 				{
 					Entity->Alpha = Lerp(0.99999f, 0.0f, Min(Entity->TimeToDisappearCurrent / Entity->TimeToDisappear, 1.0f));
@@ -677,6 +626,27 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 						Entity->TimeToDisappearCurrent += GameInput->dt;
 					}
 					else
+					{
+						Entity->bRemoved = true;
+					}
+				} break;
+
+				case Entity_ColorParticle:
+				{
+					if (Entity->bTargetHero)
+					{
+						const SEntity* HeroEntity = &Level->Entities[0];
+						Assert(HeroEntity->Type == Entity_Hero);
+						Entity->TargetPos = HeroEntity->Pos + (HeroEntity->LampOffset.x * HeroEntity->Dim.x * Camera->Right) + (HeroEntity->LampOffset.z * Camera->Dir) + (HeroEntity->LampOffset.y * Camera->Up);
+					}
+
+					float t = Entity->TimeToMoveCurrent / Entity->TimeToMove;
+					Entity->Pos = Lerp(Entity->Pos, Entity->TargetPos, t);
+
+					Entity->TimeToMoveCurrent += GameInput->dt;
+					Entity->TimeToMoveCurrent = Clamp(Entity->TimeToMoveCurrent, 0.0f, Entity->TimeToMove);
+
+					if (t >= 1.0f)
 					{
 						Entity->bRemoved = true;
 					}
