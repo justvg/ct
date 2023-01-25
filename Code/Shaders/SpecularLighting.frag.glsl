@@ -135,7 +135,7 @@ void main()
 			}
 
 			FragSpecular.rgb = vec3(VoxelColorR, VoxelColorG, VoxelColorB) * (Ambient + LightsColor);
-			FragSpecular.rgb = mix(FragSpecular.rgb, SampledDiffuse.rgb, uint(bTransparent) * ScreenPosFactor);
+			FragSpecular.rgb = mix(FragSpecular.rgb, SampledDiffuse.rgb, uint(bTransparent) * BlendFactor);
 		}
 		else
 		{
