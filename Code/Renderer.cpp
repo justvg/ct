@@ -499,7 +499,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
     
 #ifndef ENGINE_RELEASE
 	// DearImgui
-	RenderDearImgui(EngineState, &Vulkan, Renderer->HudRenderPass.GetFramebuffer());
+	RenderDearImgui(EngineState, &Vulkan, Renderer->HudRenderPass.GetFramebuffer(), FrameID);
 #endif
     
 	VkImageMemoryBarrier FinalRenderBarrier = CreateImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Renderer->FinalImage.Image, VK_IMAGE_ASPECT_COLOR_BIT);

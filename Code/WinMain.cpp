@@ -1021,6 +1021,8 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					LARGE_INTEGER FrameCpuBeginTime = WinGetWallClock();
 
+					BEGIN_PROFILER_BLOCK("PLATFORM_INPUT_HANDLING");
+
 					GameInput.MouseDeltaX = GameInput.MouseDeltaY = 0.0f;
                     GameInput.MouseWheelDelta = 0.0f;
 					for (uint32_t I = 0; I < ArrayCount(GameInput.Buttons); I++)
@@ -1071,6 +1073,8 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						}
 					}
 
+					END_PROFILER_BLOCK("PLATFORM_INPUT_HANDLING");
+
 					VkSurfaceCapabilitiesKHR SurfaceCaps = {};
 					VkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCaps));
 					if ((SurfaceCaps.currentExtent.width != 0) && (SurfaceCaps.currentExtent.height != 0))
@@ -1084,12 +1088,18 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 						uint32_t FrameInFlight = FrameID % FramesInFlight;
 
+
+						BEGIN_PROFILER_BLOCK("PRESENTING_OR_WAITING_GPU");
+
 						VkCheck(vkWaitForFences(Device, 1, &FrameFences[FrameInFlight], VK_TRUE, UINT64_MAX));
 						VkCheck(vkResetFences(Device, 1, &FrameFences[FrameInFlight]));
 
 						uint32_t ImageIndex = 0;
 						VkCheck(vkAcquireNextImageKHR(Device, Swapchain.VkSwapchain, UINT64_MAX, AcquireSemaphores[FrameInFlight], VK_NULL_HANDLE, &ImageIndex));
 						SLogger::Log("Next swapchain image acquired.\n", LoggerVerbosity_SuperDebug);
+
+						END_PROFILER_BLOCK("PRESENTING_OR_WAITING_GPU");
+
 
 						Vulkan.CommandBuffer = CommandBuffers[FrameInFlight];
 						Vulkan.bSwapchainChanged = bSwapchainChanged;
@@ -1189,6 +1199,9 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 						END_GPU_PROFILER_BLOCK("BLIT_TO_SWAPCHAIN", CommandBuffers[FrameInFlight], FrameInFlight);
 
+
+						BEGIN_PROFILER_BLOCK("PRESENTING_OR_WAITING_GPU");
+
 						VkCheck(vkEndCommandBuffer(CommandBuffers[FrameInFlight]));
 
 						VkPipelineStageFlags SubmitWaitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -1209,17 +1222,14 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 						PresentInfo.pSwapchains = &Swapchain.VkSwapchain;
 						PresentInfo.pImageIndices = &ImageIndex;
 						VkCheck(vkQueuePresentKHR(GraphicsQueue, &PresentInfo));
+
+						END_PROFILER_BLOCK("PRESENTING_OR_WAITING_GPU");
 					}
 
 					END_PROFILER_BLOCK("FRAME_TIME");
 
-					// OUTPUT_PROFILER_INFO();
+					CALCULATE_PROFILER_INFO();
 					CLEAR_PROFILER_INFO();
-
-					if (FrameID > (FramesInFlight - 2))
-					{
-						// OUTPUT_GPU_PROFILER_INFO(Device, FrameID % FramesInFlight);
-					}
 
 					LARGE_INTEGER FrameCpuEndTime = WinGetWallClock();
 					float FrameCpuTimeTemp = WinGetSecondsElapsed(FrameCpuBeginTime, FrameCpuEndTime);

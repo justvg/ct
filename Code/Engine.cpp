@@ -183,7 +183,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 
 		EngineState->bVignetteEnabled = true;
 
-		EngineState->AudioState.MasterVolume = 50;
+		EngineState->AudioState.MasterVolume = 100;
 		EngineState->AudioState.MusicVolume = 50;
 		EngineState->AudioState.EffectsVolume = 50;
 		EngineState->LoadedSounds[Sound_Footstep0] = LoadWAV("Sounds\\Footsteps\\Footstep0.wav");
@@ -446,9 +446,12 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	UpdateVoxels(EngineState, Vulkan, Level);
 
 	// Sound mixing
-	STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-	OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
-	EndTempMemoryArena(&SoundTempMemory);
+	if (GameInput.FrameID > 2)
+	{
+		STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
+		OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
+		EndTempMemoryArena(&SoundTempMemory);
+	}
     
 	// Render
 // #ifndef ENGINE_RELEASE

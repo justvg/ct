@@ -22,7 +22,23 @@ struct SCpuProfilerBlock
     uint64_t TotalCycles;
 	float TotalTime;
 
+    uint32_t Depth;
+
     uint32_t HitCount;
+};
+
+struct SCpuProfilerBlockOuput
+{
+    const char* Name;
+    float TotalTime;
+    uint64_t TotalCycles;
+    uint32_t HitCount;
+    uint32_t Depth;
+};
+struct SCpuProfilerOutput
+{
+    uint32_t Count;
+    SCpuProfilerBlockOuput* Blocks;
 };
 
 struct SCpuProfiler
@@ -31,12 +47,17 @@ public:
     void BeginProfilerBlock(const char* Name);
     void EndProfilerBlock(const char* Name);
 
-    void OutputInfo();
+    SCpuProfilerOutput CalculateInfo();
 	void ClearInfo();
+
+    SCpuProfilerOutput GetProfilerOutput() { return ProfilerOutput; };
 
 private:
     // NOTE(georgii): Must be a power of two!
     SCpuProfilerBlock BlocksHashTable[512];
+    SCpuProfilerBlockOuput OutputBlocks[ArrayCount(BlocksHashTable)];
+    SCpuProfilerOutput ProfilerOutput;
+    uint32_t CurrentDepth;
 
 private:
     SCpuProfilerBlock* GetBlockFromName(const char* Name);
@@ -51,7 +72,10 @@ void SCpuProfiler::BeginProfilerBlock(const char* Name)
     if (Block->HitCount == 0)
     {
         Block->FirstCycleInFrame = Block->CycleStartValue;
+        Block->Depth = CurrentDepth;
     }
+
+    CurrentDepth++;
 }
 
 void SCpuProfiler::EndProfilerBlock(const char* Name)
@@ -65,9 +89,10 @@ void SCpuProfiler::EndProfilerBlock(const char* Name)
 	Block->TotalTime += 1000.0f * WinGetSecondsElapsed(Block->TimeStartValue, Block->TimeEndValue);
 
     Block->HitCount++;
+    CurrentDepth--;
 }
 
-void SCpuProfiler::OutputInfo()
+SCpuProfilerOutput SCpuProfiler::CalculateInfo()
 {
     SCpuProfilerBlock SortedBlocks[ArrayCount(BlocksHashTable)];
     memcpy(SortedBlocks, BlocksHashTable, sizeof(SortedBlocks));
@@ -95,38 +120,45 @@ void SCpuProfiler::OutputInfo()
         }
     }
 
-	// Bubble sort 
-	for (uint32_t I = 0; I < BlocksCount - 1; I++)
-	{
-		bool bSwapped  = false;
-		for (uint32_t J = 0; J < BlocksCount - I - 1; J++)
-		{
-			if (SortedBlocks[J].FirstCycleInFrame > SortedBlocks[J + 1].FirstCycleInFrame)
-			{
-				SCpuProfilerBlock Temp = SortedBlocks[J];
-				SortedBlocks[J] = SortedBlocks[J + 1];
-				SortedBlocks[J + 1] = Temp;
-
-				bSwapped = true;
-			}
-		}
-
-		if (!bSwapped)
+    ProfilerOutput.Count = BlocksCount;
+    ProfilerOutput.Blocks = OutputBlocks;
+    if (BlocksCount)
+    {
+        // Bubble sort 
+        for (uint32_t I = 0; I < BlocksCount - 1; I++)
         {
-			break;
+            bool bSwapped  = false;
+            for (uint32_t J = 0; J < BlocksCount - I - 1; J++)
+            {
+                if (SortedBlocks[J].FirstCycleInFrame > SortedBlocks[J + 1].FirstCycleInFrame)
+                {
+                    SCpuProfilerBlock Temp = SortedBlocks[J];
+                    SortedBlocks[J] = SortedBlocks[J + 1];
+                    SortedBlocks[J + 1] = Temp;
+
+                    bSwapped = true;
+                }
+            }
+
+            if (!bSwapped)
+            {
+                break;
+            }
         }
-	}
 
-	for (uint32_t I = 0; I < BlocksCount; I++)
-	{
-		SCpuProfilerBlock &Block = SortedBlocks[I];
+        for (uint32_t I = 0; I < BlocksCount; I++)
+        {
+            SCpuProfilerBlock &Block = SortedBlocks[I];
 
-		char Output[256];
-		snprintf(Output, sizeof(Output), "%s: %.3fms/hit %lldcycl/hit %u\n", Block.Name, Block.TotalTime / Block.HitCount, Block.TotalCycles / Block.HitCount, Block.HitCount);
-		PlatformOutputDebugString(Output);
-	}
+            OutputBlocks[I].Name = Block.Name;
+            OutputBlocks[I].TotalTime = Block.TotalTime;
+            OutputBlocks[I].TotalCycles = Block.TotalCycles;
+            OutputBlocks[I].HitCount = Block.HitCount;
+            OutputBlocks[I].Depth = Block.Depth;
+        }
+    }
 
-	PlatformOutputDebugString("\n\n");
+    return ProfilerOutput;
 }
 
 void SCpuProfiler::ClearInfo()
@@ -177,14 +209,16 @@ static SCpuProfiler CpuProfiler = {};
 
 #define BEGIN_PROFILER_BLOCK(BlockName) CpuProfiler.BeginProfilerBlock(BlockName)
 #define END_PROFILER_BLOCK(BlockName) CpuProfiler.EndProfilerBlock(BlockName)
-#define OUTPUT_PROFILER_INFO() CpuProfiler.OutputInfo()
+#define CALCULATE_PROFILER_INFO() CpuProfiler.CalculateInfo()
+#define GET_PROFILER_OUTPUT() CpuProfiler.GetProfilerOutput()
 #define CLEAR_PROFILER_INFO() CpuProfiler.ClearInfo()
 
 #else
 
 #define BEGIN_PROFILER_BLOCK(BlockName)
 #define END_PROFILER_BLOCK(BlockName)
-#define OUTPUT_PROFILER_INFO()
+#define CALCULATE_PROFILER_INFO()
+#define GET_PROFILER_OUTPUT()
 #define CLEAR_PROFILER_INFO()
 
 #endif

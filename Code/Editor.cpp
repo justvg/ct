@@ -76,7 +76,7 @@ bool EditorInputText(SEditorState* EditorState, const char* Name, char* Buffer, 
 	return bEnter;
 }
 
-void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, VkFramebuffer Framebuffer)
+void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, VkFramebuffer Framebuffer, uint32_t FrameID)
 {
 	SEditorState* EditorState = &EngineState->EditorState;
 	EditorState->bIsImguiWindowHovered = false;
@@ -88,7 +88,8 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
     BeginInfo.renderArea.extent.width = Vulkan->Width;
     BeginInfo.renderArea.extent.height = Vulkan->Height;
 	vkCmdBeginRenderPass(Vulkan->CommandBuffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    
+
+	ImVec2 ProfilersWindowOffset = {};
 	if (EngineState->EngineMode == EngineMode_Game)
 	{
 		if (ImGui::Begin("Mode", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
@@ -106,6 +107,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EngineState->bMenuOpened = false;
 			}
             
+			ProfilersWindowOffset = ImGui::GetWindowSize();
 			ImGui::SetWindowPos(ImVec2(0, 0), true);
 			EditorState->bIsImguiWindowHovered |= ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_RootAndChildWindows);
 		}
@@ -219,6 +221,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 			}
             
 			LevelsWindowSize = ImGui::GetWindowSize();
+			ProfilersWindowOffset = LevelsWindowSize;
 			ImGui::SetWindowPos(ImVec2(0, 0), true);
 			EditorState->bIsImguiWindowHovered |= ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_RootAndChildWindows);
 		}
@@ -266,6 +269,7 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 				EditorState->SelectedVoxelRoughFloat = 0.0f;
 			}
             
+			ProfilersWindowOffset += ImGui::GetWindowSize();
 			ImGui::SetWindowPos(ImVec2(0, Max(LevelsWindowSize.y, ModeWindowSize.y)), true);
 			EditorState->bIsImguiWindowHovered |= ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_RootAndChildWindows);
 		}
@@ -751,6 +755,66 @@ void RenderDearImgui(SEngineState* EngineState, const SVulkanContext* Vulkan, Vk
 		}
 		ImGui::End();
 	}
+
+	if (ImGui::Begin("Profilers", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
+	{
+		if (ImGui::TreeNode("CPU"))
+		{
+			if (FrameID != 0)
+			{
+				SCpuProfilerOutput CpuProfilerOutput = GET_PROFILER_OUTPUT();
+				for (uint32_t TimingIndex = 0; TimingIndex < CpuProfilerOutput.Count; TimingIndex++)
+				{
+					SCpuProfilerBlockOuput* Timing = CpuProfilerOutput.Blocks + TimingIndex;
+
+					int32_t Depth = int32_t(Timing->Depth);
+					while (Depth > 0)
+					{
+						ImGui::Text("\t");
+						ImGui::SameLine();
+						Depth--;
+					}
+
+					if (Timing->HitCount > 1)
+					{
+						ImGui::Text("%s %.3fms %.3fms/hit %uhits", Timing->Name, Timing->TotalTime, Timing->TotalTime / Timing->HitCount, Timing->HitCount);
+					}
+					else
+					{
+						ImGui::Text("%s %.3fms", Timing->Name, Timing->TotalTime);
+					}
+				}
+			}
+			ImGui::TreePop();
+		}
+
+		if(ImGui::TreeNode("GPU"))
+		{
+			if (FrameID > (FramesInFlight - 2))
+			{
+				SGpuProfilerOutput GpuProfilerOutput = OUTPUT_GPU_PROFILER_INFO(Vulkan->Device, FrameID % FramesInFlight);
+				for (uint32_t TimingIndex = 0; TimingIndex < GpuProfilerOutput.Count; TimingIndex++)
+				{
+					SGpuProfilerBlockOuput* Timing = GpuProfilerOutput.Blocks + TimingIndex;
+
+					int32_t Depth = int32_t(Timing->Depth);
+					while (Depth > 0)
+					{
+						ImGui::Text("\t");
+						ImGui::SameLine();
+						Depth--;
+					}
+
+					ImGui::Text("%s %.3fms", Timing->Name, Timing->Time);
+				}
+			}
+			ImGui::TreePop();
+		}
+
+		ImGui::SetWindowPos(ImVec2(0.0f, ProfilersWindowOffset.y), true);
+		EditorState->bIsImguiWindowHovered |= ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_RootAndChildWindows);
+	}
+	ImGui::End();
     
 	BEGIN_GPU_PROFILER_BLOCK("IMGUI_RENDER", Vulkan->CommandBuffer, Vulkan->FrameInFlight);
     

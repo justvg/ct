@@ -17,6 +17,18 @@ struct SGpuProfilerBlock
     uint32_t HierarchyDepth[FramesHistory];
 };
 
+struct SGpuProfilerBlockOuput
+{
+    const char* Name;
+    float Time;
+    uint32_t Depth;
+};
+struct SGpuProfilerOutput
+{
+    uint32_t Count;
+    SGpuProfilerBlockOuput* Blocks;
+};
+
 struct SGpuProfiler
 {
 public:
@@ -25,7 +37,7 @@ public:
     void BeginProfilerBlock(const char* Name, VkCommandBuffer CommandBuffer, uint32_t FrameInFlight);
     void EndProfilerBlock(const char* Name, VkCommandBuffer CommandBuffer, uint32_t FrameInFlight);
 
-    void OutputInfo(VkDevice Device, uint32_t FrameInFlight);
+    SGpuProfilerOutput OutputInfo(VkDevice Device, uint32_t FrameInFlight);
 	void ClearInfo(VkCommandBuffer CommandBuffer, uint32_t FrameInFlight);
 
 private:
@@ -40,6 +52,7 @@ private:
 
     // NOTE(georgii): Must be a power of two!
     SGpuProfilerBlock BlocksHashTable[512];
+    SGpuProfilerBlockOuput OutputBlocks[ArrayCount(BlocksHashTable)];
 
 	PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
 	PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
@@ -108,7 +121,7 @@ void SGpuProfiler::EndProfilerBlock(const char* Name, VkCommandBuffer CommandBuf
 	}
 }
 
-void SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
+SGpuProfilerOutput SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
 {
     SGpuProfilerBlock SortedBlocks[ArrayCount(BlocksHashTable)];
     memcpy(SortedBlocks, BlocksHashTable, sizeof(SortedBlocks));
@@ -138,9 +151,10 @@ void SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
         }
     }
 
-	// Bubble sort 
+    SGpuProfilerOutput ProfilerOutput = { BlocksCount, OutputBlocks };
     if (BlocksCount > 0)
     {
+	    // Bubble sort 
 	    for (uint32_t I = 0; I < BlocksCount - 1; I++)
 	    {
 		    bool bSwapped  = false;
@@ -175,17 +189,13 @@ void SGpuProfiler::OutputInfo(VkDevice Device, uint32_t FrameInFlight)
             double EndTime = double(TimestampResults[Block.QueryEndIndex[LastFrameInFlight]]) * (TimestampPeriod * 1e-6);
             double Time = EndTime - BeginTime;
 
-		    char Output[128];
-            for (uint32_t J = 0; J < Block.HierarchyDepth[LastFrameInFlight]; J++)
-            {
-                Output[J] = '\t';
-            }
-		    snprintf(Output + Block.HierarchyDepth[LastFrameInFlight], sizeof(Output) - Block.HierarchyDepth[LastFrameInFlight], "%s: %.3fms\n", Block.Name, Time);
-		    PlatformOutputDebugString(Output);
+            OutputBlocks[I].Name = Block.Name;
+            OutputBlocks[I].Time = float(Time);
+            OutputBlocks[I].Depth = Block.HierarchyDepth[LastFrameInFlight];
 	    }
-
-	    PlatformOutputDebugString("\n\n");
     }
+
+    return ProfilerOutput;
 }
 
 void SGpuProfiler::ClearInfo(VkCommandBuffer CommandBuffer, uint32_t FrameInFlight)
