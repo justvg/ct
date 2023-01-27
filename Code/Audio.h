@@ -15,7 +15,7 @@ struct SPlayingSound
 
 	float Pitch;
 
-	uint32_t SamplesPlayed;
+	float SamplePos;
 
 	uint32_t SoundID;
 };

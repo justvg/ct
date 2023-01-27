@@ -70,6 +70,7 @@ inline float Floor(float Value)
 
 inline uint32_t FloorToUInt32(float Value)
 {
+    Assert(Value >= 0.0f);
 	uint32_t Result = (uint32_t)Value;
 
     return Result;
@@ -77,6 +78,7 @@ inline uint32_t FloorToUInt32(float Value)
 
 inline uint32_t CeilToUInt32(float Value)
 {
+    Assert(Value >= 0.0f);
 	uint32_t Result = (uint32_t)Value;
 	if (Value > Result) 
     {

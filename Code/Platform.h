@@ -267,6 +267,8 @@ void PlatformCreateThread(RunningThreadType* RunningThreadFunction, void* Data);
 void PlatformInterlockedExchange(uint32_t volatile* Target, uint32_t Value);
 uint32_t PlatformInterlockedIncrement(uint32_t volatile* Target);
 
+SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime);
+
 void PlatformDisableCursor(SGameInput* GameInput);
 void PlatformEnableCursor(SGameInput* GameInput);
 void PlatformToggleCursor(SGameInput* GameInput, bool bEnable, bool bShowCursor = true);

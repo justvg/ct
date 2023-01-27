@@ -159,7 +159,7 @@ void UpdateVoxels(SEngineState* EngineState, const SVulkanContext& Vulkan, SLeve
 	}
 }
 
-VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, const SGameInput& GameInput, const SGameSoundBuffer& SoundBuffer)
+VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, const SGameInput& GameInput)
 {
 	Assert((sizeof(SEngineState) + sizeof(SGameState)) <= GameMemory->StorageSize);
 
@@ -444,22 +444,14 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
     
 	// NOTE(georgii): Delete all voxels that were marked for deletion. Add all voxels that were added. Chnage all voxels that were updated. Update appropriate GPU buffers.
 	UpdateVoxels(EngineState, Vulkan, Level);
-
-	// Sound mixing
-	if (GameInput.FrameID > 2)
-	{
-		STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-		OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
-		EndTempMemoryArena(&SoundTempMemory);
-	}
     
 	// Render
-// #ifndef ENGINE_RELEASE
+#ifndef ENGINE_RELEASE
 	char FrameTimeText[64];
 	const float FrameMS = uint32_t(10000.0f * GameInput.dt) / 10.0f;
 	snprintf(FrameTimeText, sizeof(FrameTimeText), "%.1fms/f %dFPS\n\n", FrameMS, (uint32_t)(1000.0f / FrameMS));
 	AddTextOneFrame(EngineState, FrameTimeText, Vec2(-1.0f, -0.95f), 0.1f, Vec4(1.0f), TextAlignment_Left);
-// #endif
+#endif
 
 	vec2 MousePos = Vec2(float(GameInput.PlatformMouseX), float(GameInput.PlatformMouseY));
 
@@ -523,6 +515,15 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 #if ENGINE_RELEASE
 	SaveGeneralSaveData(EngineState);
 #endif
+
+	// Sound mixing
+	if (GameInput.FrameID > 1)
+	{
+		STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
+		SGameSoundBuffer SoundBuffer = PlatformGetSoundBufferForThisFrame(GameInput.dt);
+		OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
+		EndTempMemoryArena(&SoundTempMemory);
+	}
     
 	return FinalImage;
 }

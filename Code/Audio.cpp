@@ -110,17 +110,68 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 		uint32_t SamplesPerSec = SoundBuffer.SamplesPerSec;
 		float SecsPerSample = 1.0f / SamplesPerSec;
 
-		for (uint32_t I = 0; I < AudioState->PlayingSoundCount; I++)
+		for (uint32_t I = 0; I < AudioState->PlayingSoundCount;)
 		{
 			SPlayingSound* PlayingSound = &AudioState->PlayingSounds[I];
 			const SLoadedWAV* Sound = &LoadedSounds[PlayingSound->SoundID];
 			int16_t* SoundSamples = Sound->Samples;
 
+			vec2 SoundVolumeMultiplier = Vec2(1.0f);
+			const float MusicCoeff = 0.5f;
+			const float EffectsCoeff = 0.25f;
+			if (PlayingSound->bMusic)
+			{
+				vec2 MusicVolume = MusicCoeff * Vec2(AudioState->MusicVolume / 100.0f);
+				SoundVolumeMultiplier = Hadamard(SoundVolumeMultiplier, MusicVolume);
+			}
+			else
+			{
+				vec2 EffectsVolume = EffectsCoeff * Vec2(AudioState->EffectsVolume / 100.0f);
+				SoundVolumeMultiplier = Hadamard(SoundVolumeMultiplier, EffectsVolume);
+			}
+
+			if (PlayingSound->bThreeD)
+			{
+				const float MaxSoundDistance = 30.0f;
+
+				vec3 DistanceVec = ListenerPos - PlayingSound->Pos;
+				float DistanceSquared = Dot(DistanceVec, DistanceVec);
+
+				if (DistanceSquared > Square(MaxSoundDistance))
+				{
+					// TODO(georgii): Think about this!
+					SoundVolumeMultiplier = Vec2(0.0f);
+				}
+				else
+				{
+					float Distance = SquareRoot(DistanceSquared);
+
+					float HitCoefficient = 1.0f;
+					SRaytraceVoxelsResult RaytraceVoxelsResult = RaytraceVoxels(Level, PlayingSound->Pos, Normalize(DistanceVec), Distance);
+					if (RaytraceVoxelsResult.bHit)
+					{
+						// TODO(georgii): Think about this!
+						// HitCoefifcient *= RaytraceVoxelsResult.Distance / Distance;
+					}
+
+					if (DistanceSquared > FloatEpsilon)
+					{
+						SoundVolumeMultiplier *= HitCoefficient * Min(Square(9.0f) / DistanceSquared, 1.0f);
+					}
+				}
+			}
+
 			uint32_t TotalSamplesToMix = SoundBuffer.SampleCount;
 			uint32_t SamplesMixed = 0; 
 			while (!PlayingSound->bFinished && (TotalSamplesToMix > 0))
 			{
-				uint32_t SamplesRemainingInSound = CeilToUInt32((Sound->SampleCount - PlayingSound->SamplesPlayed) / PlayingSound->Pitch);
+				// NOTE(georgii): This formula is super strange, but it seems like it works.
+				//				  Actually, if I'm not interested to be super precise I can use commented formulas,
+				// 				  and when sampling this sound's buffer check for sampling outside the array.
+				float FloatSamplesRemainingInSound = ((Sound->SampleCount - 1) - (PlayingSound->SamplePos - PlayingSound->Pitch)) / PlayingSound->Pitch;
+				uint32_t SamplesRemainingInSound = FloorToUInt32(FloatSamplesRemainingInSound);
+				// float FloatSamplesRemainingInSound = (Sound->SampleCount - roundf(PlayingSound->SamplePos)) / PlayingSound->Pitch;
+				// uint32_t SamplesRemainingInSound = uint32_t(roundf(FloatSamplesRemainingInSound));
 				uint32_t SamplesToMix = TotalSamplesToMix > SamplesRemainingInSound ? SamplesRemainingInSound : TotalSamplesToMix;
 
 				vec2 DeltaVolumePerSample = PlayingSound->DeltaVolume * SecsPerSample;
@@ -140,70 +191,29 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 					}
 				}
 
-				const float Step = PlayingSound->Pitch;
+				float SamplePos = PlayingSound->SamplePos;
 				for (uint32_t J = 0; J < SamplesToMix; J++)
 				{
-					vec2 Volume = PlayingSound->CurrentVolume;
+					vec2 Volume = Hadamard(PlayingSound->CurrentVolume, SoundVolumeMultiplier);
 
-					const float MusicCoeff = 0.5f;
-					const float EffectsCoeff = 0.25f;
-					if (PlayingSound->bMusic)
-					{
-						vec2 MusicVolume = MusicCoeff * Vec2(AudioState->MusicVolume / 100.0f);
-						Volume = Hadamard(Volume, MusicVolume);
-					}
-					else
-					{
-						vec2 EffectsVolume = EffectsCoeff * Vec2(AudioState->EffectsVolume / 100.0f);
-						Volume = Hadamard(Volume, EffectsVolume);
-					}
+					uint32_t LeftSampleIndex = FloorToUInt32(SamplePos);
+					uint32_t RightSampleIndex = CeilToUInt32(SamplePos);
 
-					if (PlayingSound->bThreeD)
-					{
-						const float MaxSoundDistance = 30.0f;
+					float Frac = SamplePos - float(LeftSampleIndex);
 
-						vec3 DistanceVec = ListenerPos - PlayingSound->Pos;
-						float DistanceSquared = Dot(DistanceVec, DistanceVec);
-
-						if (DistanceSquared > Square(MaxSoundDistance))
-						{
-							Volume = Vec2(0.0f);
-						}
-						else
-						{
-							float Distance = SquareRoot(DistanceSquared);
-
-							float HitCoefficient = 1.0f;
-							SRaytraceVoxelsResult RaytraceVoxelsResult = RaytraceVoxels(Level, PlayingSound->Pos, Normalize(DistanceVec), Distance);
-							if (RaytraceVoxelsResult.bHit)
-							{
-								HitCoefficient *= RaytraceVoxelsResult.Distance / Distance;
-							}
-
-							if (DistanceSquared > FloatEpsilon)
-							{
-								Volume *= HitCoefficient * Min(Square(9.0f) / DistanceSquared, 1.0f);
-							}
-						}
-					}
-
-					float Position = J * Step;
-					uint32_t LeftSampleIndex = FloorToUInt32(Position);
-					uint32_t RightSampleIndex = CeilToUInt32(Position);
-					float Frac = Position - float(LeftSampleIndex);
-
-					float LeftSample0 = SoundSamples[2 * PlayingSound->SamplesPlayed + 2 * LeftSampleIndex];
-					float RightSample0 = SoundSamples[2 * PlayingSound->SamplesPlayed + 2 * RightSampleIndex];
+					float LeftSample0 = SoundSamples[2 * LeftSampleIndex];
+					float RightSample0 = SoundSamples[2 * RightSampleIndex];
 					float Sample0 = Lerp(LeftSample0, RightSample0, Frac);
 
-					float LeftSample1 = SoundSamples[2 * PlayingSound->SamplesPlayed + 2 * LeftSampleIndex + 1];
-					float RightSample1 = SoundSamples[2 * PlayingSound->SamplesPlayed + 2 * RightSampleIndex + 1];
+					float LeftSample1 = SoundSamples[2 * LeftSampleIndex + 1];
+					float RightSample1 = SoundSamples[2 * RightSampleIndex + 1];
 					float Sample1 = Lerp(LeftSample1, RightSample1, Frac);
 
 					SamplesFloat[2 * (J + SamplesMixed)] += Volume.x * Sample0;
 					SamplesFloat[2 * (J + SamplesMixed) + 1] += Volume.y * Sample1;
 
 					PlayingSound->CurrentVolume += DeltaVolumePerSample;
+					SamplePos += PlayingSound->Pitch;
 				}
 
 				for (uint32_t J = 0; J < ArrayCount(VolumeEndSamples); J++)
@@ -215,26 +225,30 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 					}
 				}
 
-				PlayingSound->SamplesPlayed += CeilToUInt32(PlayingSound->Pitch * SamplesToMix);
-				if (PlayingSound->SamplesPlayed >= Sound->SampleCount)
+				SamplesMixed += SamplesToMix;
+				TotalSamplesToMix -= SamplesToMix;
+
+				PlayingSound->SamplePos = SamplePos;
+				if (PlayingSound->SamplePos >= (Sound->SampleCount - 1))
 				{
 					if (PlayingSound->bLoop)
 					{
-						PlayingSound->SamplesPlayed = 0;
+						PlayingSound->SamplePos = 0;
 					}
 					else
 					{
 						PlayingSound->bFinished = true;
 					}
 				}
-
-				SamplesMixed += SamplesToMix;
-				TotalSamplesToMix -= SamplesToMix;
 			}
 
 			if (PlayingSound->bFinished)
 			{
 				AudioState->PlayingSounds[I] = AudioState->PlayingSounds[--AudioState->PlayingSoundCount];
+			}
+			else
+			{
+				I++;
 			}
 		}
 
