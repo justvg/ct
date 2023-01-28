@@ -885,9 +885,9 @@ void UpdateEditor(SEngineState* EngineState, SGameInput* GameInput, const SVulka
 			Camera->Head += -Sign(Camera->Head) * 360.0f;
 		}
 
-		Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
-		Camera->Dir.y = Sin(Radians(Camera->Pitch));
-		Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
+		Camera->Dir.x = Cos(Camera->Pitch) * Sin(Camera->Head);
+		Camera->Dir.y = Sin(Camera->Pitch);
+		Camera->Dir.z = Cos(Camera->Pitch) * Cos(Camera->Head);
 		Camera->Dir = Normalize(Camera->Dir);
 		
 		Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));

@@ -198,9 +198,9 @@ void CreateSphereMesh(SGeometry& Geometry)
 		{
 			const float Theta = 360.0f * (float(Sector) / SectorCount);
 
-			float X = Sin(Radians(Phi)) * Sin(Radians(Theta));
-			float Y = Cos(Radians(Phi));
-			float Z = -Sin(Radians(Phi)) * Cos(Radians(Theta));
+			float X = Sin(Phi) * Sin(Theta);
+			float Y = Cos(Phi);
+			float Z = -Sin(Phi) * Cos(Theta);
 			Vertices[VertexIndex].Pos = 0.5f * Vec3(X, Y, Z);
 			Vertices[VertexIndex++].Normal = Normalize(Vertices[VertexIndex].Pos);
 		}

@@ -134,18 +134,18 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 		Camera->Head += -Sign(Camera->Head) * 360.0f;
 	}
 	
-	Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
-	Camera->Dir.y = Sin(Radians(Camera->Pitch));
-	Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
+	Camera->Dir.x = Cos(Camera->Pitch) * Sin(Camera->Head);
+	Camera->Dir.y = Sin(Camera->Pitch);
+	Camera->Dir.z = Cos(Camera->Pitch) * Cos(Camera->Head);
 	Camera->Dir = Normalize(Camera->Dir);
 	
 	Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
 	Camera->Up = Cross(Camera->Right, Camera->Dir);
 	
 	vec3 MovementDir;
-	MovementDir.x = Sin(Radians(Camera->Head));
+	MovementDir.x = Sin(Camera->Head);
 	MovementDir.y = 0.0f;
-	MovementDir.z = Cos(Radians(Camera->Head));
+	MovementDir.z = Cos(Camera->Head);
 	MovementDir = Normalize(MovementDir);
 	SHeroControl HeroControl = {};
 	if (GameInput->Buttons[Button_W].IsDown)
@@ -561,7 +561,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 
 					if (Length(Vec3(Entity->Velocity.x, 0.0f, Entity->Velocity.z)) > 0.2f)
 					{
-						Entity->LampOffset.y += GameInput->dt * 0.1f * Sin(5.0f * GameState->StepHandMovementTime);
+						Entity->LampOffset.y += GameInput->dt * 0.1f * Sin(280.0f * GameState->StepHandMovementTime);
 						GameState->StepHandMovementTime += GameInput->dt;
 
 						if (GameState->StepSoundTime >= GameState->StepSoundTimer)
@@ -762,9 +762,9 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 								HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
 							}
 							
-							Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
-							Camera->Dir.y = Sin(Radians(Camera->Pitch));
-							Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
+							Camera->Dir.x = Cos(Camera->Pitch) * Sin(Camera->Head);
+							Camera->Dir.y = Sin(Camera->Pitch);
+							Camera->Dir.z = Cos(Camera->Pitch) * Cos(Camera->Head);
 							Camera->Dir = Normalize(Camera->Dir);
 							
 							Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));

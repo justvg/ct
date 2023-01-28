@@ -296,9 +296,9 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 				float CameraHead = Camera.Head;
 
 				vec3 CameraDir;
-				CameraDir.x = Cos(Radians(CameraPitch)) * Sin(Radians(CameraHead));
-				CameraDir.y = Sin(Radians(CameraPitch));
-				CameraDir.z = Cos(Radians(CameraPitch)) * Cos(Radians(CameraHead));
+				CameraDir.x = Cos(CameraPitch) * Sin(CameraHead);
+				CameraDir.y = Sin(CameraPitch);
+				CameraDir.z = Cos(CameraPitch) * Cos(CameraHead);
 				CameraDir = Normalize(CameraDir);
 				
 				vec3 CameraRight = Camera.Right;
@@ -691,9 +691,9 @@ void UpdateCameraRenderData(SRenderer* Renderer, const SCamera& Camera, uint32_t
 	SBuffer& CameraBuffer = Renderer->CameraBuffers[FrameInFlight];
 
 	float AspectRatio = float(Width) / float(Height);
-	float NearHalfHeight = Camera.Near * tanf(0.5f*Radians(Camera.FoV));
+	float NearHalfHeight = Camera.Near * Tan(0.5f * Camera.FoV);
 	float NearHalfWidth = AspectRatio * NearHalfHeight;
-	float FarHalfHeight = Camera.Far * tanf(0.5f*Radians(Camera.FoV));
+	float FarHalfHeight = Camera.Far * Tan(0.5f * Camera.FoV);
 	float FarHalfWidth = AspectRatio * FarHalfHeight;
 
 	CameraBufferData.Pos = Vec4(Camera.Pos, -Camera.Near);

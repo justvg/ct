@@ -113,29 +113,25 @@ inline int32_t Absolute(int32_t Value)
 
 inline float Sin(float Angle)
 {
-    float Result = sinf(Angle);
-
+    float Result = sinf((Angle / 180.0f) * Pi);
     return Result;
 }
 
 inline float Cos(float Angle)
 {
-    float Result = cosf(Angle);
-
+    float Result = cosf((Angle / 180.0f) * Pi);
     return Result;
 }
 
 inline float Tan(float Angle)
 {
-    float Result = tanf(Angle);
-
+    float Result = tanf((Angle / 180.0f) * Pi);
     return Result;
 }
 
 inline float ArcCos(float Value)
 {
-    float Result = acosf(Value);
-
+    float Result = (acosf(Value) / Pi) * 180.0f;
     return Result;
 }
 

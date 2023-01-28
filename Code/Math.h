@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Intrinsics.h"
-
 const float Pi = 3.14159265358979323846f;
+
+#include "Intrinsics.h"
 
 const int32_t Int32Min = (-2147483647 - 1);
 const int32_t Int32Max = 2147483647;
@@ -164,20 +164,6 @@ struct Rect
 //
 // NOTE(georgii): scalar
 //
-
-inline float Radians(float Angle)
-{
-    float Result = (Angle / 180.0f) * Pi;
-
-    return Result;
-}
-
-inline float Degrees(float Rad)
-{
-    float Result = (Rad / Pi) * 180.0f;
-
-    return Result;
-}
 
 inline float Lerp(float A, float B, float t)
 {
@@ -869,8 +855,8 @@ inline quat Quat(vec3 Axis, float Angle)
 {
     quat Result;
 
-    vec3 V = Sin(Radians(0.5f * Angle)) * Axis;
-    float W = Cos(Radians(0.5f * Angle));
+    vec3 V = Sin(0.5f * Angle) * Axis;
+    float W = Cos(0.5f * Angle);
 
     Result.x = V.x;
     Result.y = V.y;
@@ -913,10 +899,10 @@ vec3 RotateByQuaternion(vec3 V, quat Q)
 
 vec4 QuaternionToAxisAngle(quat Q)
 {
-	float AngleRadians = GetAngle(Q);
-	vec3 Axis = Vec3(SafeDivide0(Q.x, Sin(0.5f * AngleRadians)), SafeDivide0(Q.y, Sin(0.5f * AngleRadians)), SafeDivide0(Q.z, Sin(0.5f * AngleRadians)));
-
-	vec4 Result = Vec4(Axis, Degrees(AngleRadians));
+	float Angle = GetAngle(Q);
+    float SinHalfAngle = Sin(0.5f * Angle);
+	vec3 Axis = Vec3(SafeDivide0(Q.x, SinHalfAngle), SafeDivide0(Q.y, SinHalfAngle), SafeDivide0(Q.z, SinHalfAngle));
+	vec4 Result = Vec4(Axis, Angle);
 
 	return Result;
 }
@@ -962,9 +948,8 @@ mat3 Rotation3x3(float Angle, vec3 Axis)
 {
     mat3 Result;
 
-    float Rad = Radians(Angle);
-    float Sine = Sin(Rad);
-    float Cosine = Cos(Rad);
+    float Sine = Sin(Angle);
+    float Cosine = Cos(Angle);
 
     Assert(LengthSq(Axis) > 0.0f);
     Axis = Normalize(Axis);
@@ -1108,9 +1093,8 @@ mat4 Rotation(float Angle, vec3 Axis)
 
     if ((Angle != 0.0f) && (LengthSq(Axis) > 0.0f))
     {
-        float Rad = Radians(Angle);
-        float Sine = Sin(Rad);
-        float Cosine = Cos(Rad);
+        float Sine = Sin(Angle);
+        float Cosine = Cos(Angle);
 
         Axis = Normalize(Axis);
 
@@ -1210,7 +1194,7 @@ mat4 Orthographic(float Left, float Right, float Bottom, float Top, float Near, 
 
 mat4 Perspective(float FoV, float AspectRatio, float Near, float Far)
 {
-    float Scale = Tan(Radians(FoV) * 0.5f) * Near;
+    float Scale = Tan(0.5f * FoV) * Near;
     float Top = Scale;
     float Bottom = -Top;
     float Right = Scale * AspectRatio;
