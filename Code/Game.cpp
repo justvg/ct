@@ -125,7 +125,7 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 	}
 	else
 	{
-		Camera->Pitch = Clamp(Camera->Pitch, -60.0f, 89.0f);
+		Camera->Pitch = Clamp(Camera->Pitch, -55.0f, 80.0f);
 	}
 	
 	Camera->Head -= 0.1f*GameInput->MouseDeltaX;

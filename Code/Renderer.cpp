@@ -292,7 +292,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 			if (EngineState->EngineMode == EngineMode_Game)
 			{
 				// NOTE(georgii): These hacks are here so a player can always see the lamp.
-				float CameraPitch = Clamp(Camera.Pitch, -89.0f, 50.0f);
+				float CameraPitch = Clamp(Camera.Pitch, -55.0f, 50.0f);
 				float CameraHead = Camera.Head;
 
 				vec3 CameraDir;
@@ -304,7 +304,7 @@ VkImage RenderScene(SEngineState* EngineState, SRenderer* Renderer, const SVulka
 				vec3 CameraRight = Camera.Right;
 				vec3 CameraUp = Camera.Up;
 
-				float CameraPrevPitch = Clamp(Camera.PrevPitch, -89.0f, 50.0f);
+				float CameraPrevPitch = Clamp(Camera.PrevPitch, -55.0f, 50.0f);
 				float CameraPrevHead = Camera.PrevHead;
 				
 				vec3 CameraPrevDir = Camera.PrevDir;
