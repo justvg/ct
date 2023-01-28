@@ -199,20 +199,24 @@ void OutputPlayingSounds(SAudioState* AudioState, const SGameSoundBuffer& SoundB
 					uint32_t LeftSampleIndex = FloorToUInt32(SamplePos);
 					uint32_t RightSampleIndex = CeilToUInt32(SamplePos);
 
-					float Frac = SamplePos - float(LeftSampleIndex);
+					if ((LeftSampleIndex < Sound->SampleCount) && (RightSampleIndex < Sound->SampleCount))
+					{
+						float Frac = SamplePos - float(LeftSampleIndex);
 
-					float LeftSample0 = SoundSamples[2 * LeftSampleIndex];
-					float RightSample0 = SoundSamples[2 * RightSampleIndex];
-					float Sample0 = Lerp(LeftSample0, RightSample0, Frac);
+						float LeftSample0 = SoundSamples[2 * LeftSampleIndex];
+						float RightSample0 = SoundSamples[2 * RightSampleIndex];
+						float Sample0 = Lerp(LeftSample0, RightSample0, Frac);
 
-					float LeftSample1 = SoundSamples[2 * LeftSampleIndex + 1];
-					float RightSample1 = SoundSamples[2 * RightSampleIndex + 1];
-					float Sample1 = Lerp(LeftSample1, RightSample1, Frac);
+						float LeftSample1 = SoundSamples[2 * LeftSampleIndex + 1];
+						float RightSample1 = SoundSamples[2 * RightSampleIndex + 1];
+						float Sample1 = Lerp(LeftSample1, RightSample1, Frac);
 
-					SamplesFloat[2 * (J + SamplesMixed)] += Volume.x * Sample0;
-					SamplesFloat[2 * (J + SamplesMixed) + 1] += Volume.y * Sample1;
+						SamplesFloat[2 * (J + SamplesMixed)] += Volume.x * Sample0;
+						SamplesFloat[2 * (J + SamplesMixed) + 1] += Volume.y * Sample1;
 
-					PlayingSound->CurrentVolume += DeltaVolumePerSample;
+						PlayingSound->CurrentVolume += DeltaVolumePerSample;
+					}
+					
 					SamplePos += PlayingSound->Pitch;
 				}
 

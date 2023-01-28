@@ -43,6 +43,7 @@ void SaveLight(FILE* File, const SLight* Light)
 	fwrite(&Light->Cutoff, sizeof(Light->Cutoff), 1, File);
 }
 
+// TODO(georgii): I think I don't have to serialize all of the properties? Maybe I can fix this in the future to minimize sizes on disk. But who cares....
 void SaveLevel(const SLevel& Level, FILE* File)
 {
     // Save file version
@@ -96,6 +97,7 @@ void SaveLevel(const SLevel& Level, FILE* File)
         fwrite(Entity->TargetLevelName, sizeof(Entity->TargetLevelName), 1, File);
         fwrite(&Entity->bGoBack, sizeof(Entity->bGoBack), 1, File);
         fwrite(&Entity->CheckpointIndex, sizeof(Entity->CheckpointIndex), 1, File);
+        fwrite(&Entity->bLoadLevel, sizeof(Entity->bLoadLevel), 1, File);
         fwrite(&Entity->bRemoved, sizeof(Entity->bRemoved), 1, File);
         fwrite(&Entity->DistanceToCam, sizeof(Entity->DistanceToCam), 1, File);
     }
@@ -194,6 +196,7 @@ void LoadLevel(SLevel& Level, FILE* File)
         fread(Entity->TargetLevelName, sizeof(Entity->TargetLevelName), 1, File);
         fread(&Entity->bGoBack, sizeof(Entity->bGoBack), 1, File);
         fread(&Entity->CheckpointIndex, sizeof(Entity->CheckpointIndex), 1, File);
+        fread(&Entity->bLoadLevel, sizeof(Entity->bLoadLevel), 1, File);
         fread(&Entity->bRemoved, sizeof(Entity->bRemoved), 1, File);
         fread(&Entity->DistanceToCam, sizeof(Entity->DistanceToCam), 1, File);
     }

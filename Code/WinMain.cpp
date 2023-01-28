@@ -366,7 +366,7 @@ void WinStartSoundPlaying()
 #endif
 }
 
-SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime)
+SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime, bool bAdditionalAudioLatency)
 {
 	SGameSoundBuffer GameSoundBuffer = {};
 	if (WinSound.bInitialized)
@@ -438,9 +438,16 @@ SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime)
 			}
 
 			DWORD ByteToLock = (WinSound.SamplesWritten * WinSound.BytesPerSample) % WinSound.SecondaryBufferSize;
-			DWORD TargetCursor = (WriteCursor + ExpectedSoundBytesPerFrame) % WinSound.SecondaryBufferSize;
+			DWORD TargetCursor = WriteCursor + ExpectedSoundBytesPerFrame;
+			uint64_t WriteCursorSequentialIncreased = WinSound.WriteCursorSequential + ExpectedSoundBytesPerFrame;
+			if (bAdditionalAudioLatency)
+			{
+				TargetCursor += 2 * ExpectedSoundBytesPerFrame;
+				WriteCursorSequentialIncreased += 2 * ExpectedSoundBytesPerFrame;
+			}
+			TargetCursor %= WinSound.SecondaryBufferSize;
 
-			WinSound.bFillThisFrame = (WinSound.SamplesWritten * WinSound.BytesPerSample) < (WinSound.WriteCursorSequential + ExpectedSoundBytesPerFrame);
+			WinSound.bFillThisFrame = (WinSound.SamplesWritten * WinSound.BytesPerSample) < WriteCursorSequentialIncreased;
 			if (WinSound.bFillThisFrame)
 			{
 				DWORD BytesToWrite = 0;
@@ -1342,12 +1349,11 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 					VkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, Surface, &SurfaceCaps));
 					if ((SurfaceCaps.currentExtent.width != 0) && (SurfaceCaps.currentExtent.height != 0))
 					{
-						bool bSwapchainChanged = ResizeSwapchainIfChanged(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, SurfaceCaps);
+						bool bSwapchainChanged = ChangeSwapchainIfNeeded(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, SurfaceCaps, GlobalPresentMode);
 						if (bSwapchainChanged)
 						{
 							GameInput.MouseDeltaX = GameInput.MouseDeltaY = 0.0f;
 						}
-						bSwapchainChanged = bSwapchainChanged || ChangeVSyncIfNeeded(Swapchain, Device, PhysicalDevice, Surface, SwapchainFormat, GlobalPresentMode);
 
 						uint32_t FrameInFlight = FrameID % FramesInFlight;
 

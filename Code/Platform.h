@@ -267,7 +267,7 @@ void PlatformCreateThread(RunningThreadType* RunningThreadFunction, void* Data);
 void PlatformInterlockedExchange(uint32_t volatile* Target, uint32_t Value);
 uint32_t PlatformInterlockedIncrement(uint32_t volatile* Target);
 
-SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime);
+SGameSoundBuffer PlatformGetSoundBufferForThisFrame(float FrameTime, bool bAdditionalAudioLatency);
 
 void PlatformDisableCursor(SGameInput* GameInput);
 void PlatformEnableCursor(SGameInput* GameInput);

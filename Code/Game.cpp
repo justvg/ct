@@ -684,90 +684,100 @@ void UpdateGameMode(SGameState* GameState, SEngineState* EngineState, const SGam
 				
 			if ((Entity->Type == Entity_Gates) && Entity->bCollisionWithHeroStarted)
 			{
-				if (Entity->CollisionWithHeroTimePassed > 0.015f)
+				if ((Entity->CollisionWithHeroTimePassed > 0.015f) || Entity->bLoadLevel)
 				{
 					ChangeVolume(PlaySound(&EngineState->AudioState, false, Sound_Portal), 0.0f, Vec2(0.3f));
 
-					if (Entity->CollisionWithHeroTimePassed > 0.05f)
+					if ((Entity->CollisionWithHeroTimePassed > 0.04f) || Entity->bLoadLevel)
 					{
-						bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
-					#if ENGINE_RELEASE
-						if (bTargetMainHub)
+						if (Entity->bLoadLevel)
 						{
-							SMainHubSavedData MainHubSavedData = LoadMainHubAndSavedData(EngineState);
-							if (MainHubSavedData.bValid)
+							Entity->bLoadLevel = false;
+
+							bool bTargetMainHub = CompareStrings(Entity->TargetLevelName, "MainHub");
+						#if ENGINE_RELEASE
+							if (bTargetMainHub)
 							{
-								GameState->LastBaseLevelPos = MainHubSavedData.LastBaseLevelPos;
-								GameState->LastBaseLevelGatesAngle = MainHubSavedData.LastBaseLevelGatesAngle;
+								SMainHubSavedData MainHubSavedData = LoadMainHubAndSavedData(EngineState);
+								if (MainHubSavedData.bValid)
+								{
+									GameState->LastBaseLevelPos = MainHubSavedData.LastBaseLevelPos;
+									GameState->LastBaseLevelGatesAngle = MainHubSavedData.LastBaseLevelGatesAngle;
+								}
+								else
+								{
+									char LevelName[MaxPath] = {};
+									ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
+									LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
+								}
 							}
 							else
+						#endif
 							{
 								char LevelName[MaxPath] = {};
 								ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
 								LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
 							}
-						}
-						else
-					#endif
-						{
-							char LevelName[MaxPath] = {};
-							ConcStrings(LevelName, sizeof(LevelName), Entity->TargetLevelName, ".ctl");
-							LoadLevel(EngineState, &EngineState->LevelBaseState, LevelName, true, Level->Entities[0].Velocity);
-						}
 
-						if (bTargetMainHub && Entity->bFinishGates)
-						{
-							SLevel* LoadedLevel = &EngineState->LevelBaseState;
-							for (uint32_t LoadedLevelEntityIndex = 0; LoadedLevelEntityIndex < LoadedLevel->EntityCount; LoadedLevelEntityIndex++)
+							if (bTargetMainHub && Entity->bFinishGates)
 							{
-								SEntity* LoadedLevelEntity = LoadedLevel->Entities + LoadedLevelEntityIndex;
-
-								if (LoadedLevelEntity->Type == Entity_Gates)
+								SLevel* LoadedLevel = &EngineState->LevelBaseState;
+								for (uint32_t LoadedLevelEntityIndex = 0; LoadedLevelEntityIndex < LoadedLevel->EntityCount; LoadedLevelEntityIndex++)
 								{
-									char LevelName[MaxPath] = {};
-									ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
-									ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
+									SEntity* LoadedLevelEntity = LoadedLevel->Entities + LoadedLevelEntityIndex;
 
-									if (CompareStrings(LevelName, CurrentLevelName))
+									if (LoadedLevelEntity->Type == Entity_Gates)
 									{
-										LoadedLevelEntity->bFinishedLevel = true;
-										break;
+										char LevelName[MaxPath] = {};
+										ConcStrings(LevelName, sizeof(LevelName), "Levels\\", LoadedLevelEntity->TargetLevelName);
+										ConcStrings(LevelName, sizeof(LevelName), LevelName, ".ctl");
+
+										if (CompareStrings(LevelName, CurrentLevelName))
+										{
+											LoadedLevelEntity->bFinishedLevel = true;
+											break;
+										}
 									}
 								}
 							}
-						}
 
-						SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
+							SEntity* HeroEntity = &EngineState->LevelBaseState.Entities[0];
 
-						float GatesAngleDifference = 0.0f;
-						if (bTargetMainHub)
-						{
-							GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
+							float GatesAngleDifference = 0.0f;
+							if (bTargetMainHub)
+							{
+								GatesAngleDifference = GameState->LastBaseLevelGatesAngle - Entity->Orientation.y;
+							}
+							else
+							{
+								GatesAngleDifference = HeroEntity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+							}
+
+							quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
+							HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
+							Camera->Head += GatesAngleDifference;
+
+							if (bTargetMainHub)
+							{
+								HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
+							}
+							
+							Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
+							Camera->Dir.y = Sin(Radians(Camera->Pitch));
+							Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
+							Camera->Dir = Normalize(Camera->Dir);
+							
+							Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
+							Camera->Up = Cross(Camera->Right, Camera->Dir);
+							
+							Entity->bCollisionWithHeroStarted = false;
+							Entity->CollisionWithHeroTimePassed = 0.0f;
 						}
 						else
 						{
-							GatesAngleDifference = HeroEntity->Orientation.y - GameState->LastBaseLevelGatesAngle;
+							Entity->bLoadLevel = true;
+							EngineState->bAdditionalAudioLatency = true;
 						}
-
-						quat Rotation = Quat(Vec3(0.0f, 1.0f, 0.0f), GatesAngleDifference);
-						HeroEntity->Velocity = RotateByQuaternion(HeroEntity->Velocity, Rotation);
-						Camera->Head += GatesAngleDifference;
-
-						if (bTargetMainHub)
-						{
-							HeroEntity->Pos = GameState->LastBaseLevelPos + 0.1f * HeroEntity->Velocity;
-						}
-						
-						Camera->Dir.x = Cos(Radians(Camera->Pitch)) * Sin(Radians(Camera->Head));
-						Camera->Dir.y = Sin(Radians(Camera->Pitch));
-						Camera->Dir.z = Cos(Radians(Camera->Pitch)) * Cos(Radians(Camera->Head));
-						Camera->Dir = Normalize(Camera->Dir);
-						
-						Camera->Right = Normalize(Cross(Camera->Dir, Vec3(0.0f, 1.0f, 0.0f)));
-						Camera->Up = Cross(Camera->Right, Camera->Dir);
-						
-						Entity->bCollisionWithHeroStarted = false;
-						Entity->CollisionWithHeroTimePassed = 0.0f;
 					}
 					else
 					{
@@ -1193,16 +1203,17 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 				case MenuElement_Fullscreen:
 				{
 					PlatformChangeFullscreen(!PlatformGetFullscreen());
-
 					if (PlatformGetFullscreen())
 					{
 						EngineState->bSwapchainChanged = true;
 					}
+					EngineState->bAdditionalAudioLatency = true;
 				} break;
 
 				case MenuElement_VSync:
 				{
 					PlatformChangeVSync(!PlatformGetVSync());
+					EngineState->bAdditionalAudioLatency = true;
 				} break;
 
 				case MenuElement_Vignetting:

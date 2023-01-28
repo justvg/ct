@@ -736,30 +736,11 @@ void DestroySwapchain(SSwapchain Swapchain, VkDevice Device)
 	vkDestroySwapchainKHR(Device, Swapchain.VkSwapchain, 0);
 }
 
-bool ResizeSwapchainIfChanged(SSwapchain& Swapchain, VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, const VkSurfaceCapabilitiesKHR& SurfaceCaps)
+bool ChangeSwapchainIfNeeded(SSwapchain& Swapchain, VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, const VkSurfaceCapabilitiesKHR& SurfaceCaps, VkPresentModeKHR PresentMode)
 {
 	bool bResized = false;
 
-	if ((Swapchain.Width != SurfaceCaps.currentExtent.width) || (Swapchain.Height != SurfaceCaps.currentExtent.height))
-	{
-		VkCheck(vkDeviceWaitIdle(Device));
-
-		SSwapchain OldSwapchain = Swapchain;
-		Swapchain = CreateSwapchain(Device, PhysicalDevice, Surface, ColorFormat, Swapchain.PresentMode, Swapchain.VkSwapchain);
-
-		DestroySwapchain(OldSwapchain, Device);
-
-		bResized = true;
-	}
-
-	return bResized;
-}
-
-bool ChangeVSyncIfNeeded(SSwapchain& Swapchain, VkDevice Device, VkPhysicalDevice PhysicalDevice, VkSurfaceKHR Surface, VkFormat ColorFormat, VkPresentModeKHR PresentMode)
-{
-	bool bChanged = false;
-
-	if (Swapchain.PresentMode != PresentMode)
+	if ((Swapchain.Width != SurfaceCaps.currentExtent.width) || (Swapchain.Height != SurfaceCaps.currentExtent.height) || (Swapchain.PresentMode != PresentMode))
 	{
 		VkCheck(vkDeviceWaitIdle(Device));
 
@@ -768,10 +749,10 @@ bool ChangeVSyncIfNeeded(SSwapchain& Swapchain, VkDevice Device, VkPhysicalDevic
 
 		DestroySwapchain(OldSwapchain, Device);
 
-		bChanged = true;
+		bResized = true;
 	}
 
-	return bChanged;
+	return bResized;
 }
 
 VkCommandPool CreateCommandPool(VkDevice Device, VkCommandPoolCreateFlags Flags, uint32_t FamilyIndex)

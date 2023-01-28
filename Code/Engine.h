@@ -285,6 +285,7 @@ struct SEngineState
 	bool bReloadLevel;
 	bool bReloadGame;
 
+	bool bAdditionalAudioLatency; // NOTE(georgii): Add some more audio latency for this frame not to have glitches. E.g. when we change VSync setting from main menu
 	SLoadedWAV LoadedSounds[32];
 	SAudioState AudioState;
 

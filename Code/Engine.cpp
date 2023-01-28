@@ -322,6 +322,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	SCamera& Camera = EngineState->Camera;
 	SLevel* Level = &EngineState->Level;
     
+	EngineState->bAdditionalAudioLatency = false;
 	switch (EngineState->EngineMode)
 	{
 		case EngineMode_Game:
@@ -520,7 +521,7 @@ VkImage GameUpdateAndRender(SVulkanContext& Vulkan, SGameMemory* GameMemory, con
 	if (GameInput.FrameID > 1)
 	{
 		STempMemoryArena SoundTempMemory = BeginTempMemoryArena(&EngineState->MemoryArena);
-		SGameSoundBuffer SoundBuffer = PlatformGetSoundBufferForThisFrame(GameInput.dt);
+		SGameSoundBuffer SoundBuffer = PlatformGetSoundBufferForThisFrame(GameInput.dt, EngineState->bAdditionalAudioLatency);
 		OutputPlayingSounds(&EngineState->AudioState, SoundBuffer, EngineState->LoadedSounds, &SoundTempMemory, Camera.Pos, Level);
 		EndTempMemoryArena(&SoundTempMemory);
 	}

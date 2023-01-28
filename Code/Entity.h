@@ -171,6 +171,7 @@ struct SEntity
 		bool bFinishedLevel; // NOTE(georgii): Should be set for gates of the levels that are finished.
     };
 
+	bool bLoadLevel; // NOTE(georgii): Currently used for gates to load a level in the next frame.
 	bool bRemoved;
 
 	float DistanceToCam;
