@@ -1208,6 +1208,8 @@ void UpdateMenuSettings(SMenuState* MenuState, SEngineState* EngineState, const 
 						EngineState->bSwapchainChanged = true;
 					}
 					EngineState->bAdditionalAudioLatency = true;
+
+					MenuState->FullscreenChangedFramesAgo = 0;
 				} break;
 
 				case MenuElement_VSync:
@@ -1442,11 +1444,10 @@ void UpdateMenu(SMenuState* MenuState, SEngineState* EngineState, const SGameInp
 
 	if (MenuState->bJustOpened)
 	{
-		MenuState->LastMousePos = MenuState->MousePos;
 		MenuState->bJustOpened = false;
 	}
 
-	MenuState->bMousePosChanged = !IsEqual(MenuState->MousePos, MenuState->LastMousePos) || WasDown(GameInput->Buttons[Button_MouseLeft]);
+	MenuState->bMousePosChanged = (GameInput->bMouseMoved && MenuState->FullscreenChangedFramesAgo >= 6) || WasDown(GameInput->Buttons[Button_MouseLeft]);
 	MenuState->bEnterDown = WasDown(GameInput->Buttons[Button_Enter]) || WasDown(GameInput->Buttons[Button_Space]);
 	MenuState->bMouseLeftReleased = WasReleased(GameInput->Buttons[Button_MouseLeft]);
 
@@ -1476,7 +1477,10 @@ void UpdateMenu(SMenuState* MenuState, SEngineState* EngineState, const SGameInp
 		} break;
 	}
 	
-	MenuState->LastMousePos = MenuState->MousePos;
+	if (MenuState->FullscreenChangedFramesAgo < 6)
+	{
+		MenuState->FullscreenChangedFramesAgo++;
+	}
 
 	MenuState->SelectedTime += GameInput->dt;
 	if (MenuState->SelectedTime >= (MenuState->SelectedStayBrightTime + MenuState->SelectedAnimationTime))

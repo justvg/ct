@@ -840,6 +840,8 @@ LRESULT CALLBACK WinMainWindowCallback(HWND Window, UINT Message, WPARAM WParam,
 					PlatformData->MouseLastX = X;
 					PlatformData->MouseLastY = Y;
 
+					GameInput->bMouseMoved = Length(Vec2(float(DeltaX), float(DeltaY))) > 0.0f;
+					
 					if (!bGlobalShowMouse)
 					{
 						GameInput->MouseX += DeltaX;
@@ -1293,12 +1295,15 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 
 					BEGIN_PROFILER_BLOCK("PLATFORM_INPUT_HANDLING");
 
+					GameInput.bMouseMoved = false;
 					GameInput.MouseDeltaX = GameInput.MouseDeltaY = 0.0f;
                     GameInput.MouseWheelDelta = 0.0f;
 					for (uint32_t I = 0; I < ArrayCount(GameInput.Buttons); I++)
 					{
 						GameInput.Buttons[I].HalfTransitionCount = 0;
 					}
+
+					WinToggleFullscreen(Window);
 
 					MSG Message;
 					while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE)) 
@@ -1317,7 +1322,6 @@ int CALLBACK WinMain(HINSTANCE HInstance, HINSTANCE PrevInstance, LPSTR CommandL
 							} break;
 						}
 					}
-					WinToggleFullscreen(Window);
 
 					if (FrameID == 0)
 					{

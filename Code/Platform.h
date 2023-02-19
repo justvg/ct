@@ -186,6 +186,8 @@ bool WasReleased(const SButton& Button)
 
 struct SGameInput
 {
+	bool bMouseMoved;
+
 	double MouseX, MouseY;
 	double MouseLastX, MouseLastY;
 	float MouseDeltaX, MouseDeltaY;

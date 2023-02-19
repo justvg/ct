@@ -46,9 +46,10 @@ struct SMenuState
 	EMenuElement SelectedMenuElement;
 
 	vec2 MousePos;
-	vec2 LastMousePos;
 
 	vec2 ScreenDim;
+
+	uint32_t FullscreenChangedFramesAgo;
 
 	bool bJustOpened;
 
